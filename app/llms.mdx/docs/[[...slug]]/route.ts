@@ -25,7 +25,7 @@ function resolvePage(slug: string[] | undefined) {
 
 export async function GET(
   _req: Request,
-  { params }: RouteContext<'/llms.mdx/docs/[[...slug]]'>,
+  { params }: { params: Promise<{ slug?: string[] }> },
 ) {
   const { slug } = await params
   const page = resolvePage(slug)
