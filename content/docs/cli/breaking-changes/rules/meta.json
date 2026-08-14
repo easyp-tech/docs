@@ -1,0 +1,20 @@
+{
+  "title": "Rules",
+  "pages": [
+    "enum-no-delete",
+    "enum-value-no-delete",
+    "enum-value-same-name",
+    "field-no-delete",
+    "field-same-cardinality",
+    "field-same-type",
+    "import-no-delete",
+    "message-no-delete",
+    "oneof-field-no-delete",
+    "oneof-field-same-type",
+    "oneof-no-delete",
+    "rpc-no-delete",
+    "rpc-same-request-type",
+    "rpc-same-response-type",
+    "service-no-delete"
+  ]
+}

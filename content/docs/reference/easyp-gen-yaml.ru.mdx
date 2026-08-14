@@ -1,0 +1,123 @@
+---
+title: "Справочник easyp.gen.yaml"
+description: "Полная спецификация файла easyp.gen.yaml, управляющего кодогенерацией на стороне потребителя, выводами плагинов, WASM/remote запуском и managed-опциями."
+---
+
+Файл `easyp.gen.yaml` задаёт **правила генерации кода на стороне потребителя**. Находясь рядом с приложением или сервисом, он определяет, какие модули и пакеты компилировать, какие плагины вызывать, куда записывать сгенерированный код и какие managed-опции (такие как `package_prefix`) применять.
+
+В соответствии с принципом недублирования источников EasyP, `easyp.gen.yaml` **никогда** не содержит URL репозиториев или версий зависимостей — источники и версии протоколов определяются строго через `protobuf.mod` и `protobuf.lock`.
+
+---
+
+## Схема конфигурации
+
+<TypeTable
+  type={{
+    version: {
+      description: "Версия схемы конфигурации. Текущая версия — 'v1'.",
+      type: "string",
+      default: "v1"
+    },
+    generate: {
+      description: "Блок выбора модулей и пакетов для генерации.",
+      type: "object"
+    },
+    "generate.modules": {
+      description: "Список имён модулей или локальных путей для генерации кода.",
+      type: "string[]"
+    },
+    "generate.packages": {
+      description: "Фильтр конкретных пакетов, если требуется генерация не всего модуля.",
+      type: "string[]"
+    },
+    plugins: {
+      description: "Список плагинов-генераторов кода для выполнения.",
+      type: "object[]"
+    },
+    "plugins[].name": {
+      description: "Имя локального бинарного файла или WASM плагина.",
+      type: "string"
+    },
+    "plugins[].remote": {
+      description: "URL удалённого сервиса генерации кода (gRPC или HTTP).",
+      type: "string"
+    },
+    "plugins[].version": {
+      description: "Строгий тег версии плагина. Использование ':latest' запрещено.",
+      type: "string"
+    },
+    "plugins[].out": {
+      description: "Директория назначения относительно easyp.gen.yaml для результатов.",
+      type: "string"
+    },
+    "plugins[].opts": {
+      description: "Параметры и флаги плагина (словарь или список строк).",
+      type: "object | string[]"
+    },
+    options: {
+      description: "Managed-опции пакетов, сгруппированные по целевым языкам.",
+      type: "object"
+    },
+    "options.go.package_prefix": {
+      description: "Базовый префикс Go-пакета, автоматически добавляемый к go_package.",
+      type: "string"
+    }
+  }}
+/>
+
+---
+
+## Примеры конфигураций
+
+### Проектный генератор (`backend/easyp.gen.yaml`)
+
+```yaml
+version: v1
+
+generate:
+  modules:
+    - proto/user
+    - proto/order
+
+plugins:
+  - name: go
+    version: v1.34.2
+    out: ./gen/go
+    opts:
+      paths: source_relative
+  - name: go-grpc
+    version: v1.4.0
+    out: ./gen/go
+    opts:
+      paths: source_relative
+      require_unimplemented_servers: false
+
+options:
+  go:
+    package_prefix: github.com/acme/backend/gen/go
+```
+
+### Удалённая веб-генерация (`frontend/easyp.gen.yaml`)
+
+```yaml
+version: v1
+
+generate:
+  modules:
+    - proto/user
+
+plugins:
+  - remote: gen.easyp.tech/es
+    version: v2.0.0
+    out: ./src/gen
+    opts:
+      target: ts
+```
+
+---
+
+## Managed Options (`options`)
+
+Вместо явного прописывания опций вроде `option go_package = "..."` внутри каждого `.proto` файла, блок `options` в EasyP группирует настройки по целевым языкам программирования.
+
+Например, указание `options.go.package_prefix: github.com/acme/backend/gen/go` автоматически вычисляет пути импортов на основе структуры директорий модуля без модификации исходных `.proto` файлов.

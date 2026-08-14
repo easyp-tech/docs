@@ -1,0 +1,123 @@
+---
+title: "easyp.gen.yaml Reference"
+description: "Complete specification for easyp.gen.yaml, configuring consumer-side code generation, plugin outputs, WASM/remote execution, and managed package options."
+---
+
+The `easyp.gen.yaml` file specifies **consumer-side code generation rules**. Residing alongside consuming applications or service projects, it defines which modules or packages to compile, which plugins to invoke, where generated artifacts should be written, and language-specific managed options (such as `package_prefix`).
+
+In accordance with EasyP's zero-duplication principles, `easyp.gen.yaml` **never** contains dependency URLs or version numbers for Protobuf schemas—schema sources and versions are resolved strictly through `protobuf.mod` and `protobuf.lock`.
+
+---
+
+## Configuration Schema
+
+<TypeTable
+  type={{
+    version: {
+      description: "Configuration schema version. Currently 'v1'.",
+      type: "string",
+      default: "v1"
+    },
+    generate: {
+      description: "Module and package selection block.",
+      type: "object"
+    },
+    "generate.modules": {
+      description: "List of module names or local paths to generate code for.",
+      type: "string[]"
+    },
+    "generate.packages": {
+      description: "Fine-grained package path filters if full module generation is not required.",
+      type: "string[]"
+    },
+    plugins: {
+      description: "List of code generator plugins to execute.",
+      type: "object[]"
+    },
+    "plugins[].name": {
+      description: "Local executable binary or WASM plugin identifier.",
+      type: "string"
+    },
+    "plugins[].remote": {
+      description: "gRPC or HTTP remote code generation service URL.",
+      type: "string"
+    },
+    "plugins[].version": {
+      description: "Strict version tag of the plugin. ':latest' is prohibited for reproducibility.",
+      type: "string"
+    },
+    "plugins[].out": {
+      description: "Destination directory relative to easyp.gen.yaml where generated code is written.",
+      type: "string"
+    },
+    "plugins[].opts": {
+      description: "Plugin-specific key-value options or flag strings.",
+      type: "object | string[]"
+    },
+    options: {
+      description: "Language-scoped managed options for package prefixes.",
+      type: "object"
+    },
+    "options.go.package_prefix": {
+      description: "Base Go package prefix automatically prepended to generated go_package imports.",
+      type: "string"
+    }
+  }}
+/>
+
+---
+
+## Example Configurations
+
+### Project-Level Generator (`backend/easyp.gen.yaml`)
+
+```yaml
+version: v1
+
+generate:
+  modules:
+    - proto/user
+    - proto/order
+
+plugins:
+  - name: go
+    version: v1.34.2
+    out: ./gen/go
+    opts:
+      paths: source_relative
+  - name: go-grpc
+    version: v1.4.0
+    out: ./gen/go
+    opts:
+      paths: source_relative
+      require_unimplemented_servers: false
+
+options:
+  go:
+    package_prefix: github.com/acme/backend/gen/go
+```
+
+### Remote Web Generator (`frontend/easyp.gen.yaml`)
+
+```yaml
+version: v1
+
+generate:
+  modules:
+    - proto/user
+
+plugins:
+  - remote: gen.easyp.tech/es
+    version: v2.0.0
+    out: ./src/gen
+    opts:
+      target: ts
+```
+
+---
+
+## Managed Options (`options`)
+
+Instead of requiring explicit file-level options (like `option go_package = "..."`) inside every individual `.proto` schema file, EasyP's managed `options` block groups settings logically by target language.
+
+For example, setting `options.go.package_prefix: github.com/acme/backend/gen/go` automatically computes import paths based on the module directory layout without mutating source `.proto` files.

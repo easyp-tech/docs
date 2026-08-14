@@ -1,0 +1,79 @@
+---
+title: "Organizational Lint Policy Sharing"
+description: "How to centralize linter rules using extends, and handle legacy directories via cascading configurations."
+---
+
+Maintaining consistent Protobuf linting rules across hundreds of microservice repositories is a common challenge. This guide demonstrates how to share organizational base policies using `linters.extends` and manage exceptions cleanly.
+
+---
+
+## 1. Defining a Shared Base Policy
+
+Platform engineering teams can publish a centralized linting policy repository (e.g. `github.com/uzum/proto-policy/lint-base`).
+
+```yaml
+# Shared policy repo: github.com/uzum/proto-policy/lint-base/easyp.yaml
+version: v1
+
+linters:
+  default: STANDARD
+  enable:
+    - ENUM_VALUE_PREFIX
+    - RPC_REQUEST_RESPONSE_UNIQUE
+  disable:
+    - PACKAGE_VERSION_SUFFIX
+
+linters-settings:
+  ENUM_ZERO_VALUE_SUFFIX:
+    suffix: UNSPECIFIED
+```
+
+---
+
+## 2. Inheriting Policies via `extends`
+
+Individual service repositories inherit the central policy using `linters.extends`. They can also override individual rules locally:
+
+```yaml
+# Service repo: proto/easyp.yaml
+version: v1
+
+linters:
+  extends: github.com/uzum/proto-policy/lint-base
+  disable:
+    - PACKAGE_VERSION_SUFFIX # Local exception to shared policy
+
+breaking:
+  baseline: git:main
+  categories:
+    - WIRE
+```
+
+---
+
+## 3. Handling Legacy Subtrees via Directory Cascading
+
+If your repository contains legacy Protobuf files that cannot yet adhere to corporate standards, create a targeted `easyp.yaml` inside the legacy directory:
+
+```text
+proto/
+├── easyp.yaml          # Standard corporate policy for active services
+├── user/v1/user.proto
+└── legacy/
+    ├── easyp.yaml      # MINIMAL policy override strictly for legacy/
+    └── old.proto
+```
+
+`proto/legacy/easyp.yaml`:
+
+```yaml
+version: v1
+
+linters:
+  default: MINIMAL
+  disable:
+    - FIELD_LOWER_SNAKE_CASE
+    - ENUM_VALUE_PREFIX
+```
+
+Due to EasyP's nearest-file cascading rule, the relaxed policy applies exclusively to `.proto` files under `proto/legacy/`, while the rest of the repository adheres to corporate standards.

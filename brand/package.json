@@ -1,0 +1,27 @@
+{
+  "name": "@easyp/brand",
+  "version": "1.1.0",
+  "private": true,
+  "type": "module",
+  "description": "EasyP design tokens (local package). Source: tokens/*.json",
+  "scripts": {
+    "generate": "node scripts/generate.mjs",
+    "prepare": "node scripts/generate.mjs"
+  },
+  "exports": {
+    "./tokens": {
+      "types": "./tokens/index.d.ts",
+      "import": "./tokens/index.js",
+      "default": "./tokens/index.js"
+    },
+    "./css/variables.css": "./css/variables.css",
+    "./tailwind/preset": "./tailwind/preset.js",
+    "./assets/*": "./assets/*"
+  },
+  "files": [
+    "tokens",
+    "css",
+    "tailwind",
+    "assets"
+  ]
+}

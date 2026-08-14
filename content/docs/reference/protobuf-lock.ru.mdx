@@ -1,0 +1,70 @@
+---
+title: "Справочник protobuf.lock"
+description: "Спецификация файла protobuf.lock, автоматически генерируемого lock-файла для фиксации коммитов Git, версий и криптографических хешей для воспроизводимых сборок."
+---
+
+Файл `protobuf.lock` — это автоматически генерируемый артефакт, создаваемый командами управления зависимостями EasyP (`easyp mod tidy`, `easyp mod update`). Он фиксирует точный транзитивный граф зависимостей для обеспечения **100% герметичных и воспроизводимых сборок** во всех локальных окружениях и в CI.
+
+---
+
+## Схема lock-файла
+
+<TypeTable
+  type={{
+    version: {
+      description: "Версия формата lock-файла. Текущая версия — 1.",
+      type: "number",
+      default: "1"
+    },
+    modules: {
+      description: "Массив зафиксированных описателей модулей зависимостей.",
+      type: "object[]"
+    },
+    "modules[].source": {
+      description: "Канонический URL Git-репозитория модуля.",
+      type: "string"
+    },
+    "modules[].version": {
+      description: "Разрешённый тег Semantic Version (например, v1.2.3).",
+      type: "string"
+    },
+    "modules[].commit": {
+      description: "Точный SHA-хеш Git-коммита, соответствующего релизу.",
+      type: "string"
+    },
+    "modules[].hash": {
+      description: "Криптографический хеш содержимого (h1:...) для контроля целостности.",
+      type: "string"
+    }
+  }}
+/>
+
+---
+
+## Пример lock-файла
+
+```yaml
+# protobuf.lock - СГЕНЕРИРОВАННЫЙ ФАЙЛ, НЕ РЕДАКТИРОВАТЬ РУКАМИ
+version: 1
+modules:
+  - source: github.com/googleapis/googleapis
+    version: v1.5.0
+    commit: 8f3a1c94b2e10a84e
+    hash: h1:a9F8zK9mB20...
+  - source: github.com/acme/weather
+    version: v1.2.3
+    commit: 51d2e071c89f33b11
+    hash: h1:x7B3mL4k90a...
+  - source: github.com/grpc-ecosystem/grpc-gateway
+    version: v2.19.0
+    commit: c4f88aa91024e12c4
+    hash: h1:p0Q1wK97ab1...
+```
+
+---
+
+## Команды жизненного цикла
+
+- `easyp mod tidy`: Сканирует импорты, дописывает транзитивные зависимости и перегенерирует `protobuf.lock`.
+- `easyp mod update`: Обновляет версии зависимостей до свежих совместимых релизов и обновляет `protobuf.lock`.
+- `easyp mod download`: Наполняет локальный кэш строго по `protobuf.lock` без обращения к внешним реестрам.

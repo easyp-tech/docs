@@ -1,0 +1,40 @@
+{
+  "light": {
+    "bg": "{slate.50}",
+    "bgElevated": "{white}",
+    "fg": "{slate.900}",
+    "fgMuted": "{slate.600}",
+    "border": "{slate.200}",
+    "primary": "{slate.900}",
+    "primaryFg": "{slate.50}",
+    "accent": "{emerald.500}",
+    "accentFg": "{white}",
+    "danger": "{red.500}",
+    "warning": "{amber.500}",
+    "success": "{emerald.500}"
+  },
+  "dark": {
+    "bg": "#0b1120",
+    "bgElevated": "#151e2f",
+    "fg": "{slate.200}",
+    "fgMuted": "{slate.400}",
+    "border": "rgba(226, 232, 240, 0.08)",
+    "primary": "{slate.200}",
+    "primaryFg": "{slate.900}",
+    "accent": "{emerald.400}",
+    "accentFg": "{slate.900}",
+    "danger": "{red.400}",
+    "warning": "{amber.400}",
+    "success": "{emerald.400}"
+  },
+  "marketing": {
+    "bg": "{slate.950}",
+    "fg": "{slate.200}",
+    "primary": "{blue.500}",
+    "primaryMuted": "{blue.400}",
+    "secondary": "{violet.500}",
+    "secondaryMuted": "{violet.400}",
+    "surface": "{slate.900}",
+    "border": "{slate.700}"
+  }
+}

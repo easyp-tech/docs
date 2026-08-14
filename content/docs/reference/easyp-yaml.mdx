@@ -1,0 +1,133 @@
+---
+title: "easyp.yaml Reference"
+description: "Complete specification for easyp.yaml, configuring producer-side linting rules, breaking change detection, path exclusions, and policy inheritance."
+---
+
+The `easyp.yaml` file defines **producer-side policy configuration** for Protocol Buffer schema repositories. It specifies linting standards, breaking change checks against git baselines, path exclusion rules, and policy inheritance via `extends`.
+
+`easyp.yaml` files cascade hierarchically down directory structures: for any given `.proto` file, EasyP traverses up the directory tree to find the nearest `easyp.yaml` and applies its configuration.
+
+---
+
+## Configuration Schema
+
+<TypeTable
+  type={{
+    version: {
+      description: "Configuration schema version. Currently 'v1'.",
+      type: "string",
+      default: "v1"
+    },
+    linters: {
+      description: "Linter presets, explicit rule enable/disable, and inheritance.",
+      type: "object"
+    },
+    "linters.default": {
+      description: "Base linter preset. Options: MINIMAL, BASIC, STANDARD, COMMENTS.",
+      type: "string",
+      default: "STANDARD"
+    },
+    "linters.enable": {
+      description: "List of additional linter rules to enable on top of preset.",
+      type: "string[]"
+    },
+    "linters.disable": {
+      description: "List of linter rules to disable from the active preset.",
+      type: "string[]"
+    },
+    "linters.extends": {
+      description: "Remote Git module or policy path to inherit base linter rules from.",
+      type: "string"
+    },
+    "linters-settings": {
+      description: "Rule-specific settings and custom parameter definitions.",
+      type: "object"
+    },
+    issues: {
+      description: "Issue reporting settings and path-based exclusion rules.",
+      type: "object"
+    },
+    "issues.exclude-rules": {
+      description: "Array of exclusion rules matching file path glob patterns to disabled linters.",
+      type: "object[]"
+    },
+    breaking: {
+      description: "Breaking change detection settings for CI verification.",
+      type: "object"
+    },
+    "breaking.baseline": {
+      description: "Git ref or tag target to compare schema changes against (e.g. git:main).",
+      type: "string",
+      default: "git:main"
+    },
+    "breaking.categories": {
+      description: "Enforced breaking change categories: FILE, PACKAGE, WIRE_JSON, WIRE.",
+      type: "string[]",
+      default: "['WIRE']"
+    },
+    "breaking.ignore_unstable": {
+      description: "When true, unstable proto packages (v1alpha, v1beta) bypass breaking checks.",
+      type: "boolean",
+      default: "true"
+    },
+    "breaking.extends": {
+      description: "Remote Git policy module to inherit breaking change settings from.",
+      type: "string"
+    }
+  }}
+/>
+
+---
+
+## Example Configuration
+
+```yaml
+version: v1
+
+linters:
+  default: STANDARD
+  enable:
+    - ENUM_VALUE_PREFIX
+    - RPC_REQUEST_RESPONSE_UNIQUE
+  disable:
+    - PACKAGE_VERSION_SUFFIX
+
+linters-settings:
+  ENUM_ZERO_VALUE_SUFFIX:
+    suffix: UNSPECIFIED
+  SERVICE_SUFFIX:
+    suffix: Service
+
+issues:
+  exclude-rules:
+    - path: "gen/**"
+    - path: "**/legacy/**"
+      linters:
+        - FIELD_LOWER_SNAKE_CASE
+        - PACKAGE_DIRECTORY_MATCH
+
+breaking:
+  baseline: git:main
+  categories:
+    - WIRE
+    - WIRE_JSON
+  ignore_unstable: true
+```
+
+---
+
+## Directory Cascading
+
+EasyP applies the **nearest file rule**: when evaluating a `.proto` file, EasyP searches upward through parent directories for an `easyp.yaml`. 
+
+```text
+proto/
+├── easyp.yaml          # STANDARD policy applies to root & user/
+├── user/
+│   └── v1/user.proto
+└── legacy/
+    ├── easyp.yaml      # MINIMAL policy override applies strictly to legacy/
+    └── old.proto
+```
+
+Sections are inherited as whole units from the nearest declaring file, preventing confusing partial merges.

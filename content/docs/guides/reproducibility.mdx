@@ -1,0 +1,38 @@
+---
+title: "Hermetic Build Reproducibility"
+description: "Achieving 100% bit-for-bit reproducible Protobuf builds with lockfiles, pinned plugin versions, and prohibition of floating latest tags."
+---
+
+Build reproducibility ensures that checking out a commit today produces the exact same generated output as building it months or years later. This guide explains how EasyP guarantees hermetic, reproducible builds.
+
+---
+
+## 3 Pillars of EasyP Reproducibility
+
+1. **`protobuf.lock`**: Locks transitive dependency Git commit SHAs and cryptographic content hashes (`h1:...`).
+2. **Pinned Plugin Versions**: Generator plugins in `easyp.gen.yaml` require explicit semantic version tags. Floating `:latest` tags are prohibited.
+3. **WASM / Remote Executors**: Eliminates system environment dependencies (such as locally installed `protoc` or plugin binaries) by running plugins inside deterministic WASM sandboxes or remote generation environments.
+
+---
+
+## Workflow for Clean Repositories
+
+When cloning a repository on a fresh machine or CI runner:
+
+```bash
+# 1. Download exact schema versions locked in protobuf.lock
+easyp mod download
+
+# 2. Execute code generation using pinned plugin versions
+easyp generate
+```
+
+Because `easyp mod download` reads strictly from `protobuf.lock`, remote registry updates or force-pushed Git tags cannot alter your build output.
+
+---
+
+## Prohibited Patterns in CI
+
+- ❌ Running `easyp mod update` inside CI pipelines (updates should only occur locally via PRs).
+- ❌ Using floating plugin tags like `version: latest`.
+- ❌ Leaving uncommitted `replace` directives in `protobuf.mod`.

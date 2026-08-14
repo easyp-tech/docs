@@ -1,0 +1,147 @@
+---
+title: "Go"
+---
+
+## Installing Plugins
+
+First, install the necessary plugins for working with gRPC:
+
+```shell
+go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
+go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
+```
+
+These commands will install the `protoc-gen-go` and `protoc-gen-go-grpc` plugins for use with EasyP.
+
+## Example Proto Service
+
+Here is an example proto file for an Echo service:
+
+```proto
+syntax = "proto3";
+
+package api.echo.v1;
+
+option go_package = "github.com/easyp-tech/example/api/echo/v1;pb";
+
+service EchoAPI {
+  rpc Echo(EchoRequest) returns (EchoResponse);
+  rpc EchoStream(EchoStreamRequest) returns (EchoResponse);
+}
+
+message EchoRequest {
+  string payload = 1;
+}
+
+message EchoResponse {
+  string payload = 2;
+}
+
+message EchoStreamRequest {
+  string payload = 1;
+}
+
+message EchoStreamResponse {
+  string payload = 2;
+}
+```
+
+## Configuration Setup
+
+Compare generator configurations across formats:
+
+<Tabs items={["easyp.gen.yaml", "buf.gen.yaml"]}>
+  <Tab value="easyp.gen.yaml">
+    ```yaml
+    version: v1
+    generate:
+      plugins:
+        - name: go
+          out: ./gen/go
+          opts:
+            paths: source_relative
+        - name: go-grpc
+          out: ./gen/go
+          opts:
+            paths: source_relative
+            require_unimplemented_servers: false
+    ```
+  </Tab>
+  <Tab value="buf.gen.yaml">
+    ```yaml
+    version: v2
+    plugins:
+      - remote: buf.build/protocolbuffers/go
+        out: gen/go
+        opt: paths=source_relative
+      - remote: buf.build/grpc/go
+        out: gen/go
+        opt:
+          - paths=source_relative
+          - require_unimplemented_servers=false
+    ```
+  </Tab>
+</Tabs>
+
+## Target Language Comparisons
+
+<Tabs items={["Go", "TypeScript", "Python"]}>
+  <Tab value="Go">
+    ```yaml
+    generate:
+      plugins:
+        - name: go
+          out: ./gen/go
+          opts:
+            paths: source_relative
+        - name: go-grpc
+          out: ./gen/go
+          opts:
+            paths: source_relative
+    ```
+  </Tab>
+  <Tab value="TypeScript">
+    ```yaml
+    generate:
+      plugins:
+        - name: ts
+          out: ./gen/ts
+          opts:
+            target: es2017
+        - name: grpc-web
+          out: ./gen/ts
+          opts:
+            import_style: typescript
+            mode: grpcweb
+    ```
+  </Tab>
+  <Tab value="Python">
+    ```yaml
+    generate:
+      plugins:
+        - name: python
+          out: ./gen/python
+        - name: grpc_python
+          out: ./gen/python
+    ```
+  </Tab>
+</Tabs>
+
+## Generating Code
+
+To generate code, execute the EasyP generator command:
+
+<Tabs items={["CLI", "Configuration"]}>
+  <Tab value="CLI">
+    ```shell
+    easyp generate
+    ```
+  </Tab>
+  <Tab value="Configuration">
+    ```shell
+    easyp --cfg easyp.yaml generate
+    ```
+  </Tab>
+</Tabs>
+
+Now you have generated code stubs ready for integration!

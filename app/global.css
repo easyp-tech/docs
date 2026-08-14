@@ -1,0 +1,170 @@
+@import 'tailwindcss';
+@import 'fumadocs-ui/css/neutral.css';
+@import 'fumadocs-ui/css/preset.css';
+@import '../styles/brand-variables.css';
+
+/*
+ * EasyP brand — dark-only override of Fumadocs fd tokens.
+ * neutral.css sets @theme + .dark { --color-fd-* }.
+ * We re-declare under :root (and .dark for specificity parity).
+ */
+
+:root, .dark {
+  --color-fd-background: #020617;
+  --color-fd-foreground: #e2e8f0;
+  --color-fd-muted: #0f172a;
+  --color-fd-muted-foreground: #94a3b8;
+  --color-fd-popover: #0f172a;
+  --color-fd-popover-foreground: #e2e8f0;
+  --color-fd-card: #0f172a;
+  --color-fd-card-foreground: #e2e8f0;
+  --color-fd-border: rgb(51 65 85 / 0.85);
+  --color-fd-primary: #3b82f6;
+  --color-fd-primary-foreground: #ffffff;
+  --color-fd-secondary: #1e293b;
+  --color-fd-secondary-foreground: #e2e8f0;
+  --color-fd-accent: rgb(59 130 246 / 0.12);
+  --color-fd-accent-foreground: #93c5fd;
+  --color-fd-ring: #3b82f6;
+}
+
+.dark #nd-sidebar {
+  --color-fd-muted: #0f172a;
+  --color-fd-secondary: #1e293b;
+  --color-fd-muted-foreground: #94a3b8;
+}
+
+html {
+  color-scheme: dark;
+  scrollbar-gutter: stable;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+html > body[data-scroll-locked] {
+  margin-right: 0px !important;
+  --removed-body-scroll-bar-size: 0px !important;
+}
+
+body {
+  font-feature-settings: 'ss01' on, 'cv11' on;
+  letter-spacing: -0.011em;
+}
+
+/* Typography */
+.prose {
+  --tw-prose-body: var(--color-fd-foreground);
+  --tw-prose-headings: var(--color-fd-foreground);
+  --tw-prose-links: var(--color-fd-primary);
+  --tw-prose-bold: var(--color-fd-foreground);
+  --tw-prose-code: var(--color-fd-foreground);
+  --tw-prose-pre-bg: var(--color-fd-muted);
+  --tw-prose-quotes: var(--color-fd-muted-foreground);
+  --tw-prose-quote-borders: var(--color-fd-primary);
+  --tw-prose-hr: var(--color-fd-border);
+  --tw-prose-th-borders: var(--color-fd-border);
+  --tw-prose-td-borders: var(--color-fd-border);
+}
+
+.prose :is(h1, h2, h3, h4) {
+  letter-spacing: -0.025em;
+  font-weight: 650;
+}
+
+.prose h2 {
+  border-bottom: 1px solid var(--color-fd-border);
+  padding-bottom: 0.35em;
+  margin-top: 2em;
+}
+
+.prose a {
+  font-weight: 500;
+  color: var(--color-fd-primary);
+  text-underline-offset: 0.15em;
+}
+
+.prose :not(pre) > code {
+  font-size: 0.875em;
+  padding: 0.15em 0.4em;
+  border-radius: 0.35rem;
+  background: color-mix(in srgb, var(--color-fd-muted) 80%, var(--color-fd-primary) 8%);
+  border: 1px solid var(--color-fd-border);
+}
+
+
+::selection {
+  background: color-mix(in srgb, #3b82f6 35%, transparent);
+}
+
+/* Active nav emphasis */
+a[data-active='true'],
+[data-active='true'] {
+  color: var(--color-fd-primary);
+}
+
+/* Marketing Home Utilities (dark-only) */
+.text-gradient {
+  background: linear-gradient(to right, #60a5fa, #a78bfa);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.glass-panel {
+  background: rgba(15, 23, 42, 0.6);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+@keyframes marquee {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-25%);
+  }
+}
+.animate-marquee {
+  animation: marquee 40s linear infinite;
+}
+
+@keyframes fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.animate-fade-in-up {
+  animation: fade-in-up 0.5s ease-out forwards;
+  opacity: 0; /* invisible before animation starts */
+}
+
+/* Keep content interactive if motion is reduced / animation skipped */
+@media (prefers-reduced-motion: reduce) {
+  .animate-fade-in-up {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
+  .animate-marquee {
+    animation: none;
+  }
+}
+
+/* Header must stay above marketing sections (nav links) */
+#nd-nav {
+  position: sticky;
+  z-index: 50;
+}

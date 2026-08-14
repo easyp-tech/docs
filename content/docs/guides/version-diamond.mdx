@@ -1,0 +1,58 @@
+---
+title: "Resolving Diamond Dependencies"
+description: "How Minimal Version Selection (MVS) deterministically resolves diamond version conflicts across direct and indirect requirements without manual intervention."
+---
+
+A common conflict in module package management is the **Diamond Dependency Problem**. This guide explains how EasyP's MVS algorithm resolves version discrepancies deterministically without human intervention or SAT solver backtracking.
+
+---
+
+## Scenario Description
+
+Consider a service module `user` that relies on two dependencies: `common` and `weather`.
+
+- `user` explicitly requires `common v1.2.0`.
+- `user` explicitly requires `weather v2.1.0`.
+- `weather v2.1.0` transitively requires `common v1.3.0`.
+
+```text
+               +-------------------+
+               |    proto/user     |
+               +---------+---------+
+                         |
+           +-------------+-------------+
+           |                           |
+           v                           v
++---------------------+     +---------------------+
+| github.com/acme/    |     | github.com/acme/    |
+| common v1.2.0       |     | weather v2.1.0      |
++---------------------+     +----------+----------+
+                                       |
+                                       v
+                            +---------------------+
+                            | github.com/acme/    |
+                            | common v1.3.0       |
+                            +---------------------+
+```
+
+---
+
+## The MVS Resolution Rule
+
+Unlike traditional resolvers that attempt complex range matching or halt with a manual version conflict error, MVS applies a simple high-water mark rule:
+
+`Resolved Version = max(Requested Minimums)`
+
+1. **Collect requested minimums**: `[ v1.2.0 (from user), v1.3.0 (from weather) ]`
+2. **Select maximum**: $\max(v1.2.0, v1.3.0) = v1.3.0$
+3. **Outcome**: `common v1.3.0` is selected for the module resolution graph.
+
+Because `v1.3.0` is backwards-compatible with `v1.2.0` under Semantic Versioning guidelines, both `user` and `weather` compile successfully against `v1.3.0`.
+
+---
+
+## What If Breaking Changes Occur?
+
+If `v1.3.0` introduced an incompatible schema modification, this represents a semantic versioning violation on the part of `common`'s maintainers.
+
+EasyP catches such violations on the producer side via `easyp breaking` checks before release, ensuring that minor version upgrades remain 100% backwards-compatible.

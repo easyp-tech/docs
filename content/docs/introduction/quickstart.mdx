@@ -1,0 +1,174 @@
+---
+title: "Quickstart"
+---
+
+EasyP is a modern toolkit for working with Protobuf files. In this quickstart, you'll learn to:
+
+1. **Initialize** your project with EasyP configuration
+2. **Set up linting** to catch errors and ensure best practices
+3. **Manage dependencies** from Git repositories
+4. **Generate code** from your Protobuf files
+
+## Prerequisites
+
+Before you begin, make sure you have:
+
+- **EasyP CLI installed** - See [Installation guide](/docs/introduction/install) if you haven't already
+- **Git** installed and available in your system path
+- **Protobuf files** ready to work with
+
+Verify your installation for your platform:
+
+<Tabs items={["macOS / Linux", "Windows"]}>
+  <Tab value="macOS / Linux">
+    ```bash
+    easyp --version
+    ```
+  </Tab>
+  <Tab value="Windows">
+    ```powershell
+    easyp.exe --version
+    ```
+  </Tab>
+</Tabs>
+
+## Initialize your project
+
+Start by creating an `easyp.yaml` configuration file in your project root:
+
+<Tabs items={["CLI", "Configuration"]}>
+  <Tab value="CLI">
+    ```bash
+    easyp init
+    ```
+
+    This interactive command checks for existing `buf.yaml` files to offer automatic migration and generates a base `easyp.yaml`.
+  </Tab>
+  <Tab value="Configuration">
+    ```yaml
+    # Initial easyp.yaml template
+    version: v1
+
+    lint:
+      use:
+        - DEFAULT
+    ```
+  </Tab>
+</Tabs>
+
+## Configure linting
+
+Linting helps catch errors and ensures your Protobuf files follow best practices. EasyP provides default rules compatible with Buf standards.
+
+<Tabs items={["CLI", "Configuration"]}>
+  <Tab value="CLI">
+    Run the linter across all `.proto` files in your project tree:
+
+    ```bash
+    easyp lint
+    ```
+  </Tab>
+  <Tab value="Configuration">
+    Configure linter rules and exclusions inside `easyp.yaml`:
+
+    ```yaml
+    version: v1
+    lint:
+      use:
+        - DEFAULT
+      except:
+        - PACKAGE_DIRECTORY_MATCH
+    ```
+  </Tab>
+</Tabs>
+
+<Callout type="info">
+EasyP's linting rules are 100% compatible with Buf, making migration seamless if you're switching tools.
+</Callout>
+
+## Manage dependencies
+
+If your project uses third-party Protobuf packages (like Google APIs or gRPC Gateway), EasyP makes it easy to manage them via `protobuf.mod` or `easyp.yaml`.
+
+### Dependency format
+
+Dependencies use a simple format: `$GIT_LINK@$VERSION`
+
+- **`$GIT_LINK`** - URL to any Git repository (GitHub, GitLab, etc.)
+- **`$VERSION`** - Git tag or commit hash (optional)
+
+### Add and download dependencies
+
+<Tabs items={["macOS / Linux", "Windows"]}>
+  <Tab value="macOS / Linux">
+    ```bash
+    # Download dependencies defined in configuration
+    easyp mod download
+
+    # Update dependencies to the latest matching minimums
+    easyp mod update
+    ```
+  </Tab>
+  <Tab value="Windows">
+    ```powershell
+    # Download dependencies on Windows
+    easyp.exe mod download
+
+    # Update dependencies on Windows
+    easyp.exe mod update
+    ```
+  </Tab>
+</Tabs>
+
+<Callout type="info">
+**Tip:** Use `easyp mod update` to fetch updated dependencies and refresh `protobuf.lock`.
+</Callout>
+
+## Generate code
+
+Now let's configure code generation. EasyP supports all standard Protobuf plugins.
+
+<Tabs items={["CLI", "Configuration"]}>
+  <Tab value="CLI">
+    Execute code generation across all target configurations:
+
+    ```bash
+    easyp generate
+    ```
+  </Tab>
+  <Tab value="Configuration">
+    Add plugin configuration to `easyp.yaml` (or `easyp.gen.yaml`):
+
+    ```yaml
+    generate:
+      plugins:
+        - name: go
+          out: ./gen/go
+          opts:
+            paths: source_relative
+        - name: go-grpc
+          out: ./gen/go
+          opts:
+            paths: source_relative
+            require_unimplemented_servers: false
+    ```
+  </Tab>
+</Tabs>
+
+<Callout type="info">
+EasyP uses a hybrid execution model with WASM for blazing speed and remote/Docker executors for heavy plugins.
+</Callout>
+
+## Next steps
+
+Congratulations! 🎉 You've successfully:
+- ✅ Initialized an EasyP project
+- ✅ Configured linting rules
+- ✅ Managed third-party dependencies
+- ✅ Generated code from your Protobuf files
+
+### Learn more
+
+- **[CLI Reference](/docs/cli/linter)** - Deep dive into all CLI commands
+- **[Architecture Deep-Dive](/docs/architecture/mvs-dependency-resolution)** - Learn about MVS dependency resolution
+- **[API Service](/docs/api-service/overview)** - Set up remote code generation

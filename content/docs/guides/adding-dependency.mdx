@@ -1,0 +1,78 @@
+---
+title: "Adding a Dependency"
+description: "Step-by-step guide on adding Protobuf module dependencies, resolving transitive dependencies via easyp mod tidy, and committing lockfiles."
+---
+
+This guide demonstrates how to add a third-party or shared Protobuf module dependency to your EasyP project.
+
+---
+
+## Workflow Overview
+
+1. **Declare Dependency**: Add the target module repository URL and version tag to `protobuf.mod` or reference it directly via `import` statements in your `.proto` schema files.
+2. **Run Resolution**: Execute `easyp mod tidy` to compute the transitive dependency graph.
+3. **Commit Lockfile**: Review the updated `protobuf.mod` and `protobuf.lock` files and commit them to version control.
+
+---
+
+## Step 1: Declare the Dependency
+
+Open your module's `protobuf.mod` file and add the required module under the `require` block:
+
+```protobuf
+// proto/user/protobuf.mod
+
+require (
+    github.com/googleapis/googleapis v1.5.0
+    github.com/acme/weather v1.2.3
+)
+```
+
+Alternatively, you can write an `import` statement directly in your Protobuf source file:
+
+```protobuf
+// proto/user/v1/user.proto
+syntax = "proto3";
+
+package user.v1;
+
+import "google/type/datetime.proto";
+```
+
+---
+
+## Step 2: Resolve Graph with `easyp mod tidy`
+
+Run the `easyp mod tidy` command in your terminal:
+
+```bash
+easyp mod tidy
+```
+
+### What `easyp mod tidy` Does:
+- Scans all `.proto` files in the module tree to identify active `import` statements.
+- Downloads required module metadata from Git repositories.
+- Computes Minimal Version Selection (MVS) for transitive dependencies.
+- Appends transitive dependencies to `protobuf.mod` marked with `// indirect`.
+- Generates or updates `protobuf.lock` with Git commit hashes and cryptographic content digests.
+
+Updated `protobuf.mod`:
+
+```protobuf
+require (
+    github.com/googleapis/googleapis v1.5.0
+    github.com/acme/weather v1.2.3
+    github.com/grpc-ecosystem/grpc-gateway v2.19.0 // indirect
+)
+```
+
+---
+
+## Step 3: Commit Changes
+
+Always check both `protobuf.mod` and `protobuf.lock` into Git. This guarantees that all team members and CI pipelines build against the exact same schema versions:
+
+```bash
+git add protobuf.mod protobuf.lock
+git commit -m "feat: add googleapis and weather dependencies"
+```

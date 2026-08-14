@@ -1,0 +1,134 @@
+---
+title: "Breaking-проверки в CI"
+description: "Настройка проверки обратной совместимости, категорий строгости и исключений для нестабильных пакетов с помощью EasyP в CI/CD."
+---
+
+Предотвращение несовместимых изменений (breaking changes) в схемах Protocol Buffer имеет критическое значение для сохранения обратной совместимости между микросервисами и клиентскими приложениями. EasyP предоставляет команду `easyp breaking` для автоматического обнаружения ломающих изменений до их мёрджа в основную ветку репозитория.
+
+<Callout type="info">
+В отличие от обычного линтинга, проверка breaking changes — это автоматический гейт для CI/CD пайплайнов. Она сравнивает ваше текущее локальное состояние с объявленным базовым состоянием (таким как Git-тег или ветка по умолчанию).
+</Callout>
+
+## Конфигурация breaking
+
+Правила проверки breaking-изменений настраиваются в файле `easyp.yaml` в секции `breaking`. Этот файл размещается в директории с протоколами и каскадируется на все вложенные поддиректории.
+
+```yaml
+# proto/easyp.yaml
+version: v1
+
+breaking:
+  baseline: git:main
+  categories: [WIRE, WIRE_JSON]
+  ignore_unstable: true
+```
+
+### Параметры проверки
+
+- **`baseline`**: Явная точка сравнения. Задаётся с префиксом `git:`, например `git:main`, `git:master` или `git:v1.0.0`.
+- **`categories`**: Массив уровней строгости проверки. Категории упорядочены по возрастанию строгости:
+  - `WIRE`: Проверяет бинарную совместимость формата передачи (запрещает изменение номеров полей, удаление полей без резервирования, изменение типов полей).
+  - `WIRE_JSON`: Проверяет как бинарную совместимость, так и совместимость JSON-маппинга имен полей.
+  - `PACKAGE`: Проверяет стабильность на уровне пакета в дополнение к бинарной совместимости.
+  - `FILE`: Строгая проверка структуры (запрещает перемещение proto-файлов между директориями и переименование файлов).
+- **`ignore_unstable`**: Флаг (по умолчанию `true`). Если включен, пакеты с суффиксами нестабильных версий (такие как `v1alpha`, `v1beta1`, `v2alpha2`) исключаются из проверки, что позволяет свободно экспериментировать с новым API.
+
+## Сравнение категорий строгости
+
+В следующей таблице приведено сравнение того, что гарантирует каждая категория:
+
+| Категория | Бинарная совместимость WIRE | Совместимость JSON | Сохранение пакетов | Расположение файлов |
+| --- | --- | --- | --- | --- |
+| `WIRE` | Обязательно | Допускает изменения | Допускает изменения | Допускает перемещение |
+| `WIRE_JSON` | Обязательно | Обязательно | Допускает изменения | Допускает перемещение |
+| `PACKAGE` | Обязательно | Обязательно | Обязательно | Допускает перемещение |
+| `FILE` | Обязательно | Обязательно | Обязательно | Обязательно |
+
+## Интеграция в CI/CD
+
+Добавьте `easyp breaking` в ваш непрерывный процесс интеграции для автоматической проверки Merge/Pull Request.
+
+<Callout type="warn">
+В CI должны запускаться только команды валидации в режиме чтения (`easyp lint` и `easyp breaking`). Команды, меняющие lock-файлы (`easyp mod tidy` или `easyp mod update`), никогда не должны запускаться в CI. Кроме того, коммиты с активными `replace`-директивами в `protobuf.mod` должны автоматически отклоняться CI.
+</Callout>
+
+<Tabs items={["GitHub Actions", "GitLab CI"]}>
+  <Tab value="GitHub Actions">
+    ```yaml
+    # .github/workflows/proto-ci.yml
+    name: Protocol Buffer CI
+
+    on:
+      pull_request:
+        branches: [ main ]
+
+    jobs:
+      breaking-check:
+        runs-on: ubuntu-latest
+        steps:
+          - name: Checkout Source Code
+            uses: actions/checkout@v4
+            with:
+              fetch-depth: 0 # Загрузка всей истории для git-сравнения с baseline
+
+          - name: Install EasyP
+            run: |
+              curl -fsSL https://easyp.tech/install.sh | sh
+              echo "$HOME/.easyp/bin" >> $GITHUB_PATH
+
+          - name: Run Proto Linting
+            run: easyp lint
+
+          - name: Run Breaking Change Detection
+            run: easyp breaking --against git:origin/main
+    ```
+  </Tab>
+  <Tab value="GitLab CI">
+    ```yaml
+    # .gitlab-ci.yml
+    stages:
+      - lint
+      - breaking
+
+    variables:
+      GIT_DEPTH: 0 # Требуется для сравнения с baseline по git
+
+    easyp:lint:
+      stage: lint
+      script:
+        - easyp lint
+
+    easyp:breaking:
+      stage: breaking
+      script:
+        - easyp breaking --against git:origin/main
+      only:
+        - merge_requests
+    ```
+  </Tab>
+</Tabs>
+
+## Работа с ошибками несовместимости
+
+Когда `easyp breaking` обнаруживает несовместимое изменение, команда завершается с ненулевым кодом ответа и выводит диагностическое сообщение:
+
+```text
+user/v1/user.proto:24:5: field "email" changed type from "string" to "bytes" (category: WIRE)
+user/v1/user.proto:18:1: field "phone_number" (number 3) was deleted without reservation (category: WIRE)
+```
+
+### Способы решения
+
+1. **Резервирование удаленных тегов**: Вместо полного удаления поля отметьте его номер и имя как `reserved`:
+   ```protobuf
+   message User {
+     reserved 3;
+     reserved "phone_number";
+     string id = 1;
+     string email = 2;
+   }
+   ```
+2. **Повышение мажорной версии**: Если ломающие изменения неизбежны, создайте новую мажорную версию пакета (например, `user.v2`) в отдельной директории (`proto/user/v2/`).
+3. **Разработка в нестабильном пакете**: Ведите разработку в альфа- или бета-пакете (`user.v1alpha1`), где `ignore_unstable: true` разрешает любые изменения до стабилизации API.
+
+Подробности смотрите в [Справочнике конфигурации EasyP](/ru/docs/cli/configuration) и [Руководстве по добавлению зависимостей](/ru/docs/guides/adding-dependencies).

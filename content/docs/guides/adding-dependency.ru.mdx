@@ -1,0 +1,78 @@
+---
+title: "Добавление зависимости"
+description: "Пошаговое руководство по добавлению зависимостей Protobuf-модулей, резолюции транзитивных зависимостей через easyp mod tidy и фиксации lock-файлов."
+---
+
+В данном руководстве рассматривается процесс добавления сторонних или общих Protobuf-модулей в проект EasyP.
+
+---
+
+## Общий процесс
+
+1. **Объявление зависимости**: Добавление URL репозитория и тега версии в `protobuf.mod` или прямое использование `import` в `.proto` файлах.
+2. **Запуск резолюции**: Выполнение `easyp mod tidy` для вычисления полного графа транзитивных зависимостей.
+3. **Фиксация в Git**: Проверка и коммит обновлённых файлов `protobuf.mod` и `protobuf.lock`.
+
+---
+
+## Шаг 1: Объявление зависимости
+
+Откройте `protobuf.mod` вашего модуля и добавьте требуемый модуль в блок `require`:
+
+```protobuf
+// proto/user/protobuf.mod
+
+require (
+    github.com/googleapis/googleapis v1.5.0
+    github.com/acme/weather v1.2.3
+)
+```
+
+Также вы можете просто добавить инструкцию `import` прямо в Protobuf-файл:
+
+```protobuf
+// proto/user/v1/user.proto
+syntax = "proto3";
+
+package user.v1;
+
+import "google/type/datetime.proto";
+```
+
+---
+
+## Шаг 2: Выполнение `easyp mod tidy`
+
+Запустите команду `easyp mod tidy` в терминале:
+
+```bash
+easyp mod tidy
+```
+
+### Что делает `easyp mod tidy`:
+- Сканирует все `.proto` файлы модуля для поиска активных `import`.
+- Загружает метаданные требуемых модулей из Git-репозиториев.
+- Вычисляет Minimal Version Selection (MVS) для транзитивных зависимостей.
+- Дописывает транзитивные зависимости в `protobuf.mod` с пометкой `// indirect`.
+- Генерирует или обновляет `protobuf.lock` с хешами коммитов и контрольными суммами.
+
+Обновлённый `protobuf.mod`:
+
+```protobuf
+require (
+    github.com/googleapis/googleapis v1.5.0
+    github.com/acme/weather v1.2.3
+    github.com/grpc-ecosystem/grpc-gateway v2.19.0 // indirect
+)
+```
+
+---
+
+## Шаг 3: Коммит изменений
+
+Всегда коммитьте файлы `protobuf.mod` и `protobuf.lock` в репозиторий. Это гарантирует, что все разработчики и CI-пайплайны будут использовать идентичные версии схем:
+
+```bash
+git add protobuf.mod protobuf.lock
+git commit -m "feat: add googleapis and weather dependencies"
+```

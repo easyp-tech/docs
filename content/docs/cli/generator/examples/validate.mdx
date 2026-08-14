@@ -1,0 +1,132 @@
+---
+title: "Validate"
+---
+
+## Installing Plugins
+
+First, install the necessary plugins for working with gRPC and validation:
+
+```shell
+go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
+go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
+go install github.com/envoyproxy/protoc-gen-validate@latest
+```
+
+## Example Proto Service
+
+Here is an example proto file with validation annotations:
+
+```proto
+syntax = "proto3";
+
+package api.echo.v1;
+
+import "validate/validate.proto";
+
+option go_package = "github.com/easyp-tech/example/api/echo/v1;pb";
+
+service EchoAPI {
+  rpc Echo(EchoRequest) returns (EchoResponse);
+}
+
+message EchoRequest {
+  string payload = 1 [(validate.rules).string = {max_len: 200}];
+}
+
+message EchoResponse {
+  string payload = 2;
+}
+```
+
+## Configuration Setup
+
+Compare generator configurations across formats:
+
+<Tabs items={["easyp.gen.yaml", "buf.gen.yaml"]}>
+  <Tab value="easyp.gen.yaml">
+    ```yaml
+    deps:
+      - github.com/bufbuild/protoc-gen-validate
+
+    generate:
+      plugins:
+        - name: go
+          out: ./gen/go
+          opts:
+            paths: source_relative
+        - name: go-grpc
+          out: ./gen/go
+          opts:
+            paths: source_relative
+        - name: validate
+          out: ./gen/go
+          opts:
+            paths: source_relative
+            lang: "go"
+    ```
+  </Tab>
+  <Tab value="buf.gen.yaml">
+    ```yaml
+    version: v2
+    plugins:
+      - remote: buf.build/protocolbuffers/go
+        out: gen/go
+        opt: paths=source_relative
+      - remote: buf.build/grpc/go
+        out: gen/go
+        opt: paths=source_relative
+      - remote: buf.build/bufbuild/validate-go
+        out: gen/go
+        opt: paths=source_relative
+    ```
+  </Tab>
+</Tabs>
+
+<Tabs items={["Go", "TypeScript", "Python"]}>
+  <Tab value="Go">
+    ```yaml
+    generate:
+      plugins:
+        - name: validate
+          out: ./gen/go
+          opts:
+            paths: source_relative
+            lang: "go"
+    ```
+  </Tab>
+  <Tab value="TypeScript">
+    ```yaml
+    generate:
+      plugins:
+        - name: validate-ts
+          out: ./gen/ts
+          opts:
+            lang: "ts"
+    ```
+  </Tab>
+  <Tab value="Python">
+    ```yaml
+    generate:
+      plugins:
+        - name: validate-python
+          out: ./gen/python
+          opts:
+            lang: "python"
+    ```
+  </Tab>
+</Tabs>
+
+## Generating Code
+
+<Tabs items={["CLI", "Configuration"]}>
+  <Tab value="CLI">
+    ```shell
+    easyp generate
+    ```
+  </Tab>
+  <Tab value="Configuration">
+    ```shell
+    easyp --cfg easyp.yaml generate
+    ```
+  </Tab>
+</Tabs>
