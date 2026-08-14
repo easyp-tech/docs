@@ -1,0 +1,33 @@
+---
+title: "Service Suffix"
+---
+
+Categories:
+
+- **MINIMAL**
+- **BASIC**
+- **DEFAULT**
+
+This rule checks that all services are suffixed with `Service` or your custom suffix.
+
+## Examples
+
+### Bad
+
+```proto
+syntax = "proto3";
+
+service Foo {
+    rpc Bar(BarRequest) returns (BarResponse);
+}
+```
+
+### Good
+
+```proto
+syntax = "proto3";
+
+service FooService {
+    rpc Bar(BarRequest) returns (BarResponse); 
+}
+```

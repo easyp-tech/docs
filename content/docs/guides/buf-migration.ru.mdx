@@ -1,0 +1,95 @@
+---
+title: "Миграция с Buf на EasyP"
+description: "Пошаговое руководство по миграции конфигураций и команд с Buf на EasyP."
+---
+
+В данном руководстве подробно рассматривается процесс перехода существующих проектов с **Buf** на **EasyP**.
+
+---
+
+## Прямое соответствие концепций и файлов
+
+| Конструкция Buf | Эквивалент в EasyP | Ключевое отличие |
+| --- | --- | --- |
+| `buf.yaml` (секция deps) | `protobuf.mod` | Независимый от инструментов DSL; использует Git URL вместо BSR. |
+| `buf.yaml` (секция lint) | `easyp.yaml` (linters) | Использует синтаксис golangci-lint; поддерживает каскадирование и `extends`. |
+| `buf.yaml` (секция breaking) | `easyp.yaml` (breaking) | Явное сравнение с git-baseline (например, `git:main`). |
+| `buf.gen.yaml` | `easyp.gen.yaml` | Находится у потребителя; не содержит дублирующих путей к источникам. |
+| `buf.gen.yaml` (managed) | `easyp.gen.yaml` (options) | Сгруппирован по языкам (например, `options.go.package_prefix`). |
+| `buf.lock` | `protobuf.lock` | Включает SHA коммитов Git и хеши содержимого. |
+| `buf dep update` | `easyp mod tidy` | Вычисляет минимальные версии (MVS) помодульно. |
+| `buf lint` | `easyp lint` | Каскадируется через ближайший `easyp.yaml`. |
+| `buf breaking` | `easyp breaking` | CI-гейт против явного baseline. |
+| `buf generate` | `easyp generate` | Автоматически находит все `easyp.gen.yaml`. |
+
+---
+
+## Пошаговый процесс миграции
+
+### Шаг 1: Автоматическая первичная инициализация
+
+Запустите `easyp init` в корне вашего проекта. EasyP обнаружит существующие файлы `buf.yaml` и `buf.gen.yaml` и автоматически создаст первичные `protobuf.mod`, `easyp.yaml` и `easyp.gen.yaml`.
+
+```bash
+easyp init
+```
+
+### Шаг 2: Вынос зависимостей в `protobuf.mod`
+
+Перенесите зависимости модулей из `buf.yaml` в `protobuf.mod`:
+
+```protobuf
+// protobuf.mod
+module github.com/acme/my-service
+
+require (
+    github.com/googleapis/googleapis v1.5.0
+)
+```
+
+### Шаг 3: Конвертация правил в `easyp.yaml`
+
+Перенесите конфигурацию линтера и breaking-проверок в `easyp.yaml`:
+
+```yaml
+# easyp.yaml
+version: v1
+
+linters:
+  default: STANDARD
+
+breaking:
+  baseline: git:main
+  categories:
+    - WIRE
+```
+
+### Шаг 4: Удаление блоков источников из генератора
+
+В `easyp.gen.yaml` удалите блоки `inputs` (такие как `directory` или `git_repo`). EasyP берёт источники схем напрямую из `protobuf.mod`:
+
+```yaml
+# backend/easyp.gen.yaml
+version: v1
+
+generate:
+  modules:
+    - proto/user
+
+plugins:
+  - name: go
+    version: v1.34.2
+    out: ./gen/go
+    opts:
+      paths: source_relative
+```
+
+### Шаг 5: Наведение порядка и проверка
+
+Запустите `easyp mod tidy`, затем `easyp lint` и `easyp generate`:
+
+```bash
+easyp mod tidy
+easyp lint
+easyp generate
+```

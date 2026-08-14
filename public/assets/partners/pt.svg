@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<svg version="1.1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" xml:space="preserve">
+<g fill="#e2e8f0">
+	<path d="M 40,50 V 160 H 62 V 125 C 72,125 90,120 90,92 C 90,65 72,50 62,50 Z M 62,70 C 67,70 72,75 72,92 C 72,108 67,108 62,108 Z"/>
+	<path d="M 105,70 V 50 H 122 V 70 H 145 V 88 H 122 V 135 C 122,145 130,145 142,142 V 160 C 120,165 105,160 105,135 V 88 H 92 V 70 Z"/>
+</g>
+</svg>

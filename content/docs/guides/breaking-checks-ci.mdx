@@ -1,0 +1,134 @@
+---
+title: "Breaking Change Prevention in CI"
+description: "How to configure baseline comparison, severity categories, and unstable package exemptions using EasyP breaking checks in CI pipelines."
+---
+
+Preventing breaking changes in Protocol Buffer schemas is critical for maintaining backward compatibility across microservices and client applications. EasyP provides the `easyp breaking` command to automatically catch breaking schema modifications before they are merged into your repository's primary branch.
+
+<Callout type="info">
+Unlike general linting, breaking change detection is an automated gate designed for CI/CD pipelines. It compares your current local working tree against a declared baseline state (such as a Git tag or default branch).
+</Callout>
+
+## Configuration Reference
+
+Breaking change rules are configured inside `easyp.yaml` under the `breaking` section. This file is placed in your protocol directory and cascades down through child subdirectories.
+
+```yaml
+# proto/easyp.yaml
+version: v1
+
+breaking:
+  baseline: git:main
+  categories: [WIRE, WIRE_JSON]
+  ignore_unstable: true
+```
+
+### Breaking Check Parameters
+
+- **`baseline`**: Explicit baseline comparison target. Specified using the `git:` prefix, such as `git:main`, `git:master`, or `git:v1.0.0`.
+- **`categories`**: Array of compatibility enforcement levels. Categories are ordered by increasing strictness:
+  - `WIRE`: Enforces binary wire format compatibility (e.g., prevents changing field numbers, deleting fields without reservation, or altering field types).
+  - `WIRE_JSON`: Enforces binary wire format compatibility as well as JSON field name mapping compatibility.
+  - `PACKAGE`: Enforces package-level stability in addition to wire format rules.
+  - `FILE`: Strict layout checks (prevents moving proto files across directory structures or renaming files).
+- **`ignore_unstable`**: Boolean flag (default `true`). When enabled, packages containing unstable version identifiers (such as `v1alpha`, `v1beta1`, `v2alpha2`) are exempt from breaking change checks, allowing rapid API experimentation.
+
+## Severity Categories Comparison
+
+The following table summarizes what each breaking category enforces:
+
+| Category | Binary Wire Compatibility | JSON Mapping Compatibility | Package Structure | File Location |
+| --- | --- | --- | --- | --- |
+| `WIRE` | Required | Allowed to change | Allowed to change | Allowed to move |
+| `WIRE_JSON` | Required | Required | Allowed to change | Allowed to move |
+| `PACKAGE` | Required | Required | Required | Allowed to move |
+| `FILE` | Required | Required | Required | Required |
+
+## CI Pipeline Integration
+
+Integrate `easyp breaking` into your continuous integration workflow to validate pull requests automatically.
+
+<Callout type="warn">
+CI pipelines should only run read-only validation commands (`easyp lint` and `easyp breaking`). Commands that alter lockfiles (`easyp mod tidy` or `easyp mod update`) should never run in CI. Furthermore, commits containing active `replace` directives in `protobuf.mod` must be rejected by CI.
+</Callout>
+
+<Tabs items={["GitHub Actions", "GitLab CI"]}>
+  <Tab value="GitHub Actions">
+    ```yaml
+    # .github/workflows/proto-ci.yml
+    name: Protocol Buffer CI
+
+    on:
+      pull_request:
+        branches: [ main ]
+
+    jobs:
+      breaking-check:
+        runs-on: ubuntu-latest
+        steps:
+          - name: Checkout Source Code
+            uses: actions/checkout@v4
+            with:
+              fetch-depth: 0 # Fetch all history for baseline git comparison
+
+          - name: Install EasyP
+            run: |
+              curl -fsSL https://easyp.tech/install.sh | sh
+              echo "$HOME/.easyp/bin" >> $GITHUB_PATH
+
+          - name: Run Proto Linting
+            run: easyp lint
+
+          - name: Run Breaking Change Detection
+            run: easyp breaking --against git:origin/main
+    ```
+  </Tab>
+  <Tab value="GitLab CI">
+    ```yaml
+    # .gitlab-ci.yml
+    stages:
+      - lint
+      - breaking
+
+    variables:
+      GIT_DEPTH: 0 # Required for git baseline comparison
+
+    easyp:lint:
+      stage: lint
+      script:
+        - easyp lint
+
+    easyp:breaking:
+      stage: breaking
+      script:
+        - easyp breaking --against git:origin/main
+      only:
+        - merge_requests
+    ```
+  </Tab>
+</Tabs>
+
+## Handling Breaking Change Failures
+
+When `easyp breaking` detects an incompatible schema modification, it exits with a non-zero status code and prints detailed error diagnostic messages:
+
+```text
+user/v1/user.proto:24:5: field "email" changed type from "string" to "bytes" (category: WIRE)
+user/v1/user.proto:18:1: field "phone_number" (number 3) was deleted without reservation (category: WIRE)
+```
+
+### Remediation Strategies
+
+1. **Reserve Deleted Tags**: Instead of removing a field entirely, mark its tag number and name as `reserved` to prevent reuse:
+   ```protobuf
+   message User {
+     reserved 3;
+     reserved "phone_number";
+     string id = 1;
+     string email = 2;
+   }
+   ```
+2. **Major Version Bump**: If backwards-incompatible changes are unavoidable, introduce a new major package version (e.g., `user.v2`) in a separate directory (`proto/user/v2/`).
+3. **Unstable Iteration**: Work inside an alpha or beta package (e.g., `user.v1alpha1`) where `ignore_unstable: true` allows free modification until API stabilization.
+
+For related configuration details, refer to the [EasyP Configuration Reference](/docs/cli/configuration) and [Adding Dependencies Guide](/docs/guides/adding-dependencies).

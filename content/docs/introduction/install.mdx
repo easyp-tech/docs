@@ -1,0 +1,53 @@
+---
+title: "Install the EasyP cli"
+---
+
+### Install from system's package manager
+
+##### Recommended installation method
+
+<Tabs items={["Homebrew", "Go install", "Binary Download"]}>
+  <Tab value="Homebrew">
+    #### Homebrew
+
+    You can install a binary release on macOS using brew:
+
+    ```bash
+    brew install easyp-tech/tap/easyp
+    ```
+
+    `Work in progress`: support for apt, yum, pacman, etc. is under development.
+  </Tab>
+  <Tab value="Go install">
+    #### Requires Go 1.24 or later
+
+    Installs the latest stable version of EasyP using the Go toolchain:
+
+    ```bash
+    go install github.com/easyp-tech/easyp/cmd/easyp@latest
+    ```
+  </Tab>
+  <Tab value="Binary Download">
+    #### Build from source
+
+    1. Clone the official repository:
+
+    ```bash
+    git clone https://github.com/easyp-tech/easyp.git
+    ```
+
+    2. Build binary with Go:
+
+    ```bash
+    go build ./cmd/easyp
+    ```
+  </Tab>
+</Tabs>
+
+## Local Installation Considerations
+
+Package managers are recommended over manual binary compilation because package managers provide:
+- Automatic updates and security patches
+- Better integration with system package management
+- Simplified installation and uninstallation
+- Verified binary distribution

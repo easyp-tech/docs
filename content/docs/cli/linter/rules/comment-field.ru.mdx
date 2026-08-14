@@ -1,0 +1,35 @@
+---
+title: "Comment Field"
+---
+
+Категории:
+
+- **COMMENT**
+
+Это правило проверяет, что все поля сообщений имеют комментарий.
+
+## Примеры
+
+### Bad
+
+```proto
+syntax = "proto3";
+
+message Foo {
+    string bar = 1;
+    string baz = 2;
+}
+```
+
+### Good
+
+```proto
+syntax = "proto3";
+
+message Foo {
+    // bar field for bar logic
+    string bar = 1;
+    // baz field for baz logic
+    string baz = 2;
+}
+```

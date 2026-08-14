@@ -1,0 +1,174 @@
+---
+title: "Быстрый старт (Quickstart)"
+---
+
+EasyP — современный toolkit для работы с файлами Protobuf. В этом кратком руководстве вы научитесь:
+
+1. **Инициализировать** проект с конфигурацией EasyP
+2. **Настраивать линтинг**, чтобы ловить ошибки и соблюдать лучшие практики
+3. **Управлять зависимостями** из Git‑репозиториев
+4. **Генерировать код** из ваших Protobuf файлов
+
+## Предварительные требования
+
+Перед началом убедитесь, что у вас установлены:
+
+- **EasyP CLI** — см. [руководство по установке](/ru/docs/introduction/install)
+- **Git** доступен в вашем `$PATH`
+- **Файлы `.proto`**
+
+Проверить версию EasyP на вашей платформе:
+
+<Tabs items={["macOS / Linux", "Windows"]}>
+  <Tab value="macOS / Linux">
+    ```bash
+    easyp --version
+    ```
+  </Tab>
+  <Tab value="Windows">
+    ```powershell
+    easyp.exe --version
+    ```
+  </Tab>
+</Tabs>
+
+## Инициализация проекта
+
+Создайте базовый файл конфигурации `easyp.yaml` в корне проекта:
+
+<Tabs items={["CLI", "Configuration"]}>
+  <Tab value="CLI">
+    ```bash
+    easyp init
+    ```
+
+    Интерактивная команда проверяет наличие `buf.yaml` для миграции и генерирует шаблон `easyp.yaml`.
+  </Tab>
+  <Tab value="Configuration">
+    ```yaml
+    # Начальный шаблон easyp.yaml
+    version: v1
+
+    lint:
+      use:
+        - DEFAULT
+    ```
+  </Tab>
+</Tabs>
+
+## Настройка линтинга
+
+Линтинг помогает находить проблемы и поддерживать единый стиль. EasyP использует правила, совместимые с Buf.
+
+<Tabs items={["CLI", "Configuration"]}>
+  <Tab value="CLI">
+    Запуск линтера по всем `.proto` файлам проекта:
+
+    ```bash
+    easyp lint
+    ```
+  </Tab>
+  <Tab value="Configuration">
+    Конфигурация правил линтера в `easyp.yaml`:
+
+    ```yaml
+    version: v1
+    lint:
+      use:
+        - DEFAULT
+      except:
+        - PACKAGE_DIRECTORY_MATCH
+    ```
+  </Tab>
+</Tabs>
+
+<Callout type="info">
+Правила линтинга EasyP на 100% совместимы с Buf — мигрировать просто.
+</Callout>
+
+## Управление зависимостями
+
+Если вы используете сторонние protobuf пакеты (например Google APIs или gRPC Gateway), EasyP упрощает их подключение.
+
+### Формат зависимости
+
+Запись: `$GIT_LINK@$VERSION`
+
+- **`$GIT_LINK`** — URL любого Git‑репозитория (GitHub, GitLab и т.д.)
+- **`$VERSION`** — тег или хеш коммита (опционально)
+
+### Загрузка и обновление зависимостей
+
+<Tabs items={["macOS / Linux", "Windows"]}>
+  <Tab value="macOS / Linux">
+    ```bash
+    # Загрузить зависимости из конфигурации
+    easyp mod download
+
+    # Обновить зависимости и обновить lock-файл
+    easyp mod update
+    ```
+  </Tab>
+  <Tab value="Windows">
+    ```powershell
+    # Загрузить зависимости в Windows
+    easyp.exe mod download
+
+    # Обновить зависимости в Windows
+    easyp.exe mod update
+    ```
+  </Tab>
+</Tabs>
+
+<Callout type="info">
+Совет: `easyp mod update` обновляет граф зависимостей и перегенерирует `protobuf.lock`.
+</Callout>
+
+## Генерация кода
+
+EasyP поддерживает все стандартные protoc‑плагины.
+
+<Tabs items={["CLI", "Configuration"]}>
+  <Tab value="CLI">
+    Запустить генерацию кода:
+
+    ```bash
+    easyp generate
+    ```
+  </Tab>
+  <Tab value="Configuration">
+    Добавьте конфигурацию плагинов в `easyp.yaml` (или `easyp.gen.yaml`):
+
+    ```yaml
+    generate:
+      plugins:
+        - name: go
+          out: ./gen/go
+          opts:
+            paths: source_relative
+        - name: go-grpc
+          out: ./gen/go
+          opts:
+            paths: source_relative
+            require_unimplemented_servers: false
+    ```
+  </Tab>
+</Tabs>
+
+<Callout type="info">
+Гибридный рантайм: WASM для максимальной скорости, удалённые исполнители — для сложных плагинов.
+</Callout>
+
+## Следующие шаги
+
+Поздравляем! 🎉 Вы успешно:
+- ✅ Инициализировали проект EasyP
+- ✅ Настроили линтинг
+- ✅ Управляете внешними зависимостями
+- ✅ Сгенерировали код из `.proto`
+
+### Узнать больше
+
+- **[CLI Reference](/ru/docs/cli/linter)** — подробности по командам
+- **[Архитектура MVS](/ru/docs/architecture/mvs-dependency-resolution)** — подробнее о резолюции MVS
+- **[API Service](/ru/docs/api-service/overview)** — удалённая генерация

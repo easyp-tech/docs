@@ -1,0 +1,57 @@
+---
+title: "Microservice Dependency Isolation"
+description: "How per-module dependency resolution enables independent service upgrades in monorepos without forced workspace-wide version coupling."
+---
+
+In large monorepos, forcing all microservices to use the exact same dependency version creates tight cross-team coupling. This guide demonstrates how EasyP achieves **per-module dependency isolation**, allowing services to upgrade shared libraries independently.
+
+---
+
+## The Problem with Single-Workspace Resolvers
+
+Tools like Buf v2 perform workspace-wide resolution: every service in a monorepo must settle on a single version for every dependency. If `team-user` needs `common v2.0.0` but `team-order` is not ready to migrate from `common v1.2.0`, the entire workspace build breaks or requires manual coordination.
+
+---
+
+## The EasyP Per-Module Solution
+
+EasyP resolves dependencies independently for each Protobuf module defined by a `protobuf.mod` file.
+
+```text
+repo/
+└── proto/
+    ├── user/
+    │   ├── protobuf.mod     # Requires common v1.2.0
+    │   └── protobuf.lock    # Locked to common v1.2.0
+    └── order/
+        ├── protobuf.mod     # Requires common v2.0.0
+        └── protobuf.lock    # Locked to common v2.0.0
+```
+
+### Module 1: `proto/user/protobuf.mod`
+
+```protobuf
+module github.com/acme/user
+
+require (
+    github.com/acme/common v1.2.0
+)
+```
+
+### Module 2: `proto/order/protobuf.mod`
+
+```protobuf
+module github.com/acme/order
+
+require (
+    github.com/acme/common v2.0.0
+)
+```
+
+---
+
+## Key Benefits
+
+1. **Independent Release Cycles**: Team `order` can upgrade to `common v2.0.0` without waiting for Team `user`.
+2. **Zero Monorepo Friction**: Separate lockfiles (`proto/user/protobuf.lock` vs `proto/order/protobuf.lock`) mean pull requests in one service never pollute lockfiles in another.
+3. **Clean Schema Namespaces**: Because FQNs in `user` and `order` do not collide during code generation, each consumer target compiles against its expected dependency version.

@@ -1,0 +1,70 @@
+---
+title: "protobuf.lock Reference"
+description: "Specification for protobuf.lock, the generated lockfile securing resolved Git commits, versions, and cryptographic hashes for hermetic builds."
+---
+
+The `protobuf.lock` file is an auto-generated artifact created by EasyP dependency commands (`easyp mod tidy`, `easyp mod update`). It locks the exact transitive dependency graph to guarantee **100% hermetic, reproducible builds** across all local developer environments and CI pipelines.
+
+---
+
+## Lockfile Schema
+
+<TypeTable
+  type={{
+    version: {
+      description: "Lockfile format version integer. Currently 1.",
+      type: "number",
+      default: "1"
+    },
+    modules: {
+      description: "Array of locked dependency module descriptors.",
+      type: "object[]"
+    },
+    "modules[].source": {
+      description: "Canonical module Git repository URL.",
+      type: "string"
+    },
+    "modules[].version": {
+      description: "Resolved Semantic Version tag (e.g. v1.2.3).",
+      type: "string"
+    },
+    "modules[].commit": {
+      description: "Exact Git commit SHA hash corresponding to the resolved release.",
+      type: "string"
+    },
+    "modules[].hash": {
+      description: "Cryptographic content hash (h1:...) for content integrity validation.",
+      type: "string"
+    }
+  }}
+/>
+
+---
+
+## Example Lockfile
+
+```yaml
+# protobuf.lock - GENERATED FILE, DO NOT EDIT MANUALLY
+version: 1
+modules:
+  - source: github.com/googleapis/googleapis
+    version: v1.5.0
+    commit: 8f3a1c94b2e10a84e
+    hash: h1:a9F8zK9mB20...
+  - source: github.com/acme/weather
+    version: v1.2.3
+    commit: 51d2e071c89f33b11
+    hash: h1:x7B3mL4k90a...
+  - source: github.com/grpc-ecosystem/grpc-gateway
+    version: v2.19.0
+    commit: c4f88aa91024e12c4
+    hash: h1:p0Q1wK97ab1...
+```
+
+---
+
+## Lifecycle Commands
+
+- `easyp mod tidy`: Resolves required imports, updates indirect dependencies, and regenerates `protobuf.lock`.
+- `easyp mod update`: Upgrades dependencies to latest semver-compatible versions and updates `protobuf.lock`.
+- `easyp mod download`: Populates local cache strictly using `protobuf.lock` without reaching out to remote registries or modifying locked versions.

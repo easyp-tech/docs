@@ -1,0 +1,175 @@
+---
+title: "MVS Dependency Resolution"
+description: "Architecture deep-dive into Minimal Version Selection (MVS), diamond dependency graph resolution, protobuf.mod specification, and hermetic lockfiles in EasyP."
+---
+
+EasyP adopts **Minimal Version Selection (MVS)** as its core dependency resolution algorithm for Protocol Buffer modules. Designed by Russ Cox for Go modules, MVS departs from traditional package managers (such as Cargo or npm) by selecting the *oldest* (minimal) explicit version that satisfies all module constraints rather than attempting complex constraint satisfaction or defaulting to the latest version.
+
+This document provides a technical deep-dive into the MVS algorithm, its diamond dependency resolution behavior, the `protobuf.mod` domain-specific language (DSL), the hermetic `protobuf.lock` file format, and a comparison with alternative dependency models.
+
+---
+
+## 1. Minimal Version Selection (MVS) Principles
+
+Traditional dependency resolution algorithms (such as Cargo's PubGrub or npm's Max Version strategy) treat version selection as a Constraint Satisfaction Problem (CSP) solved via NP-complete SAT solvers or aggressive "latest version" upgrades. In contrast, EasyP's implementation of MVS is built around predictability, determinism, and independence from global registry state.
+
+### Key Motivations for MVS in EasyP
+
+| Challenge in Proto Management | Traditional / Buf v2 Approach | EasyP MVS Approach |
+| --- | --- | --- |
+| **Diamond Dependency Conflicts** | Global workspace-wide resolution forces a single version across all consumers, causing cross-team coupling. | Per-module independent resolution graph. Each module resolves its own minimal requirements. |
+| **Registry Volatility** | `latest` resolution or registry updates can silently alter build output over time. | Deterministic resolution selecting `max(requested_minimums)`. No SAT solver or registry lookups. |
+| **Proto Schema Collision** | Multiple major/minor versions compiled in one proto-root break Fully Qualified Names (FQNs). | Exactly one version of each dependency per module graph, strictly locked via `protobuf.lock`. |
+
+### Core Algorithm Behavior
+
+1. **Explicit Version Bounds**: Every requirement in `protobuf.mod` specifies an explicit baseline version (e.g., `github.com/acme/weather v1.2.0`). This version is treated as a *minimum requirement*, not a range constraint.
+2. **Maximum of Minimums**: When multiple modules in a dependency graph request different minimum versions of the same dependency, MVS selects the **maximum** of those requested minimum versions.
+3. **High-Water Mark Determinism**: The resulting selected version is guaranteed to satisfy all minimum requirements without requiring complex backtracking or unexpected automatic major upgrades.
+
+---
+
+## 2. Step-by-Step Diamond Dependency Graph Resolution
+
+A classic challenge in module dependency management is the "Diamond Dependency" pattern. Consider a scenario where a primary module `user` depends directly on both `common` and `weather`, while `weather` itself depends transitively on an updated version of `common`.
+
+### Graph Structure
+
+```text
+               +-------------------+
+               |    proto/user     | (Root Module)
+               +---------+---------+
+                         |
+           +-------------+-------------+
+           |                           |
+           v                           v
++---------------------+     +---------------------+
+| github.com/acme/    |     | github.com/acme/    |
+| common v1.2.0       |     | weather v2.1.0      |
++---------------------+     +----------+----------+
+                                       |
+                                       v
+                            +---------------------+
+                            | github.com/acme/    |
+                            | common v1.3.0       |
+                            +---------------------+
+```
+
+### Step-by-Step MVS Traversal
+
+<Tabs items={["Step 1: Graph Traversal", "Step 2: Version Collection", "Step 3: Maximum Selection", "Step 4: Lockfile Generation"]}>
+  <Tab value="Step 1: Graph Traversal">
+    EasyP begins by parsing the root module's `protobuf.mod` file (`proto/user/protobuf.mod`) and recursively visiting all transitive requirements:
+    - Root `user` requires `github.com/acme/common v1.2.0`.
+    - Root `user` requires `github.com/acme/weather v2.1.0`.
+    - Traversal inspects `github.com/acme/weather v2.1.0`'s `protobuf.mod`, discovering a requirement for `github.com/acme/common v1.3.0`.
+  </Tab>
+  <Tab value="Step 2: Version Collection">
+    The algorithm constructs a list of all requested minimum versions for each canonical module URL:
+    - Target: `github.com/acme/common`
+    - Requested minimums: `[ v1.2.0 (from user), v1.3.0 (from weather) ]`
+  </Tab>
+  <Tab value="Step 3: Maximum Selection">
+    MVS compares the requested minimum versions semantically:
+    `Selected Version = max(v1.2.0, v1.3.0) = v1.3.0`
+    Since `v1.3.0` is backwards-compatible with `v1.2.0` under Semantic Versioning, selecting `v1.3.0` satisfies both `user` and `weather`.
+  </Tab>
+  <Tab value="Step 4: Lockfile Generation">
+    The resolved version set (`common v1.3.0`, `weather v2.1.0`) is written to `protobuf.lock` alongside Git commit hashes and cryptographic content digests.
+  </Tab>
+</Tabs>
+
+### Per-Module Isolation Guarantee
+
+Unlike workspace-wide resolvers, EasyP resolves dependencies on a **per-module basis**. If your repository contains separate service modules under `proto/user` and `proto/order`:
+
+- `proto/user` can resolve `common v1.3.0`.
+- `proto/order` can independently resolve `common v2.0.0`.
+
+Because each proto module maintains its own `protobuf.mod` and `protobuf.lock`, teams can update shared dependencies at their own pace without breaking neighboring services in a monorepo.
+
+---
+
+## 3. `protobuf.mod` DSL Directives
+
+The `protobuf.mod` file resides in the root directory of a Protobuf module. It is a tool-neutral specification focused exclusively on dependency declaration.
+
+```protobuf
+// proto/user/protobuf.mod
+
+module github.com/acme/user
+
+roots (
+    proto
+)
+
+require (
+    github.com/googleapis/googleapis v1.5.0
+    github.com/acme/weather v1.2.3
+    github.com/grpc-ecosystem/grpc-gateway v2.19.0 // indirect
+)
+
+// Local debug override
+replace github.com/acme/weather => ../weather-fork
+```
+
+### Directive Reference
+
+- **`module`**: Declares the canonical module identity (URL/path). Optional when the Git URL matches repository layout.
+- **`roots`**: Defines the inner directory root containing `.proto` schema files (defaults to `.`). This ensures imports resolve cleanly without requiring prefix manipulation.
+- **`require`**: Declares direct and indirect module dependencies with explicit Semantic Version tags.
+  - **`// indirect`**: Appended automatically by `easyp mod tidy` for transitive dependencies not directly imported by the root module's `.proto` files.
+- **`replace`**: Overrides a module dependency with a local file path (`../weather-fork`) or an alternative Git repository/version. Useful for local development and debugging.
+
+<Callout type="warn">
+Active `replace` directives are strictly intended for local development. EasyP CI workflows will flag and reject any commit containing an active `replace` directive.
+</Callout>
+
+---
+
+## 4. Hermetic `protobuf.lock` Mechanism
+
+The `protobuf.lock` file is an auto-generated artifact created and maintained by EasyP commands (`easyp mod tidy` and `easyp mod update`).
+
+```yaml
+# protobuf.lock - GENERATED FILE, DO NOT EDIT MANUALLY
+version: 1
+modules:
+  - source: github.com/googleapis/googleapis
+    version: v1.5.0
+    commit: 8f3a1c94b2e10a84e
+    hash: h1:a9F8zK...
+  - source: github.com/acme/weather
+    version: v1.2.3
+    commit: 51d2e071c89f33b11
+    hash: h1:x7B3mL...
+  - source: github.com/grpc-ecosystem/grpc-gateway
+    version: v2.19.0
+    commit: c4f88aa91024e12c4
+    hash: h1:p0Q1wK...
+```
+
+### Guaranteed Hermetic Builds
+
+1. **Strict Locking**: CI pipelines execute `easyp mod download` against `protobuf.lock`. Neither network fluctuations nor registry state can change the downloaded schema versions.
+2. **Digest Verification**: The `hash` attribute validates content integrity against cache tampering or force-pushed Git tags.
+3. **Explicit Lifecycle**: `protobuf.lock` is only updated via explicit developer execution of `easyp mod tidy` or `easyp mod update`.
+
+---
+
+## 5. Architectural Comparison
+
+| Feature / Model | EasyP MVS | Go Modules (MVS) | Cargo / Rust (PubGrub SAT) | Buf v2 (Workspace SVS) |
+| --- | --- | --- | --- | --- |
+| **Algorithm** | Minimal Version Selection | Minimal Version Selection | SAT Solver (PubGrub) | Workspace Single Version |
+| **Selection Rule** | `max(minimums)` | `max(minimums)` | Complex SemVer Ranges (`^1.2.3`) | Global Single Version |
+| **Dependency Scope** | Per-module | Per-module | Per-crate | Entire Workspace |
+| **Multiple Versions in Binary** | Forbidden (FQN collision) | Allowed across major versions | Allowed across major versions | Forbidden |
+| **Lockfile** | `protobuf.lock` | `go.sum` | `Cargo.lock` | `buf.lock` |
+| **Local Override** | `replace` directive | `replace` directive | `[patch]` / `path` | Local workspace module |
+
+### Why MVS Fits Protobuf Schemas Best
+
+Protobuf schemas enforce strict package name and message Fully Qualified Name (FQN) uniqueness within a compilation unit. Unlike Rust (where Cargo can rename crates under the hood) or Go (where `v2` uses a distinct import path), compiling two versions of `user.v1.User` into the same protoc descriptor set causes immediate FQN collision errors.
+
+EasyP's per-module MVS provides the exact balance required for Protobuf: deterministic single-version resolution within each module graph, paired with complete version independence between separate service modules.

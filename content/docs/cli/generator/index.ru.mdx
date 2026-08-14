@@ -1,0 +1,136 @@
+---
+title: "Генератор"
+---
+
+EasyP включает мощный генератор, который упрощает процесс получения кода из proto‑файлов. Благодаря YAML‑конфигурациям работа становится гораздо более удобной и интуитивной по сравнению с прямым использованием команды protoc.
+
+## Ключевые особенности генератора
+
+1. **Упрощённая генерация кода**:
+    - Генерация кода из proto через декларативную `YAML`‑конфигурацию.
+    - Избавляет от необходимости писать длинные и сложные команды protoc.
+
+2. **Обёртка над protoc**:
+    - EasyP выступает как удобный слой над protoc, предоставляя декларативный API.
+    - Поддерживает все опции и плагины, доступные protoc.
+
+3. **Гибкость и кастомизация**:
+    - Используются те же параметры, что и у плагинов protoc, прямо в конфиге.
+    - Поддерживается множество плагинов и их параметры в одной конфигурации.
+
+4. **Генерация из нескольких источников**:
+    - Локальные директории и удалённые Git‑репозитории одновременно.
+    - Лёгкая интеграция с существующими проектами и репозиториями.
+
+5. **Удалённая генерация**:
+    - Генерация из удалённых Git репозиториев без локального checkout.
+
+6. **Интеграция с менеджером пакетов**:
+    - Прозрачная работа с зависимостями через пакетный менеджер EasyP.
+    - Автоматическое разрешение и подключение proto‑зависимостей.
+
+## Справочник конфигурации
+
+### Сравнение конфигураций генератора
+
+<Tabs items={["easyp.gen.yaml", "buf.gen.yaml"]}>
+  <Tab value="easyp.gen.yaml">
+    ```yaml
+    # Зависимости пакетного менеджера
+    deps:
+      - github.com/googleapis/googleapis@common-protos-1_3_1
+      - github.com/grpc-ecosystem/grpc-gateway@v2.19.1
+      - github.com/bufbuild/protoc-gen-validate@v0.10.1
+
+    # Конфигурация генератора
+    generate:
+      plugins:
+        - name: go
+          out: ./gen/go
+          opts:
+            paths: source_relative
+            module: github.com/mycompany/myproject
+          with_imports: true
+
+        - name: go-grpc
+          out: ./gen/go
+          opts:
+            paths: source_relative
+            require_unimplemented_servers: false
+    ```
+  </Tab>
+  <Tab value="buf.gen.yaml">
+    ```yaml
+    version: v2
+    plugins:
+      - remote: buf.build/protocolbuffers/go
+        out: gen/go
+        opt:
+          - paths=source_relative
+          - module=github.com/mycompany/myproject
+      - remote: buf.build/grpc/go
+        out: gen/go
+        opt:
+          - paths=source_relative
+          - require_unimplemented_servers=false
+    ```
+  </Tab>
+</Tabs>
+
+### Примеры плагинов для различных языков
+
+<Tabs items={["Go", "TypeScript", "Python"]}>
+  <Tab value="Go">
+    ```yaml
+    plugins:
+      - name: go
+        out: ./gen/go
+        opts:
+          paths: source_relative
+      - name: go-grpc
+        out: ./gen/go
+        opts:
+          paths: source_relative
+          require_unimplemented_servers: false
+    ```
+  </Tab>
+  <Tab value="TypeScript">
+    ```yaml
+    plugins:
+      - name: ts
+        out: ./src/gen
+        opts:
+          declaration: true
+          target: es2017
+      - name: grpc-web
+        out: ./src/gen
+        opts:
+          import_style: typescript
+          mode: grpcweb
+    ```
+  </Tab>
+  <Tab value="Python">
+    ```yaml
+    plugins:
+      - name: python
+        out: ./gen/python
+      - name: grpc_python
+        out: ./gen/python
+    ```
+  </Tab>
+</Tabs>
+
+## Команды запуска
+
+<Tabs items={["CLI", "Configuration"]}>
+  <Tab value="CLI">
+    ```bash
+    easyp generate
+    ```
+  </Tab>
+  <Tab value="Configuration">
+    ```bash
+    easyp --cfg custom-easyp.yaml generate
+    ```
+  </Tab>
+</Tabs>

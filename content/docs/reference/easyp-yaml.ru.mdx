@@ -1,0 +1,133 @@
+---
+title: "Справочник easyp.yaml"
+description: "Полная спецификация файла easyp.yaml, управляющего правилами линтинга продюсера, проверками ломающих изменений, исключениями путей и наследованием политик."
+---
+
+Файл `easyp.yaml` определяет **конфигурацию политик на стороне продюсера** для репозиториев Protobuf-схем. Он задаёт стандарты линтинга, проверки ломающих изменений относительно git-baseline, правила исключения путей и наследование политик через `extends`.
+
+Файлы `easyp.yaml` каскадируются по иерархии директорий: для каждого файла `.proto` EasyP ищет ближайший `easyp.yaml` вверх по дереву каталогов и применяет его правила.
+
+---
+
+## Схема конфигурации
+
+<TypeTable
+  type={{
+    version: {
+      description: "Версия схемы конфигурации. Текущая версия — 'v1'.",
+      type: "string",
+      default: "v1"
+    },
+    linters: {
+      description: "Пресеты линтеров, точечное включение/отключение правил и наследование.",
+      type: "object"
+    },
+    "linters.default": {
+      description: "Базовый пресет линтера: MINIMAL, BASIC, STANDARD, COMMENTS.",
+      type: "string",
+      default: "STANDARD"
+    },
+    "linters.enable": {
+      description: "Список дополнительных правил линтера, включаемых поверх пресета.",
+      type: "string[]"
+    },
+    "linters.disable": {
+      description: "Список правил линтера, отключаемых из активного пресета.",
+      type: "string[]"
+    },
+    "linters.extends": {
+      description: "Удалённый модуль Git или путь к политике для наследования правил.",
+      type: "string"
+    },
+    "linters-settings": {
+      description: "Параметры конкретных правил и пользовательские настройки.",
+      type: "object"
+    },
+    issues: {
+      description: "Настройки отчётов об ошибках и правила исключения по путям.",
+      type: "object"
+    },
+    "issues.exclude-rules": {
+      description: "Массив правил исключений, сопоставляющих glob-шаблоны путей с линтерами.",
+      type: "object[]"
+    },
+    breaking: {
+      description: "Параметры проверки ломающих изменений для CI.",
+      type: "object"
+    },
+    "breaking.baseline": {
+      description: "Ссылка на git-ветку или тег для сравнения изменений (например, git:main).",
+      type: "string",
+      default: "git:main"
+    },
+    "breaking.categories": {
+      description: "Категории ломающих изменений: FILE, PACKAGE, WIRE_JSON, WIRE.",
+      type: "string[]",
+      default: "['WIRE']"
+    },
+    "breaking.ignore_unstable": {
+      description: "При true нестабильные пакеты (v1alpha, v1beta) игнорируют breaking-проверки.",
+      type: "boolean",
+      default: "true"
+    },
+    "breaking.extends": {
+      description: "Удалённый модуль политики для наследования настроек breaking-проверок.",
+      type: "string"
+    }
+  }}
+/>
+
+---
+
+## Пример конфигурации
+
+```yaml
+version: v1
+
+linters:
+  default: STANDARD
+  enable:
+    - ENUM_VALUE_PREFIX
+    - RPC_REQUEST_RESPONSE_UNIQUE
+  disable:
+    - PACKAGE_VERSION_SUFFIX
+
+linters-settings:
+  ENUM_ZERO_VALUE_SUFFIX:
+    suffix: UNSPECIFIED
+  SERVICE_SUFFIX:
+    suffix: Service
+
+issues:
+  exclude-rules:
+    - path: "gen/**"
+    - path: "**/legacy/**"
+      linters:
+        - FIELD_LOWER_SNAKE_CASE
+        - PACKAGE_DIRECTORY_MATCH
+
+breaking:
+  baseline: git:main
+  categories:
+    - WIRE
+    - WIRE_JSON
+  ignore_unstable: true
+```
+
+---
+
+## Каскадирование по директориям
+
+EasyP использует **правило ближайшего файла**: при проверке `.proto` файла EasyP ищет `easyp.yaml` вверх по дереву директорий.
+
+```text
+proto/
+├── easyp.yaml          # Политика STANDARD применяется к корню и user/
+├── user/
+│   └── v1/user.proto
+└── legacy/
+    ├── easyp.yaml      # Ослабленная политика MINIMAL только для legacy/
+    └── old.proto
+```
+
+Секция берётся целиком из ближайшего определяющего файла без частичного слияния.

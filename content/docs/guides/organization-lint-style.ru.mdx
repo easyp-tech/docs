@@ -1,0 +1,79 @@
+---
+title: "Общий стиль линта в организации"
+description: "Централизация правил линтинга через extends и обработка legacy-директорий с помощью каскадных конфигов."
+---
+
+Поддержание единых правил линтинга Protobuf в сотнях репозиториев микросервисов — частая задача. В данном руководстве объясняется, как шарить единые политики организации с помощью `linters.extends` и корректно управлять исключениями.
+
+---
+
+## 1. Определение базовой политики организации
+
+Платформенная команда публикует репозиторий с централизованной политикой линтинга (например, `github.com/uzum/proto-policy/lint-base`).
+
+```yaml
+# Базовая политика: github.com/uzum/proto-policy/lint-base/easyp.yaml
+version: v1
+
+linters:
+  default: STANDARD
+  enable:
+    - ENUM_VALUE_PREFIX
+    - RPC_REQUEST_RESPONSE_UNIQUE
+  disable:
+    - PACKAGE_VERSION_SUFFIX
+
+linters-settings:
+  ENUM_ZERO_VALUE_SUFFIX:
+    suffix: UNSPECIFIED
+```
+
+---
+
+## 2. Наследование политик через `extends`
+
+Репозитории отдельных сервисов подключают центральную политику через `linters.extends`. Также они могут переопределять отдельные правила локально:
+
+```yaml
+# Сервисный репозиторий: proto/easyp.yaml
+version: v1
+
+linters:
+  extends: github.com/uzum/proto-policy/lint-base
+  disable:
+    - PACKAGE_VERSION_SUFFIX # Локальное отклонение от общей базы
+
+breaking:
+  baseline: git:main
+  categories:
+    - WIRE
+```
+
+---
+
+## 3. Обработка legacy-кода через каскадирование
+
+Если в вашем репозитории есть старые `.proto` файлы, которые пока не соответствуют стандартам компании, создайте локальный `easyp.yaml` внутри legacy-директории:
+
+```text
+proto/
+├── easyp.yaml          # Стандартная политика организации
+├── user/v1/user.proto
+└── legacy/
+    ├── easyp.yaml      # Ослабленная политика MINIMAL только для legacy/
+    └── old.proto
+```
+
+`proto/legacy/easyp.yaml`:
+
+```yaml
+version: v1
+
+linters:
+  default: MINIMAL
+  disable:
+    - FIELD_LOWER_SNAKE_CASE
+    - ENUM_VALUE_PREFIX
+```
+
+Благодаря правилу ближайшего файла ослабленная политика применяется исключительно к файлам в `proto/legacy/`, в то время как остальное дерево репозитория проверяется по полному стандарту.

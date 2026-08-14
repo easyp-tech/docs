@@ -1,0 +1,36 @@
+---
+title: "Import Used"
+---
+
+Категории:
+- **MINIMAL**
+- **BASIC**
+- **DEFAULT**
+
+Это правило проверяет, что все импорты используются в proto-файле.
+
+## Примеры
+
+### Bad
+
+```proto
+syntax = "proto3";
+
+package foo;
+
+import "bar.proto";
+```
+
+### Good
+
+```proto
+syntax = "proto3";
+
+package foo;
+
+import "bar.proto";
+
+message Foo {
+    bar.Bar bar = 1;
+}
+```

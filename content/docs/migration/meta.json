@@ -1,0 +1,9 @@
+{
+  "title": "Migration",
+  "pages": [
+    "buf-cli",
+    "protoc",
+    "protolock",
+    "prototool"
+  ]
+}

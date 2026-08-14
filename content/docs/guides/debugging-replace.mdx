@@ -1,0 +1,55 @@
+---
+title: "Debugging with Replace Directives"
+description: "Using the replace directive in protobuf.mod for local multi-module debugging, and understanding CI build guards."
+---
+
+During active multi-module development, you often need to modify a dependency locally alongside your consuming project. This guide explains how to use the `replace` directive in `protobuf.mod` for local debugging, and how EasyP prevents accidental production leaks.
+
+---
+
+## Setting Up a Local Replace
+
+Suppose your module `proto/user` depends on `github.com/acme/weather`. To debug local changes in `weather` without publishing Git tags:
+
+1. Clone or fork `weather` to a local directory (e.g. `../weather-fork`).
+2. Add a `replace` directive to `proto/user/protobuf.mod`:
+
+```protobuf
+// proto/user/protobuf.mod
+
+module github.com/acme/user
+
+require (
+    github.com/acme/weather v1.2.3
+)
+
+// Overrides remote dependency with local disk path
+replace github.com/acme/weather => ../weather-fork
+```
+
+---
+
+## Local Development Workflow
+
+When `replace` is active:
+- `easyp generate` resolves imports directly from `../weather-fork`.
+- You can iterate on proto schema changes in both modules simultaneously.
+- No remote Git tags or network downloads are required.
+
+---
+
+## CI Build Guardrails
+
+To prevent local file paths from breaking production builds, EasyP enforces a **strict CI check**:
+
+<Callout type="warn">
+EasyP CI commands fail immediately if an active `replace` directive is detected in `protobuf.mod`.
+</Callout>
+
+### Preparing for PR Submission
+
+Before opening a pull request:
+1. Publish your changes in the dependency repository to Git.
+2. Update `require` in `protobuf.mod` to reference the published version.
+3. Remove the `replace` directive.
+4. Run `easyp mod tidy` to update `protobuf.lock`.

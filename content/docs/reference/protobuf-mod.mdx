@@ -1,0 +1,66 @@
+---
+title: "protobuf.mod Reference"
+description: "Specification for protobuf.mod, the tool-neutral DSL for defining Protocol Buffer module identities, roots, requirements, and local replace directives."
+---
+
+The `protobuf.mod` file resides at the root of a Protocol Buffer module. Designed as a **tool-neutral standard**, it contains zero tool-specific settings (no linter flags, generator plugins, or vendor extensions). It is strictly focused on module identity, inner root directories, dependency requirements, and local source overrides.
+
+---
+
+## DSL Syntax & Directives
+
+<TypeTable
+  type={{
+    module: {
+      description: "Canonical module identity URL or path (e.g. github.com/acme/user). Reserved for vanity paths & registry publishing.",
+      type: "directive"
+    },
+    roots: {
+      description: "List of internal repository subdirectories containing .proto schema files. Defaults to '.'.",
+      type: "directive"
+    },
+    require: {
+      description: "Block declaring direct and transitive dependency module bounds with explicit SemVer version tags.",
+      type: "directive block"
+    },
+    "require // indirect": {
+      description: "Transitive dependency marker automatically managed by 'easyp mod tidy'.",
+      type: "annotation"
+    },
+    replace: {
+      description: "Local source replacement directive mapping a module URL to a local filesystem path or alternate repo.",
+      type: "directive"
+    }
+  }}
+/>
+
+---
+
+## Example Specification
+
+```protobuf
+// proto/user/protobuf.mod
+
+module github.com/acme/user
+
+roots (
+    proto
+)
+
+require (
+    github.com/googleapis/googleapis v1.5.0
+    github.com/acme/weather v1.2.3
+    github.com/grpc-ecosystem/grpc-gateway v2.19.0 // indirect
+)
+
+// Local debug replacement
+replace github.com/acme/weather => ../weather-fork
+```
+
+---
+
+## Behavior Rules
+
+1. **Git-Native Identity**: The canonical identity of a module is its Git URL (e.g., `github.com/acme/weather`).
+2. **Per-Module Bounds**: Every module maintains its own independent `protobuf.mod`. MVS operates per-module rather than forcing global monorepo single-version constraints.
+3. **Replace Guardrail**: Active `replace` directives are permitted during local development, but cause CI validation to fail.
