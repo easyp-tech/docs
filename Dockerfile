@@ -10,7 +10,7 @@ RUN apk add --no-cache libc6-compat
 COPY package.json package-lock.json* ./
 COPY brand ./brand
 
-RUN npm ci
+RUN npm ci --ignore-scripts
 
 # 3. Builder stage
 FROM base AS builder

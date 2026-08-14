@@ -4,9 +4,8 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "fumadocs-mdx && next build",
     "start": "next start",
-    "postinstall": "fumadocs-mdx",
     "types:check": "fumadocs-mdx && tsc --noEmit",
     "migrate:content": "node scripts/migrate-content.mjs"
   },
