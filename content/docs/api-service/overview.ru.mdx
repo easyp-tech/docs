@@ -170,28 +170,42 @@ sequenceDiagram
 
 ## Конфигурация
 
-Сервис настраивается через переменные окружения.
+Сервис читает настройки из YAML-файла, из окружения или из обоих сразу.
+Окружение перекрывает файл; `default=` в бинаре заполняет то, чего не дал ни
+один из них.
 
-### Конфигурация сервера
+### Сервер
+
 ```bash
-EASYP_SERVICE_HOST=0.0.0.0
-EASYP_SERVICE_GRPC_PORT=8080
+SERVER_HOST=0.0.0.0
+SERVER_PORT_GRPC=8080
+SERVER_PORT_METRIC=8081
+SERVER_PORT_HEALTH=8082
+SERVER_PORT_MCP=8083
 ```
 
-### Конфигурация БД
+### База данных
+
+Одна строка подключения, а не набор частей:
+
 ```bash
-EASYP_SERVICE_DB_HOST=localhost
-EASYP_SERVICE_DB_PORT=5432
-EASYP_SERVICE_DB_NAME=easyp_service
-EASYP_SERVICE_DB_USER=easyp
-EASYP_SERVICE_DB_PASSWORD=password
+DB_POSTGRES_DSN="postgres://easyp:password@localhost:5432/easyp_service?sslmode=disable"
 ```
 
-### Конфигурация Docker
+### Как узнать, что реально применится
+
+У каждой настройки ровно одно имя в каждом слое, и бинарь сам их перечислит:
+
 ```bash
-# Docker socket для запуска контейнеров
-DOCKER_HOST=unix:///var/run/docker.sock
+# Запустится ли сервис на этом файле?
+easyp-svc config validate --cfg /etc/easyp/config.yml
+
+# Что применится и какой слой дал каждое значение?
+easyp-svc config print --cfg /etc/easyp/config.yml --origin
 ```
+
+Неизвестный ключ в файле — это ошибка, а не предупреждение: сервис откажется
+стартовать, вместо того чтобы подняться на умолчаниях, которых никто не просил.
 
 ## Хранение параметров плагинов
 
