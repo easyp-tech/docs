@@ -170,28 +170,42 @@ sequenceDiagram
 
 ## Configuration
 
-The service is configured via environment variables:
+The service reads its settings from a YAML file, the environment, or both. The
+environment overrides the file; a `default=` in the binary fills whatever neither
+supplied.
 
-### Server Configuration
+### Server
+
 ```bash
-EASYP_SERVICE_HOST=0.0.0.0
-EASYP_SERVICE_GRPC_PORT=8080
+SERVER_HOST=0.0.0.0
+SERVER_PORT_GRPC=8080
+SERVER_PORT_METRIC=8081
+SERVER_PORT_HEALTH=8082
+SERVER_PORT_MCP=8083
 ```
 
-### Database Configuration
+### Database
+
+One connection string, not a set of parts:
+
 ```bash
-EASYP_SERVICE_DB_HOST=localhost
-EASYP_SERVICE_DB_PORT=5432
-EASYP_SERVICE_DB_NAME=easyp_service
-EASYP_SERVICE_DB_USER=easyp
-EASYP_SERVICE_DB_PASSWORD=password
+DB_POSTGRES_DSN="postgres://easyp:password@localhost:5432/easyp_service?sslmode=disable"
 ```
 
-### Docker Configuration
+### Checking what applies
+
+Every setting has exactly one name in each layer, and the binary will list them:
+
 ```bash
-# Docker socket for container execution
-DOCKER_HOST=unix:///var/run/docker.sock
+# Would the service start on this file?
+easyp-svc config validate --cfg /etc/easyp/config.yml
+
+# What applies, and which layer supplied each value?
+easyp-svc config print --cfg /etc/easyp/config.yml --origin
 ```
+
+An unrecognised key in the file is an error, not a warning: the service refuses
+to start rather than coming up on defaults you did not ask for.
 
 ## Plugin Parameters Storage
 
