@@ -1,6 +1,9 @@
 {
   "title": "API Service",
   "pages": [
-    "overview"
+    "overview",
+    "upgrading",
+    "runbooks",
+    "backup"
   ]
 }
