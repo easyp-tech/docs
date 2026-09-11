@@ -6,6 +6,34 @@ description: "Release-by-release upgrade notes for the API Service: what breaks,
 Only releases that need a hand are listed. A version absent from this file
 upgrades by pulling the new image.
 
+## What 1.0 freezes
+
+From v1.0.0 the surfaces below are fixed. Changing any of them is a major
+version, so they are listed here rather than left to be inferred from what
+happens not to have changed yet.
+
+**Frozen**
+
+- The proto package `easyp.generator.v1` and the service name `GeneratorAPI`.
+- Field names and field numbers in every message. A removed field keeps its
+  number reserved; a number is never reused.
+- The `reason` values in `google.rpc.ErrorInfo`, under domain `easyp.tech`.
+- Configuration keys, their environment spellings, and what a value means.
+- The public API of the `sdk` and `api` Go modules.
+
+**Still open without a major version**
+
+- New fields with new numbers, new RPCs, new messages.
+- New configuration keys, and new `reason` values.
+- New SDK options and new methods.
+- Raising a licence ceiling. Lowering one is not: a limit introduced where none
+  existed takes throughput away from deployments that already have it, which is
+  why the ceilings that exist were drawn before 1.0 rather than after.
+
+A rename is handled without breaking anyone: the old configuration key keeps
+working for one release while warning, naming both spellings and the line to
+change, and only then stops.
+
 ## v0.13.x → v0.14.0
 
 The largest set of breaking changes this project will make. They are grouped
