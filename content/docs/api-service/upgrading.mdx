@@ -34,6 +34,33 @@ A rename is handled without breaking anyone: the old configuration key keeps
 working for one release while warning, naming both spellings and the line to
 change, and only then stops.
 
+## v1.0.0 → v1.0.2
+
+### The image checks its own health
+
+From v1.0.1 the image carries a `HEALTHCHECK` that runs `easyp-svc health`,
+which probes `/live` on the health port. The probe has to know that port. It
+reads the same configuration the service does, so a port set through the
+environment is found without further work. A port set in a YAML file is not:
+the file is named by `--cfg` on the `start` command line, and the probe does not
+see that command line.
+
+From v1.0.2 every command that accepts `--cfg` also reads the path from
+`EASYP_CONFIG`. Set it on the container, and both the service and the probe
+use the same file:
+
+```yaml
+environment:
+  EASYP_CONFIG: /etc/easyp/config.yml
+```
+
+What it looks like without it: the container serves normally while `docker ps`
+reports `unhealthy`, and the probe's log says
+`dial tcp 127.0.0.1:23412: connect: connection refused`. Docker's `restart`
+policies ignore health, so nothing restarts, but anything that waits on
+`condition: service_healthy` never proceeds. Kubernetes ignores the image's
+`HEALTHCHECK` altogether; the chart's probes are unaffected.
+
 ## v0.13.x → v0.14.0
 
 The largest set of breaking changes this project will make. They are grouped
