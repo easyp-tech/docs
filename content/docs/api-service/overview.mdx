@@ -2,9 +2,9 @@
 title: "API Service Overview"
 ---
 
-**Centralized protobuf plugin execution service for consistent, isolated code generation**
+**A service that runs protobuf code-generation plugins so that developers and CI do not have to install them**
 
-The EasyP API Service eliminates plugin management chaos by providing centralized execution of protobuf/gRPC plugins as isolated Docker containers. It offers a unified platform for teams to standardize their code generation workflows without the operational overhead of managing plugins across individual developer machines.
+The EasyP API Service accepts a `CodeGeneratorRequest` over gRPC, executes the named plugin as a child process on the server — bounded in time, concurrency and output size — and returns the `CodeGeneratorResponse`. One registry of plugin versions, built from reviewed Dockerfiles and verified by checksum, replaces one installation per developer machine.
 
 ## Why EasyP API Service?
 
@@ -30,79 +30,78 @@ Managing protobuf/gRPC code generation across development teams creates signific
 
 ### The Solution: Centralized Plugin Execution
 
-EasyP API Service eliminates these operational headaches by centralizing plugin management:
-
 | Challenge | Solution |
 |-----------|----------|
-| **Version Control** | Deploy new plugin versions to entire team instantly via Docker images |
-| **Operations** | Operations team controls plugin configurations without touching developer machines |
-| **Security** | All plugins run in isolated Docker containers with resource constraints |
-| **Consistency** | Consistent execution environment regardless of developer's local setup |
+| **Version Control** | A plugin version is registered once, on the server, and every client gets the same binary |
+| **Operations** | Operators build, push and register plugins; developer machines are never touched |
+| **Provenance** | Plugins are built from Dockerfiles in a public registry, stored as archives and sha256-verified before every execution |
+| **Consistency** | The same binary on the same host for every caller |
 | **Developer Experience** | No local plugin installation or maintenance required |
+| **Accountability** | An audit log of every mutating call, with the credential that made it (Enterprise) |
 
 ## Architecture Overview
 
-The EasyP API Service uses a streamlined architecture focused on reliable plugin execution:
-
 ```mermaid
 graph TB
-    subgraph "Client Layer"
-        CLI[EasyP CLI]
+    subgraph "Clients"
+        CLI[easyp CLI]
+        SDK[Go SDK]
     end
-    
+
     subgraph "EasyP API Service"
-        GRPC[gRPC Server]
-        CORE[Core Engine]
-        METRICS[Metrics Collector]
+        GRPC[gRPC listener<br/>TLS / mTLS, rate limit, auth, licence]
+        CORE[Core]
+        POOL[Worker pool]
+        PLUGIN[Plugin process<br/>stdin → stdout]
+        MCP[MCP endpoint<br/>optional, read-only]
     end
-    
-    subgraph "Plugin Execution"
-        DOCKER[Docker Runtime]
-        REGISTRY[Docker Hub Registry]
-    end
-    
+
     subgraph "Storage"
-        DB[(PostgreSQL)]
+        DB[(PostgreSQL<br/>plugin registry, audit log)]
+        S3[(Object storage<br/>plugin archives)]
+        CACHE[Local cache<br/>unpacked plugins]
     end
-    
-    subgraph "Monitoring"
+
+    subgraph "Observability"
         PROM[Prometheus]
+        OTLP[OTLP: traces, logs]
+        PYRO[Pyroscope]
     end
-    
+
     CLI -->|CodeGeneratorRequest| GRPC
+    SDK -->|CodeGeneratorRequest| GRPC
     GRPC --> CORE
-    
-    CORE -->|Fetch plugin params| DB
-    CORE -->|Execute plugin| DOCKER
-    CORE -->|Record metrics| METRICS
-    
-    DOCKER -->|Pull images| REGISTRY
-    
-    METRICS --> PROM
+    CORE -->|Resolve plugin| DB
+    CORE --> POOL
+    POOL --> PLUGIN
+    PLUGIN -.->|miss: download, verify sha256, unpack| S3
+    S3 -.-> CACHE
+    CACHE --> PLUGIN
+    CORE --> PROM
+    CORE --> OTLP
+    CORE --> PYRO
+    MCP -->|plugins_list| DB
 ```
 
 ## Key Components
 
 ### API Layer
-- **gRPC Server**: Primary API for code generation requests
-- Each plugin execution is a separate gRPC request
-- Receives `CodeGeneratorRequest` from CLI
+- **gRPC server** — the contract is `easyp.generator.v1.GeneratorAPI`: `GenerateCode`, `Plugins`, and the three mutating methods `CreatePlugin`, `UpdatePlugin`, `DeletePlugin`
+- One `CodeGeneratorRequest` per plugin invocation
+- An interceptor chain in front of every call: TLS or mutual TLS, rate limit and concurrency cap per caller, write-token authentication, licence check
 
 ### Execution Engine
-- **Docker Runtime**: Isolated container execution for plugins
-- Pulls plugin images from public Docker registries (Docker Hub, etc.)
-- Enforces resource limits (CPU, memory) per plugin
+- **Worker pool** — a bounded number of concurrent plugin processes; a request that finds no room is refused with `SERVER_OVERLOADED` rather than queued indefinitely
+- **Plugin process** — a child process of the service, fed the request on stdin and read on stdout, with a clean environment, a timeout and an output-size limit
+- **Local cache** — plugin archives are downloaded on first use, sha256-verified against what the registry recorded, and unpacked; concurrent misses collapse into one download
 
 ### Storage Layer
-- **PostgreSQL**: Stores plugin execution parameters
-  - Resource limits (CPU, memory allocation)
-  - Plugin configuration and metadata
-  - Execution logs for auditing
-  - _Note: Storage capabilities will be expanded in future releases_
+- **PostgreSQL** — the plugin registry (name, version, command, environment, tags) and, in Enterprise mode, the audit log in monthly partitions
+- **Object storage** — plugin archives, one `tar.gz` per plugin version, pushed by the operator's CLI and read by the service
 
 ### Monitoring
-- **Prometheus**: Metrics collection and monitoring
-- Tracks execution times, success rates, and resource usage
+- **Prometheus** metrics for the worker pool, plugin durations, the cache, the licence and the audit pipeline, each with an alert rule in the Helm chart
+- **OpenTelemetry** traces and **Pyroscope** profiles when an endpoint is configured
 
 ## How It Works
 
@@ -113,60 +112,61 @@ When running locally, the EasyP CLI supports:
 
 ### Remote Execution (API Service)
 When using the API Service:
-- **Docker only**: All plugins run as Docker containers
-- **Centralized control**: Operations team manages available plugins
-- **Consistent environment**: Same execution environment for all developers
+- **Remote plugins**: a `remote:` entry in `easyp.yaml` names the service and the plugin; the CLI sends the request there instead of executing anything
+- **Centralized control**: operators decide which plugins and versions exist
+- **Consistent environment**: the same binary on the same host for every caller
 
 ## Plugin Execution Flow
 
 ```mermaid
 sequenceDiagram
-    participant CLI as EasyP CLI
-    participant API as gRPC Server
+    participant CLI as easyp CLI
+    participant API as gRPC server
     participant DB as PostgreSQL
-    participant Docker as Docker Engine
-    participant Registry as Docker Registry
-    
+    participant S3 as Object storage
+    participant Plugin as Plugin process
+
     Note over CLI: Parse protobuf files
     CLI->>API: CodeGeneratorRequest (per plugin)
-    
-    API->>DB: Fetch plugin parameters
-    Note over DB: CPU/memory limits<br/>Docker image name<br/>Execution config
-    DB-->>API: Plugin execution params
-    
-    API->>Docker: Pull plugin image (if needed)
-    Docker->>Registry: Download image
-    Registry-->>Docker: Plugin image
-    
-    API->>Docker: Run plugin container
-    Note over Docker: Isolated execution<br/>Resource limits applied
-    Docker-->>API: CodeGeneratorResponse
-    
-    API->>PROM: Record metrics
-    Note over PROM: Execution time<br/>Success/failure<br/>Resource usage
-    
+
+    API->>API: rate limit, auth, licence
+    API->>DB: Resolve plugin (or "latest")
+    DB-->>API: command, environment, sha256
+
+    alt not in the local cache
+        API->>S3: Download archive
+        S3-->>API: plugin.tgz
+        Note over API: verify sha256, unpack
+    end
+
+    API->>Plugin: Start; request on stdin
+    Note over Plugin: bounded by timeout,<br/>output size, worker pool
+    Plugin-->>API: CodeGeneratorResponse on stdout
+
+    Note over API: metrics, trace, audit
     API-->>CLI: CodeGeneratorResponse
 ```
 
 ### Execution Steps
 
-1. **CLI Parsing**: CLI parses protobuf files locally
-2. **Request Sending**: CLI sends `CodeGeneratorRequest` to API Service (one request per plugin)
-3. **Parameter Lookup**: API Service fetches plugin execution parameters from PostgreSQL
-4. **Docker Execution**: API Service runs plugin in isolated Docker container
-5. **Metrics Recording**: Execution metrics are recorded (at end of request)
-6. **Response**: Generated code is returned to CLI
+1. **CLI parsing**: the CLI parses protobuf files locally
+2. **Request**: the CLI sends a `CodeGeneratorRequest` per plugin
+3. **Admission**: rate limit, concurrency cap, authentication and licence checks run before anything is spent on the request
+4. **Resolution**: the service looks the plugin up in PostgreSQL; `latest` resolves to the newest registered version
+5. **Fetch on miss**: if the plugin is not in the local cache, its archive is downloaded from object storage, sha256-verified and unpacked
+6. **Execution**: the plugin runs as a child process under the worker pool's limits
+7. **Response**: the generated code is returned to the CLI; metrics, a trace and (Enterprise) an audit entry are recorded
 
 ## Key Features
 
 | Feature | Description |
 |---------|-------------|
-| **🐳 Plugin Isolation** | Each plugin runs in a secure, isolated Docker container |
-| **⚙️ Resource Control** | CPU and memory limits enforced per plugin |
-| **📊 Metrics & Monitoring** | Prometheus metrics for all operations |
-| **🔄 Version Management** | Centralized plugin version control via Docker images |
+| **📦 Versioned registry** | Every plugin version is a reviewed Dockerfile, a checksummed archive and a database row |
+| **⚙️ Bounded execution** | Timeout, output-size limit and a worker pool cap every plugin run |
+| **📊 Metrics & Monitoring** | Prometheus metrics with an alert rule and a runbook for each |
+| **🔐 Authenticated writes** | Mutating calls need a token; reads are anonymous by default and can be locked down |
 | **⚡ Simple Protocol** | Standard `CodeGeneratorRequest/Response` protocol |
-| **🔒 Security First** | Container isolation with resource constraints |
+| **📝 Audit log** | Who changed what, with the credential that did it (Enterprise) |
 
 ## Configuration
 
@@ -209,112 +209,89 @@ to start rather than coming up on defaults you did not ask for.
 
 ## Plugin Parameters Storage
 
-PostgreSQL stores execution parameters for each plugin:
+PostgreSQL holds one row per registered plugin version: its name, the command
+the service runs, and what registration recorded about the archive.
 
-```sql
--- Example plugin configuration
+```json
 {
-  "plugin_name": "protobuf/go:v1.36.10",
-  "docker_image": "easyp/protoc-gen-go:v1.36.10",
-  "resources": {
-    "cpu_limit": "1.0",
-    "memory_limit": "512MB"
-  },
-  "execution_config": {
-    "timeout": "30s",
-    "network": "none"
-  }
+  "command": ["plugins/protocolbuffers/go/v1.36.10/plugin"],
+  "env": {},
+  "timeout": "60s",
+  "sha256": "9f2c…"
 }
 ```
 
-<Callout type="info">
-The storage schema and capabilities will be expanded in future releases to support additional features like audit logging, usage analytics, and plugin caching.
-</Callout>
-## Integration with EasyP CLI
-
-Configure your `easyp.yaml` to use remote plugin execution:
-
-```yaml
-generate:
-  plugins:
-    # Remote plugin execution via API Service
-    - remote: api.easyp.tech/protobuf/go:v1.36.10
-      out: .
-      opts:
-        paths: source_relative
-    
-    - remote: api.easyp.tech/grpc/go:v1.5.1
-      out: .
-      opts:
-        paths: source_relative
-```
-
-Then generate code:
-
-```bash
-easyp generate
-```
-
-The CLI will:
-1. Parse your protobuf files
-2. Send separate requests to API Service for each plugin
-3. Receive generated code responses
-4. Write generated files to specified output directories
-
-## Available Metrics
-
-Prometheus metrics exposed by the service:
-
-| Metric | Description |
-|--------|-------------|
-| `easyp_api_service_api_grpc_server_handled_total` | Total gRPC requests by status code |
-| `easyp_api_service_api_grpc_server_handling_seconds` | gRPC request latency histogram |
-| `easyp_api_service_generated_plugin_code_total` | Plugin executions by plugin name |
-| `easyp_api_service_repo_call_duration_seconds` | Database query latency |
-| `easyp_api_service_repo_errors_total` | Database errors count |
-| `easyp_api_service_standard_panics_total` | Recovered panics count |
+`command` must point inside `registry.plugins_dir`. `env` is the entire
+environment the plugin sees — nothing of the service's is inherited. `sha256`
+is computed by the service from the archive in object storage at registration
+and verified after every download, so a client cannot register a hash of its
+own choosing.
 
 ## Performance Characteristics
 
 | Metric | Typical Value | Notes |
 |--------|---------------|-------|
-| **Cold Start** | 2-5 seconds | First time pulling plugin image |
-| **Warm Start** | 100-500ms | Plugin image cached by Docker |
-| **Throughput** | 20-50 concurrent | Depends on available resources |
-| **Memory Usage** | 50-200MB | Per plugin execution |
+| **First call for a plugin version** | seconds | Downloading the archive from object storage, verifying it, unpacking |
+| **Subsequent calls** | the plugin's own run time | Executed from the local cache; the service adds milliseconds |
+| **Concurrency** | `worker_pool.max_concurrent_generations`, 16 by default | Community tier caps it at 16; Enterprise has no ceiling |
+| **Memory** | the plugin's | Not bounded by the service; see *Security* |
 
 ## Security
 
-### Container Isolation
-- Each plugin runs in a separate, ephemeral container
-- No network access during plugin execution
-- Resource limits (CPU, memory) enforced via Docker
-- Containers destroyed after execution
+### Plugin execution
 
-### API Security
-- gRPC-based communication
-- Support for authentication tokens (production deployments)
-- Input validation for all requests
-- Execution audit logs stored in PostgreSQL
+A plugin is a child process of the service — not a container. The service
+bounds its **time** (`worker_pool.generation_timeout`), its **concurrency**
+(`worker_pool.max_concurrent_generations`), the **size of its output**
+(`registry.max_output_size`), its **environment** (only what the plugin's own
+configuration declares; the service's credentials are not inherited) and
+**where its executable may live** (inside `registry.plugins_dir`).
+
+It does not bound memory, CPU, filesystem access beyond the service account's
+own, or network access: a plugin reaches whatever the pod reaches. Registering
+a plugin is therefore as privileged as running code on the host. Treat the
+write token accordingly, and treat a shared registry as a set of people who all
+trust each other. The repository README's *Known limitations* section is the
+complete list.
+
+### API security
+
+- TLS on the gRPC listener, and mutual TLS once `server.tls.client_ca_file`
+  names a CA. The CA is the whole check — there is no subject allow-list, so
+  name a CA that exists for this service rather than a corporate root.
+- The three mutating RPCs require a write token; the configuration holds only
+  its sha256 digest. Reads are anonymous by default, and
+  `auth.require_authentication` makes them require a token too.
+- Every request is validated before it reaches a plugin.
+- Audit log in PostgreSQL, in Enterprise mode.
 
 ## Production Considerations
 
-### Scalability
-- **Horizontal scaling**: Deploy multiple service instances behind load balancer
-- **Resource management**: Configure appropriate CPU/memory limits per plugin
-- **Database**: PostgreSQL can be replicated for high availability
+### Scaling
+
+**One replica.** The plugin cache on disk is not safe to share between
+processes, so the chart defaults to one replica, a `ReadWriteOnce` volume and
+the `Recreate` strategy, and more than one replica on a shared volume is not
+supported — it appears to work and corrupts the cache under concurrent misses.
+Scale by making the single pod bigger: `worker_pool.max_concurrent_generations`
+and CPU.
+
+The database side is safe for several processes — migrations take a Postgres
+session lock and audit partition maintenance an advisory lock — which is what
+makes a restart into a new version safe.
 
 ### Monitoring
-- **Prometheus metrics**: Monitor all aspects of service health
-- **Alerting**: Set up alerts for high error rates or slow execution
-- **Logs**: Structured logging for debugging and audit trails
 
-### Future Enhancements
-The API Service is actively developed with planned features including:
-- Plugin result caching for faster repeated executions
-- Enhanced audit logging and usage analytics
-- Support for custom plugin registries
-- Advanced resource scheduling and optimization
+- **Prometheus metrics** for the worker pool, plugin durations, the cache, the
+  licence and the audit pipeline, with an alert rule for each in the chart.
+- **A runbook per alert** on this site.
+- **Structured logs** with the resolved configuration printed at every start.
+
+### Planned
+
+- Caching generation results for repeated requests.
+- Usage accounting per caller.
+- Policy over which plugins and versions a deployment permits.
 
 ## Community and Support
 
