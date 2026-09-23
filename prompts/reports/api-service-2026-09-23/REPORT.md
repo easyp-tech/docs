@@ -18,7 +18,7 @@
 | `configuration` | новая: все 55 настроек из `config.Leaves()` + `EASYP_CONFIG`, `EASYP_TOKEN`, `OTEL_EXPORTER_OTLP_ENDPOINT` |
 | `authentication-and-licensing` | новая: TLS/mTLS, токены, Community vs Enterprise по коду, PASETO, grace, ELv2 |
 | `security` | новая: «не песочница», что ограничено/не ограничено, кто что может, изоляция силами окружения |
-| `plugins` | новая: имена, каталог (80/1738), plugin.yaml, Dockerfile, build→push→register, связь с bufbuild/plugins |
+| `plugins` | новая: имена, каталог (80/1743), plugin.yaml, Dockerfile, build→push→register, связь с bufbuild/plugins |
 | `client-usage` | новая: easyp CLI (`remote:`), ограничения CLI, Go SDK, gRPC, таблица ошибок |
 | `operator-cli` | новая: все команды и флаги из `--help` |
 | `observability` | новая: все метрики (со стенда + ленивые из кода), трейсы, профили, логи, алерты → runbooks |
@@ -116,3 +116,20 @@ b84da08 docs(api-service): compare with Buf BSR remote plugins, migration in bot
 | Работа `plugins register` без аргумента `path` | Не запускал |
 | `upgrading.mdx` построчно | Сверял выборочно |
 | Instance-level роли BSR, содержимое on-prem Observability | Страницы не читал |
+
+## Дополнение: каталог плагинов (второй заход, 2026-09-23)
+
+- Новая страница `api-service/plugin-catalog` (EN + RU), в навигации после `plugins`. Генерируется
+  `npm run sync:plugins -- --ref <tag>` (`scripts/sync-plugin-catalog.mjs`) из `registry/*/*/plugin.yaml`
+  на git-теге локального клона `../service`; снимок — `data/plugin-catalog.json` (тег, коммит, счётчики).
+  MDX, а не компонент, — чтобы поиск и `llms-full.txt` индексировали имена плагинов (проверено curl).
+- `yaml@2.9.0` и `semver@7.8.5` добавлены в devDependencies точными версиями; они уже стояли транзитивно,
+  новых пакетов нет. npm при этом убрал из lockfile устаревший `hasInstallScript: true` у корня.
+- **Исправление:** число версий в каталоге — **1743**, не 1738. Прежний awk-подсчёт обрывался на
+  строках-комментариях внутри `versions:` (`connectrpc/python` −1, `grpc/swift-protobuf` −4).
+  Исправлено в `plugins`, `vs-buf-bsr` (EN/RU) и в отчётах.
+- Проверка: 80 строк плагинов в EN и RU; порядок версий совпадает с `sort -rV` для всех 80; числа по
+  группам совпадают с таблицей в `plugins.mdx`; `types:check` OK; `build` exit 0 (672 страницы);
+  ссылки в разделе 212, битых 0; `/docs/api-service/plugin-catalog` и `/ru/...` → 200.
+- Ограничение поиска: ищется по целым токенам — `stephenh-ts-proto`, `vtprotobuf`, `connect-kotlin` находятся,
+  `ts-proto` — нет.

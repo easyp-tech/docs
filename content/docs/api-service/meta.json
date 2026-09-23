@@ -9,6 +9,7 @@
     "authentication-and-licensing",
     "security",
     "plugins",
+    "plugin-catalog",
     "client-usage",
     "operator-cli",
     "observability",
