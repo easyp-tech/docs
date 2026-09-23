@@ -184,7 +184,9 @@ internal/adapters/registry/cache.go:75-98]. `error_type` ∈ {`transient`,`perma
 ## 16. Каталог плагинов
 
 - [команда: `find registry -name plugin.yaml | wc -l`] → **80** плагинов в 10 вендорах.
-- [команда: подсчёт элементов `versions:` во всех `registry/**/plugin.yaml`] → **1738** версий.
+- [команда: `npm run sync:plugins -- --ref v1.0.2` (разбор `plugin.yaml` библиотекой `yaml`, без `skip: true`)] → **1743** версий.
+  Первоначально здесь стояло 1738: awk-подсчёт обрывался на строках-комментариях внутри `versions:`
+  (`connectrpc/python` −1, `grpc/swift-protobuf` −4). Исправлено во всех страницах и отчётах.
 - Формат: `registry/<vendor>/<name>/{Dockerfile,plugin.yaml}`; `plugin.yaml` = `build_args` + список `versions`;
   Dockerfile собирает `/plugin` (entrypoint обязан называться `plugin`). [код: registry/protocolbuffers/go/plugin.yaml], AGENTS.md.
 

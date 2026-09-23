@@ -19,7 +19,7 @@ configuration that matters.
 ## The catalogue
 
 The service repository's `registry/` directory holds a build recipe for every
-plugin easyp-tech publishes. In v1.0.2 that is **80 plugins with 1738 versions**
+plugin easyp-tech publishes. In v1.0.2 that is **80 plugins with 1743 versions**
 in ten groups:
 
 | Group | Plugins |
@@ -35,8 +35,8 @@ in ten groups:
 | `googlecloudplatform` | 1 |
 | `pluginrpc` | 1 |
 
-Counted with `find registry -name plugin.yaml | wc -l` and by summing the
-`versions:` lists. `ls registry/<group>` in your checkout is the current list.
+Every plugin and version is listed in the [Plugin catalog](/docs/api-service/plugin-catalog),
+generated from these files.
 
 The catalogue is a recipe book, not a set of prebuilt artifacts: a deployment
 builds and registers the versions it wants. A Community licence allows 10
