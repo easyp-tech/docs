@@ -43,6 +43,10 @@ The global flags are `--cfg` (alias `--config`, default `easyp.yaml`), `--debug`
 
 `lint` and `breaking` read the v1 `easyp.yaml`. They use the nearest module's declared roots and locked or local dependency roots for imports. A policy may exist without a `protobuf.mod`; in that case the commands use the scanned files and built-in imports.
 
+`breaking` applies the nearest `breaking` section to each reported file. When nested policies select different Git baselines, it compares against each baseline and reports an issue only under the policy that selected it.
+
+`validate-config --cfg <file> --format json` accepts `easyp.yaml`, `easyp.gen.yaml`, `protobuf.mod`, and `protobuf.lock`. Invalid lock versions, incomplete entries, and malformed hashes are reported as validation errors.
+
 The v1 pilot has no `mod vendor` or `ls-files` command.
 
 ## Minimal files
