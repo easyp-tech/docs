@@ -108,10 +108,8 @@ Helm release history.
 | `networkPolicy.enabled` | `true` | Egress limited to DNS, 5432, 443 and 4317. Add ports if your database, storage or collector use others. |
 | `reloader.enabled` | `true` | Restarts on certificate rotation if stakater/Reloader is installed. |
 
-The chart's own
-[README](https://github.com/easyp-tech/service/tree/master/deploy/charts/easyp-service)
-and `helm show values oci://ghcr.io/easyp-tech/charts/easyp-service --version 1.0.2`
-describe every value.
+Every value, with the chart's own description, is in the
+[Helm values reference](/docs/api-service/helm-values).
 
 <Callout type="info">
 The `NetworkPolicy` is the one isolation control that ships on by default. It is

@@ -8,7 +8,9 @@
     "start": "next start",
     "types:check": "fumadocs-mdx && tsc --noEmit",
     "migrate:content": "node scripts/migrate-content.mjs",
-    "sync:plugins": "node scripts/sync-plugin-catalog.mjs"
+    "sync:plugins": "node scripts/sync-plugin-catalog.mjs",
+    "sync:helm-values": "node scripts/sync-helm-values.mjs",
+    "sync:service": "node scripts/sync-plugin-catalog.mjs && node scripts/sync-helm-values.mjs"
   },
   "dependencies": {
     "@easyp/brand": "file:./brand",
