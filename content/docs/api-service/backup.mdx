@@ -21,8 +21,8 @@ about it.
 The database and the bucket have to be recoverable to *roughly* the same point.
 They are not transactional with each other, and the direction of the skew is what
 matters: a `plugins` row without its archive fails generation with
-`BINARY_NOT_UPLOADED`, which is at least legible. An archive with no row is
-merely orphaned. **So prefer a bucket snapshot slightly newer than the database
+`UNAVAILABLE` / `STORAGE_UNAVAILABLE` — the download fails — and the log names
+the missing key. An archive with no row is merely orphaned. **So prefer a bucket snapshot slightly newer than the database
 one** — never older.
 
 ## How much history to keep

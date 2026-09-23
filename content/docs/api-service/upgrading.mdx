@@ -195,8 +195,7 @@ Malformed plugin configurations also return `INVALID_ARGUMENT` rather than
 `easyp/mcp/easypconfig`, and taking that package meant taking the `easyp`
 module — which imports this service's own generated API in order to call it.
 A service that cannot compile without its own client is the wrong shape, so the
-dependency was removed rather than worked around. The tool is planned to return
-from a standalone library both sides can depend on.
+dependency was removed rather than worked around.
 
 This only affects deployments that set `mcp.enabled=true`; the endpoint is off
 by default.
