@@ -1,174 +1,68 @@
 ---
-title: "Быстрый старт (Quickstart)"
+title: "Быстрый старт"
+description: "Создание protobuf-модуля и генерация кода в пилотной версии EasyP v1."
 ---
 
-EasyP — современный toolkit для работы с файлами Protobuf. В этом кратком руководстве вы научитесь:
+Установите пилотную сборку EasyP v1 и убедитесь, что доступен Git. В примере используется локальный Go-плагин: перед генерацией добавьте `protoc-gen-go` в `PATH`.
 
-1. **Инициализировать** проект с конфигурацией EasyP
-2. **Настраивать линтинг**, чтобы ловить ошибки и соблюдать лучшие практики
-3. **Управлять зависимостями** из Git‑репозиториев
-4. **Генерировать код** из ваших Protobuf файлов
+## 1. Создайте модуль
 
-## Предварительные требования
+```bash
+mkdir contracts && cd contracts
+git init
+easyp init --module github.com/acme/contracts
+```
 
-Перед началом убедитесь, что у вас установлены:
+`init` создаёт три файла: `protobuf.mod` для модуля, `easyp.yaml` для политик линтинга и проверки совместимости, `easyp.gen.yaml` для генерации. Перед заменой существующего файла EasyP спрашивает пользователя. Автоматическая миграция зависимостей Buf в пилотную версию не входит.
 
-- **EasyP CLI** — см. [руководство по установке](/ru/docs/introduction/install)
-- **Git** доступен в вашем `$PATH`
-- **Файлы `.proto`**
+## 2. Добавьте proto-файл
 
-Проверить версию EasyP на вашей платформе:
+```bash
+mkdir -p proto/acme/v1
+```
 
-<Tabs items={["macOS / Linux", "Windows"]}>
-  <Tab value="macOS / Linux">
-    ```bash
-    easyp --version
-    ```
-  </Tab>
-  <Tab value="Windows">
-    ```powershell
-    easyp.exe --version
-    ```
-  </Tab>
-</Tabs>
+Создайте `proto/acme/v1/hello.proto`:
 
-## Инициализация проекта
+```proto
+syntax = "proto3";
+package acme.v1;
+option go_package = "github.com/acme/contracts/gen/go/acme/v1;acmev1";
 
-Создайте базовый файл конфигурации `easyp.yaml` в корне проекта:
+message Hello {
+  string name = 1;
+}
+```
 
-<Tabs items={["CLI", "Configuration"]}>
-  <Tab value="CLI">
-    ```bash
-    easyp init
-    ```
+Укажите корень исходников в `protobuf.mod`:
 
-    Интерактивная команда проверяет наличие `buf.yaml` для миграции и генерирует шаблон `easyp.yaml`.
-  </Tab>
-  <Tab value="Configuration">
-    ```yaml
-    # Начальный шаблон easyp.yaml
-    version: v1
+```text
+module github.com/acme/contracts
+roots proto
+```
 
-    lint:
-      use:
-        - DEFAULT
-    ```
-  </Tab>
-</Tabs>
+## 3. Настройте генерацию
 
-## Настройка линтинга
+Замените пустой список плагинов в `easyp.gen.yaml`:
 
-Линтинг помогает находить проблемы и поддерживать единый стиль. EasyP использует правила, совместимые с Buf.
+```yaml
+version: v1
+generate:
+  modules: [github.com/acme/contracts]
+plugins:
+  - name: go
+    out: ./gen/go
+    opts:
+      paths: source_relative
+```
 
-<Tabs items={["CLI", "Configuration"]}>
-  <Tab value="CLI">
-    Запуск линтера по всем `.proto` файлам проекта:
+## 4. Запустите команды
 
-    ```bash
-    easyp lint
-    ```
-  </Tab>
-  <Tab value="Configuration">
-    Конфигурация правил линтера в `easyp.yaml`:
+```bash
+easyp mod tidy
+easyp generate
+easyp lint --path proto
+```
 
-    ```yaml
-    version: v1
-    lint:
-      use:
-        - DEFAULT
-      except:
-        - PACKAGE_DIRECTORY_MATCH
-    ```
-  </Tab>
-</Tabs>
+`mod tidy` создаёт `protobuf.lock`. Если исходники импортируют другой Git-модуль, сначала добавьте в `protobuf.mod` строку `require module version`. Позже `mod download` скачает точные коммиты из lock. Храните `protobuf.mod` и `protobuf.lock` вместе с исходниками в репозитории.
 
-<Callout type="info">
-Правила линтинга EasyP на 100% совместимы с Buf — мигрировать просто.
-</Callout>
-
-## Управление зависимостями
-
-Если вы используете сторонние protobuf пакеты (например Google APIs или gRPC Gateway), EasyP упрощает их подключение.
-
-### Формат зависимости
-
-Запись: `$GIT_LINK@$VERSION`
-
-- **`$GIT_LINK`** — URL любого Git‑репозитория (GitHub, GitLab и т.д.)
-- **`$VERSION`** — тег или хеш коммита (опционально)
-
-### Загрузка и обновление зависимостей
-
-<Tabs items={["macOS / Linux", "Windows"]}>
-  <Tab value="macOS / Linux">
-    ```bash
-    # Загрузить зависимости из конфигурации
-    easyp mod download
-
-    # Обновить зависимости и обновить lock-файл
-    easyp mod update
-    ```
-  </Tab>
-  <Tab value="Windows">
-    ```powershell
-    # Загрузить зависимости в Windows
-    easyp.exe mod download
-
-    # Обновить зависимости в Windows
-    easyp.exe mod update
-    ```
-  </Tab>
-</Tabs>
-
-<Callout type="info">
-Совет: `easyp mod update` обновляет граф зависимостей и перегенерирует `protobuf.lock`.
-</Callout>
-
-## Генерация кода
-
-EasyP поддерживает все стандартные protoc‑плагины.
-
-<Tabs items={["CLI", "Configuration"]}>
-  <Tab value="CLI">
-    Запустить генерацию кода:
-
-    ```bash
-    easyp generate
-    ```
-  </Tab>
-  <Tab value="Configuration">
-    Добавьте конфигурацию плагинов в `easyp.yaml` (или `easyp.gen.yaml`):
-
-    ```yaml
-    generate:
-      plugins:
-        - name: go
-          out: ./gen/go
-          opts:
-            paths: source_relative
-        - name: go-grpc
-          out: ./gen/go
-          opts:
-            paths: source_relative
-            require_unimplemented_servers: false
-    ```
-  </Tab>
-</Tabs>
-
-<Callout type="info">
-Гибридный рантайм: WASM для максимальной скорости, удалённые исполнители — для сложных плагинов.
-</Callout>
-
-## Следующие шаги
-
-Поздравляем! 🎉 Вы успешно:
-- ✅ Инициализировали проект EasyP
-- ✅ Настроили линтинг
-- ✅ Управляете внешними зависимостями
-- ✅ Сгенерировали код из `.proto`
-
-### Узнать больше
-
-- **[CLI Reference](/ru/docs/cli/linter)** — подробности по командам
-- **[Архитектура MVS](/ru/docs/architecture/mvs-dependency-resolution)** — подробнее о резолюции MVS
-- **[API Service](/ru/docs/api-service/overview)** — удалённая генерация
+Подробности: [конфигурация](/ru/docs/cli/configuration), [генерация](/ru/docs/cli/generator), [зависимости](/ru/docs/cli/package-manager).

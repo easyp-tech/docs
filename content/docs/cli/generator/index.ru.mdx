@@ -1,136 +1,55 @@
 ---
 title: "Генератор"
+description: "Генерация кода из целых protobuf-модулей в пилотной версии EasyP v1."
 ---
 
-EasyP включает мощный генератор, который упрощает процесс получения кода из proto‑файлов. Благодаря YAML‑конфигурациям работа становится гораздо более удобной и интуитивной по сравнению с прямым использованием команды protoc.
+`easyp generate` ищет `easyp.gen.yaml` внутри текущего каталога, выбирает целые модули, компилирует их `.proto` и запускает перечисленные плагины. Имена модулей, корни исходников и версии зависимостей берутся из `protobuf.mod` и `protobuf.lock`.
 
-## Ключевые особенности генератора
+## Настройка модуля
 
-1. **Упрощённая генерация кода**:
-    - Генерация кода из proto через декларативную `YAML`‑конфигурацию.
-    - Избавляет от необходимости писать длинные и сложные команды protoc.
+```text
+# protobuf.mod
+module github.com/acme/contracts
+roots proto
+require github.com/acme/shared v1.2.0
+```
 
-2. **Обёртка над protoc**:
-    - EasyP выступает как удобный слой над protoc, предоставляя декларативный API.
-    - Поддерживает все опции и плагины, доступные protoc.
+```yaml
+# easyp.gen.yaml
+version: v1
+generate:
+  modules: [github.com/acme/contracts]
+plugins:
+  - name: go
+    out: ./gen/go
+    opts:
+      paths: source_relative
+  - name: go-grpc
+    out: ./gen/go
+    opts:
+      paths: source_relative
+```
 
-3. **Гибкость и кастомизация**:
-    - Используются те же параметры, что и у плагинов protoc, прямо в конфиге.
-    - Поддерживается множество плагинов и их параметры в одной конфигурации.
+```bash
+easyp mod tidy
+easyp generate
+```
 
-4. **Генерация из нескольких источников**:
-    - Локальные директории и удалённые Git‑репозитории одновременно.
-    - Лёгкая интеграция с существующими проектами и репозиториями.
+Если `generate.modules` не указан, выбирается ближайший `protobuf.mod`. Элемент списка может быть путём к локальному модулю относительно репозитория или именем зависимости из lock. Поле `generate.packages` оставлено для будущей фильтрации пакетов; непустое значение пока вызывает ошибку.
 
-5. **Удалённая генерация**:
-    - Генерация из удалённых Git репозиториев без локального checkout.
+## Выбор проекта и дескрипторы
 
-6. **Интеграция с менеджером пакетов**:
-    - Прозрачная работа с зависимостями через пакетный менеджер EasyP.
-    - Автоматическое разрешение и подключение proto‑зависимостей.
+```bash
+easyp generate --project backend
+easyp generate --descriptor_set_out descriptors.pb --include_imports
+```
 
-## Справочник конфигурации
+`--project` выбирает один каталог потребителя с `easyp.gen.yaml`. `--include_imports` добавляет транзитивные импорты в набор дескрипторов. Флагов `--path` и `--root` у команды v1 нет: корни исходников объявляются в `protobuf.mod`.
 
-### Сравнение конфигураций генератора
+## Плагины и managed mode
 
-<Tabs items={["easyp.gen.yaml", "buf.gen.yaml"]}>
-  <Tab value="easyp.gen.yaml">
-    ```yaml
-    # Зависимости пакетного менеджера
-    deps:
-      - github.com/googleapis/googleapis@common-protos-1_3_1
-      - github.com/grpc-ecosystem/grpc-gateway@v2.19.1
-      - github.com/bufbuild/protoc-gen-validate@v0.10.1
+`plugins[].name` выбирает локальный исполняемый файл или встроенный WASM-плагин. Встроенные плагины выбираются существующим resolver. Для удалённого плагина указываются `remote` и отдельный зафиксированный SemVer в `version`. Выходные каталоги задаются относительно файла генерации.
 
-    # Конфигурация генератора
-    generate:
-      plugins:
-        - name: go
-          out: ./gen/go
-          opts:
-            paths: source_relative
-            module: github.com/mycompany/myproject
-          with_imports: true
+Прежние правила managed mode доступны в `generate.managed`, в том числе селекторы по модулю, пакету, пути и полю. `options.go.package_prefix` задаёт префикс Go-пакетов; корневой `easyp.gen.yaml` может предоставить значение по умолчанию вложенным конфигам. Подробности — в [справочнике `easyp.gen.yaml`](/ru/docs/reference/easyp-gen-yaml).
 
-        - name: go-grpc
-          out: ./gen/go
-          opts:
-            paths: source_relative
-            require_unimplemented_servers: false
-    ```
-  </Tab>
-  <Tab value="buf.gen.yaml">
-    ```yaml
-    version: v2
-    plugins:
-      - remote: buf.build/protocolbuffers/go
-        out: gen/go
-        opt:
-          - paths=source_relative
-          - module=github.com/mycompany/myproject
-      - remote: buf.build/grpc/go
-        out: gen/go
-        opt:
-          - paths=source_relative
-          - require_unimplemented_servers=false
-    ```
-  </Tab>
-</Tabs>
-
-### Примеры плагинов для различных языков
-
-<Tabs items={["Go", "TypeScript", "Python"]}>
-  <Tab value="Go">
-    ```yaml
-    plugins:
-      - name: go
-        out: ./gen/go
-        opts:
-          paths: source_relative
-      - name: go-grpc
-        out: ./gen/go
-        opts:
-          paths: source_relative
-          require_unimplemented_servers: false
-    ```
-  </Tab>
-  <Tab value="TypeScript">
-    ```yaml
-    plugins:
-      - name: ts
-        out: ./src/gen
-        opts:
-          declaration: true
-          target: es2017
-      - name: grpc-web
-        out: ./src/gen
-        opts:
-          import_style: typescript
-          mode: grpcweb
-    ```
-  </Tab>
-  <Tab value="Python">
-    ```yaml
-    plugins:
-      - name: python
-        out: ./gen/python
-      - name: grpc_python
-        out: ./gen/python
-    ```
-  </Tab>
-</Tabs>
-
-## Команды запуска
-
-<Tabs items={["CLI", "Configuration"]}>
-  <Tab value="CLI">
-    ```bash
-    easyp generate
-    ```
-  </Tab>
-  <Tab value="Configuration">
-    ```bash
-    easyp --cfg custom-easyp.yaml generate
-    ```
-  </Tab>
-</Tabs>
+Репозитории зависимостей могут описывать корни `.proto` в EasyP v1, старом EasyP, Buf v1 или Buf v2. Конфиг потребителя при этом остаётся v1.
