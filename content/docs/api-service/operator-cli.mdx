@@ -1,0 +1,167 @@
+---
+title: "Operator CLI"
+description: "easyp-svc: every command and flag of the binary that is both the server and the operator's tool."
+---
+
+`easyp-svc` is one binary with six command groups. The server is one of them
+(`service start`); the rest are what an operator runs from a laptop or CI.
+
+```
+easyp-svc service start
+easyp-svc plugins build | pack | push | register
+easyp-svc auth new-token
+easyp-svc api descriptor
+easyp-svc config validate | print
+easyp-svc health
+```
+
+Global flags: `--help`/`-h`, `--version`/`-v`.
+
+Every command that takes `--cfg` also reads the path from `EASYP_CONFIG`.
+
+## service start
+
+Starts the gRPC, metrics, health and (if enabled) MCP listeners.
+
+| Flag | Meaning |
+|---|---|
+| `--cfg string` | Path to the YAML config. Omit to configure from the environment alone. |
+| `--log-level string` (also `--log_level`) | `debug`, `info`, `warn`, `error`. Overrides `log.level`. |
+
+## plugins build
+
+`easyp-svc plugins build [options] <registry-path>`
+
+Builds plugin binaries from registry Dockerfiles. Needs Docker. Each version
+listed in a `plugin.yaml` is built with `--build-arg VERSION=…` and the image
+filesystem is extracted to `<output>/{group}/{name}/{version}/`.
+
+| Flag | Default | Meaning |
+|---|---|---|
+| `--output`, `-o` | `plugins` | Output directory. |
+| `--filter` | — | Glob on `group/name[:version]`, e.g. `protocolbuffers/*`, `grpc/go:v1.5.1`. |
+| `--parallel`, `-p` | `4` | Concurrent Docker builds. |
+| `--force` | false | Rebuild even if the binary exists. |
+| `--dry-run` | false | List what would be built. |
+| `--non-interactive` | false | No interactive UI or progress bars. |
+| `--keep-going` | false | Continue after a failed build. |
+
+## plugins pack
+
+`easyp-svc plugins pack [options] [path]`
+
+Writes each version directory under `path` to
+`{out}/{group}/{name}/{version}/plugin.tgz` — the same layout as the S3 keys, so
+the tree can be uploaded later with `push --packed`.
+
+| Flag | Meaning |
+|---|---|
+| `--out` | Directory to write archives to. |
+| `--filter` | Glob filter. |
+| `--force` | Re-pack existing archives. |
+| `--dry-run` | Print the plan only. |
+| `--non-interactive` | No interactive UI. |
+
+## plugins push
+
+`easyp-svc plugins push [options] [path]`
+
+Packs each version directory and uploads it to
+`{prefix}{group}/{name}/{version}/plugin.tgz`. Run before `register`. Re-pushing
+an already registered version with `--force` invalidates its recorded checksum:
+register it again.
+
+| Flag | Default | Meaning |
+|---|---|---|
+| `--cfg` | — | A **full** service config; `registry.s3` fills settings not given as flags. A fragment containing only `registry.s3` is refused. |
+| `--bucket` | — | Bucket (overrides the config). |
+| `--endpoint` | — | Endpoint URL, e.g. `http://localhost:9000`. |
+| `--region` | — | Region. |
+| `--prefix` | — | Key prefix. |
+| `--force-path-style` | false | Path-style addressing (MinIO, RustFS). |
+| `--filter` | — | Glob filter. |
+| `--packed` | false | `path` is a tree written by `plugins pack`. |
+| `--parallel`, `-p` | `8` | Concurrent uploads. |
+| `--force` | false | Re-upload archives already in storage. |
+| `--dry-run` | false | Print the plan without contacting storage. |
+| `--non-interactive` | false | No interactive UI. |
+
+Credentials come from the standard AWS chain (`AWS_ACCESS_KEY_ID`,
+`AWS_SECRET_ACCESS_KEY`, profiles). An interrupted run resumes by re-running it.
+
+## plugins register
+
+`easyp-svc plugins register [options] [path]`
+
+Calls `CreatePlugin` for every version under `path` with its command path as the
+service sees it. With `--packed`, `path` is a `pack` tree, which is enough to
+register from a machine that never built the plugins as long as the archives are
+already in storage.
+
+| Flag | Default | Meaning |
+|---|---|---|
+| `--addr` | `localhost:23410` | Service gRPC address. |
+| `--cfg` | — | Service config; `registry.plugins_dir` is used as `--plugins-prefix` when that flag is not set. |
+| `--plugins-prefix` | `/plugins` | `plugins_dir` on the server. |
+| `--token` | `$EASYP_TOKEN` | Write token. |
+| `--tls-ca` | system store | CA that signed the server certificate. |
+| `--tls-cert`, `--tls-key` | — | Client certificate and key, for mutual TLS. |
+| `--insecure` | false | Plaintext. Local development only. |
+| `--filter` | — | Glob filter. |
+| `--packed` | false | `path` is a `pack` tree. |
+| `--parallel`, `-p` | `8` | Concurrent registrations. The server reads each archive to checksum it; keep this at or below the server's `rate_limit.max_concurrent_per_ip`. |
+| `--fail-on-error` | **true** | Exit non-zero if any registration failed. |
+| `--dry-run` | false | Print planned calls without contacting the server. |
+| `--non-interactive` | false | No interactive UI. |
+
+A version that is already registered is reported as skipped, not failed.
+
+## auth new-token
+
+`easyp-svc auth new-token [--name string]`
+
+Generates a random write token, prints it once, and prints the
+`auth.write_tokens` entry (name and sha256) that authorises it. `--name`
+defaults to `unnamed`; it labels the token in logs and the audit trail.
+
+## api descriptor
+
+`easyp-svc api descriptor [--output string]`
+
+Writes a `FileDescriptorSet` of the API for `grpcurl -protoset`; the server does
+not serve reflection. `--output`/`-o` defaults to `-` (stdout).
+
+## config validate
+
+`easyp-svc config validate [--cfg string]`
+
+Resolves the configuration exactly as `service start` would and exits non-zero
+if the service would refuse it. Without `--cfg`, checks the environment alone.
+
+## config print
+
+`easyp-svc config print [options]`
+
+| Flag | Meaning |
+|---|---|
+| `--cfg` | Config file; omit to resolve from the environment alone. |
+| `--origin` | Annotate each setting with the layer it came from. |
+| `--changed` | Print only settings that differ from the defaults — what a config file needs to state. |
+| `--show-secrets` | Print credentials instead of a placeholder. |
+
+## health
+
+`easyp-svc health [--addr host:port] [--cfg string]`
+
+Exits 0 if `/live` on the health listener answers, 1 otherwise. It is the
+image's `HEALTHCHECK`. It probes liveness, not readiness: readiness depends on
+PostgreSQL, and restarting a container on every database blip turns an outage
+into a crash loop. Without `--addr` the port comes from `--cfg`/`EASYP_CONFIG`,
+then the environment, then the default 23412.
+
+## Taskfile shortcuts
+
+The service repository's `Taskfile.yml` wraps these for development:
+`task build-plugins`, `FILTER=… task build-plugins-filter`, `task push-plugins`,
+`task register-plugins`, `task up`, `task up-minimal`, `task run`, `task run-local`.
+They assume the development stack's addresses and credentials.

@@ -1,0 +1,157 @@
+---
+title: "Authentication and Licensing"
+description: "Transport security, write tokens, the Community and Enterprise tiers, and how the licence token is verified."
+---
+
+## Transport security
+
+| Mode | Settings | Who can connect |
+|---|---|---|
+| Plaintext | no `server.tls.cert_file` | Anyone who reaches the port. The service logs a warning at start. For local development only. |
+| TLS | `server.tls.cert_file`, `server.tls.key_file` | Anyone who reaches the port; traffic is encrypted. |
+| Mutual TLS | plus `server.tls.client_ca_file` | Only clients presenting a certificate signed by that CA. |
+
+Mutual TLS checks the certificate authority and nothing else — there is no
+allow-list of subjects. Name a CA that exists only for this service, not a
+corporate root that has signed thousands of certificates.
+
+The certificate and key are read once at start; a rotated certificate needs a
+restart (the Helm chart can trigger one through stakater/Reloader).
+
+The MCP endpoint is plain HTTP regardless of these settings.
+
+## Write tokens
+
+The only credential the service understands is a static bearer token, sent as
+gRPC metadata `authorization: Bearer <token>`.
+
+```bash
+easyp-svc auth new-token --name ci
+```
+
+prints a random token once, and the entry that authorises it:
+
+```yaml
+auth:
+  write_tokens:
+    - name: "ci"
+      sha256: "4761f1d6…"
+```
+
+The configuration holds only the sha256 digest, so it is not a secret. The
+`name` identifies the caller in logs and in the audit trail. Environment form:
+`AUTH_WRITE_TOKENS=ci=<64 hex>,me=<64 hex>`. Names must be unique.
+
+| Method | Default | With `auth.require_authentication: true` |
+|---|---|---|
+| `GenerateCode`, `Plugins` | anonymous | token required |
+| `CreatePlugin`, `UpdatePlugin`, `DeletePlugin` | token required | token required |
+| gRPC Health | anonymous | anonymous |
+| MCP `/mcp` | anonymous | token required (HTTP 401 without) |
+
+An empty `write_tokens` list denies every write: a forgotten configuration
+breaks registration instead of leaving the registry open.
+
+Failures are counted in `easyp_auth_failures_total{reason}` with
+`reason="no_credentials"` or `reason="unknown_token"`, and answered with
+`UNAUTHENTICATED`.
+
+<Callout type="warn">
+The easyp CLI does not send a token and cannot present a client certificate.
+A service with `auth.require_authentication: true`, or a listener that requires
+mutual TLS, cannot be used from `easyp generate` directly. Put it behind a proxy
+that terminates mTLS for trusted networks, or use the Go SDK, which supports
+both (`sdk.WithToken`, `sdk.WithTransportCredentials`).
+</Callout>
+
+### What there is not
+
+- No users, organisations, roles or scopes. A token either is in the list or is
+  not; every write token can create, update and delete any plugin.
+- No SSO, OIDC, LDAP or SCIM.
+- No token expiry. Revoke a token by removing its digest and restarting.
+
+## Community and Enterprise
+
+One binary; the licence decides the tier. Without a valid licence the service
+runs as **Community**.
+
+| | Community | Enterprise |
+|---|---|---|
+| Code generation, plugin listing | yes | yes |
+| Plugin create/update/delete | yes | yes |
+| Rate and concurrency limits | yes | yes |
+| MCP endpoint | yes | yes |
+| Prometheus metrics, traces, profiles | yes | yes |
+| **Audit log in PostgreSQL** | no | yes |
+| `worker_pool.workers` | at most 4 | no ceiling |
+| `worker_pool.max_concurrent_generations` | at most 16 | no ceiling |
+| Registered plugin versions | at most 10 | no ceiling |
+
+The audit log is the only feature Enterprise adds; the rest is ceilings. They
+behave differently:
+
+- **Worker and generation ceilings are applied at start.** A configured value
+  above the ceiling is lowered, and the service logs
+  `worker_pool.workers lowered to the licence tier's limit` with both numbers. It
+  does not refuse to start. The defaults (4 and 16) are exactly the Community
+  ceilings, so an unchanged Community deployment is not affected.
+- **The plugin ceiling is checked on every `CreatePlugin`.** At 10 registered
+  rows the next registration fails with `RESOURCE_EXHAUSTED`, reason
+  `MAX_PLUGINS_EXCEEDED`. Each version is a row: `protocolbuffers/go` in three
+  versions uses three.
+
+The operations counter `easyp_operations_total` works on both tiers; without a
+licence, audit entries are counted in `easyp_audit_events_skipped_total`
+instead of being written.
+
+## How the licence is verified
+
+The licence is a PASETO v4.public token signed with Ed25519. Verification is
+offline: the service does not call anything.
+
+1. The token comes from `license.key` (`LICENSE_KEY`) or the file named by
+   `license.file`.
+2. The key id in the token's footer selects a public key from
+   `license.public_keys`; an entry under `"*"` verifies any key id. The Helm
+   chart ships easyp.tech's current public key (`2026-08`).
+3. No public key configured: the token is ignored and the service runs as
+   Community, with a warning in the log. A public key that does not decode stops
+   the start.
+4. Any other failure — bad signature, unknown key id — resolves to Community,
+   not to an error.
+
+The token names a tier; which features that tier includes is decided by the
+release, not the token.
+
+### Expiry and grace
+
+- The token may carry `grace_days`. Without it the grace period is zero.
+- After the expiry time (plus one minute of clock-skew tolerance) the service
+  keeps the Enterprise tier for `grace_days`, sets
+  `easyp_license_in_grace` to 1 and logs a warning.
+- After the grace period it drops to Community and logs
+  `licence expired past its grace period; running in community mode`.
+- The token is re-validated every `license.cache_ttl` (5 minutes), so the tier
+  changes on a running service. Replacing the token itself needs a restart.
+
+Dropping to Community is silent for clients: audit stops, the plugin ceiling
+starts refusing registrations above 10. The alerts
+[EasypLicenceExpiringSoon](/docs/api-service/runbooks#easyplicenceexpiringsoon)
+and [EasypLicenceInGrace](/docs/api-service/runbooks#easyplicenceingrace) exist
+for this.
+
+<Callout type="info">
+The trust anchor is your configuration. Whoever can edit `license.public_keys`
+decides which authority may issue licences for the installation.
+</Callout>
+
+## Source code licence
+
+| Part | Licence | Practical meaning |
+|---|---|---|
+| The service (`easyp-svc`, everything outside `api/` and `sdk/`) | Elastic License 2.0 | You may run it, including in production and commercially, and modify it. You may not offer it to third parties as a hosted or managed service, and may not remove or circumvent the licence-key functionality. Read the licence text for the exact terms. |
+| `api/` (gRPC contract) and `sdk/` (Go client) | Apache-2.0 | Separate Go modules, so a program that talks to the service imports only Apache-2.0 code. |
+| Releases up to and including v0.8.0 | Apache-2.0 | Remain available under those terms. |
+
+The Elastic License is source-available, not an OSI-approved open-source licence.

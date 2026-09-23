@@ -1,0 +1,66 @@
+---
+title: "MCP Endpoint"
+description: "The optional Model Context Protocol endpoint: what it exposes, how to enable it, and what it bypasses."
+---
+
+The service can serve a [Model Context Protocol](https://modelcontextprotocol.io)
+endpoint so that AI tools can look up which plugins and versions a deployment
+offers — for example while writing an `easyp.yaml`.
+
+## What it exposes
+
+One tool, `plugins_list`: the plugin catalogue, with optional `group`, `name`,
+`version` and `tags` filters, paginated like the gRPC `Plugins` call. It is
+generated from the same proto definition, so it returns the same data.
+
+It is read-only. It cannot generate code and cannot register, change or delete
+plugins.
+
+## Enabling it
+
+Off by default.
+
+| Where | Setting |
+|---|---|
+| YAML | `mcp.enabled: true` |
+| Environment | `MCP_ENABLED=true` |
+| Helm | `--set mcp.enabled=true` (also publishes the container and Service port) |
+
+The endpoint is `http://<host>:<server.port.mcp>/mcp` — port 23413 by default,
+8083 in the Helm chart — using the streamable HTTP transport. With it off the
+service logs `MCP endpoint disabled; set mcp.enabled to serve it` and nothing
+listens on the port.
+
+Client configuration, for tools that read an `mcpServers` map:
+
+```json
+{
+  "mcpServers": {
+    "easyp": { "url": "http://localhost:23413/mcp" }
+  }
+}
+```
+
+## What it bypasses
+
+The MCP listener is plain HTTP outside the gRPC interceptor chain: no TLS, no
+rate limit, no per-client concurrency limit, no audit. It exposes nothing the
+anonymous gRPC `Plugins` call does not, which is why it can be anonymous by
+default — but it is a decision, so it is off until you make it.
+
+With `auth.require_authentication: true` the endpoint requires the same bearer
+token as gRPC and answers 401 without it.
+
+Serve it inside a trusted network, or behind an ingress that terminates TLS.
+
+## Checking it
+
+The service repository has a smoke client:
+
+```bash
+go run ./cmd/mcp-smoke --endpoint http://localhost:23413/mcp
+```
+
+Buf's registry also has an MCP server, with a different scope: it exposes the
+BSR Registry API (modules, commits, labels), including writes. See
+[EasyP vs Buf BSR](/docs/api-service/vs-buf-bsr).

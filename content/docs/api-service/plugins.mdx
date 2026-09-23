@@ -1,0 +1,171 @@
+---
+title: "Plugins"
+description: "The plugin catalogue, how a plugin version gets from a Dockerfile into the service, and how to add your own."
+---
+
+## Names
+
+A plugin is addressed as `group/name:version`, for example
+`protocolbuffers/go:v1.36.10`.
+
+- `group` and `name`: lowercase letters, digits and `-`, starting with a letter.
+- `version`: `vX.Y` or `vX.Y.Z` (protobuf's own releases are `v33.1`-style), or
+  `latest`.
+
+`latest` picks the registered version that sorts last **as a string**. With
+`v1.36.9` and `v1.36.10` registered it returns `v1.36.9`. Pin versions in every
+configuration that matters.
+
+## The catalogue
+
+The service repository's `registry/` directory holds a build recipe for every
+plugin easyp-tech publishes. In v1.0.2 that is **80 plugins with 1738 versions**
+in ten groups:
+
+| Group | Plugins |
+|---|---|
+| `protocolbuffers` | 12 |
+| `grpc` | 13 |
+| `bufbuild` | 15 |
+| `connectrpc` | 9 |
+| `community` | 23 |
+| `grpc-ecosystem` | 2 |
+| `apple` | 2 |
+| `anthropics` | 2 |
+| `googlecloudplatform` | 1 |
+| `pluginrpc` | 1 |
+
+Counted with `find registry -name plugin.yaml | wc -l` and by summing the
+`versions:` lists. `ls registry/<group>` in your checkout is the current list.
+
+The catalogue is a recipe book, not a set of prebuilt artifacts: a deployment
+builds and registers the versions it wants. A Community licence allows 10
+registered versions in total.
+
+## One plugin directory
+
+```
+registry/grpc/go/
+├── Dockerfile      # takes ARG VERSION, produces /plugin
+└── plugin.yaml     # the versions to build
+```
+
+```yaml
+# registry/protocolbuffers/go/plugin.yaml
+build_args:
+  GO_MODULE: google.golang.org/protobuf/cmd/protoc-gen-go
+versions:
+  - v1.36.10
+  - v1.36.9
+```
+
+Optional keys in `plugin.yaml`: `build_args` (passed to every build),
+`dockerfile` (a different file), `args` (arguments for the entrypoint). A
+version entry may be a mapping that overrides these for itself or sets
+`skip: true`.
+
+### What the Dockerfile must produce
+
+- **An executable at `/plugin`.** It reads a `CodeGeneratorRequest` on stdin,
+  writes a `CodeGeneratorResponse` on stdout, and exits non-zero on failure.
+- **Anything else it needs next to it.** The whole image filesystem is
+  extracted into the version directory and shipped together: a jar, a
+  `node_modules`, a shared library.
+- **One recipe for every version**, selected by `ARG VERSION`.
+- By convention in this repository: a `scratch` or distroless final stage,
+  running as `nobody`, base images pinned by digest, static binaries where the
+  language allows.
+
+The service does not run the image. Docker is used only at build time to produce
+a directory of files; at run time the service executes `plugin` from that
+directory as an ordinary process.
+
+## From recipe to runnable plugin
+
+```
+ build machine / CI                                   service
+ ──────────────────                                   ───────
+ easyp-svc plugins build registry
+   → plugins/{group}/{name}/{version}/plugin (+ sidecars)
+ easyp-svc plugins push plugins
+   → s3://bucket/{prefix}{group}/{name}/{version}/plugin.tgz
+ easyp-svc plugins register plugins  ── CreatePlugin ──▶ reads the archive from S3,
+                                                           records its sha256
+                                        GenerateCode  ──▶ on cache miss: download,
+                                                           verify sha256, unpack, run
+```
+
+1. **build** — `easyp-svc plugins build <registry-path>` runs a Docker build
+   per version and extracts the result to `--output` (`plugins/` by default).
+   Needs Docker. Produces Linux binaries.
+2. **push** — packs each version directory into `plugin.tgz` and uploads it.
+   Skipped in local mode. `plugins pack` + `plugins push --packed` split this
+   across machines.
+3. **register** — calls `CreatePlugin` for each version with the command path as
+   the service will see it (`--plugins-prefix`, default `/plugins`). Needs a
+   write token.
+
+**Push before register.** With object storage enabled, registration of a version
+whose archive is absent fails with `FAILED_PRECONDITION` /
+`BINARY_NOT_UPLOADED`. The service computes the checksum itself, so a client
+cannot register a hash of its choosing.
+
+**`push --force` after register breaks the checksum.** The object changes under
+the recorded hash, and the next download fails with
+`plugin archive checksum mismatch`. Register again after re-pushing.
+
+In **local mode** (no bucket) step 2 is skipped and the files must be present
+under `plugins_dir` on the service's disk — mounted, copied, or built into a
+derived image.
+
+All commands and flags: [Operator CLI](/docs/api-service/operator-cli).
+
+## Registered configuration
+
+Each registered version is one row in the `plugins` table. Its `config` is:
+
+```json
+{
+  "command": ["/plugins/protocolbuffers/go/v1.36.10/plugin"],
+  "env": {},
+  "timeout": "60s",
+  "sha256": "9f2c…"
+}
+```
+
+| Field | Meaning |
+|---|---|
+| `command` | Executable and arguments. `command[0]` must resolve inside `registry.plugins_dir`, checked at registration and again before each run after resolving symlinks. |
+| `env` | The plugin's entire environment. Nothing from the service is inherited. |
+| `timeout` | Optional per-plugin limit, applied inside `worker_pool.generation_timeout`. |
+| `sha256` | Written by the service from the archive in storage. Absent in local mode. |
+
+`UpdatePlugin` takes a field mask (`config`, `tags`); an update recomputes the
+checksum. `DeletePlugin` removes the row and, with object storage, the archive
+and the cached directory.
+
+## Adding a plugin
+
+**To the public catalogue:** add `registry/<group>/<name>/` with a `Dockerfile`
+and a `plugin.yaml` — `community/<author>-<tool>` if the project is not one of
+the named groups — and open a pull request against
+[easyp-tech/service](https://github.com/easyp-tech/service). The repository's
+issue templates include a plugin request.
+
+**Only for your deployment:** the same two files in your own directory tree.
+`plugins build` takes any registry path, and registration does not care where a
+recipe came from. Private plugins never have to be published anywhere.
+
+Before registering a plugin someone else wrote, read
+[Security](/docs/api-service/security): the plugin runs with the service's
+privileges.
+
+## Relationship to bufbuild/plugins
+
+The group layout and the plugin set follow
+[bufbuild/plugins](https://github.com/bufbuild/plugins) (Apache-2.0), the
+catalogue behind Buf's remote plugins: the same ten owners, and the same
+`community/<author>-<tool>` naming. The recipes are written for this service's
+build (one Dockerfile per plugin taking `ARG VERSION`, a `plugin.yaml` version
+list, `/plugin` as the entrypoint) rather than copied per version. The two
+catalogues are maintained separately and their version lists differ.
