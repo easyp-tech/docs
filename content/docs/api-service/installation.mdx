@@ -1,0 +1,148 @@
+---
+title: "Installation"
+description: "Container image tags, the Helm chart and its required values, the compose stack, and release binaries."
+---
+
+Every release publishes a container image, a Helm chart and binaries. The
+current release is **v1.0.2** (chart version 1.0.2).
+
+## What the service needs
+
+| Dependency | Required | Notes |
+|---|---|---|
+| PostgreSQL | yes | One DSN in `DB_POSTGRES_DSN`. The service creates its own tables. |
+| S3-compatible object storage | no | Without it, plugin binaries must already be on the service's disk under `registry.plugins_dir`. |
+| A writable volume for `plugins_dir` | yes | Plugin cache and download staging. Sized above `registry.cache_max_bytes` (20 GiB by default). |
+| Prometheus, an OTLP collector, Pyroscope | no | Metrics are always served; traces and profiles only when an endpoint is set. |
+
+## Container image
+
+`ghcr.io/easyp-tech/service`, multi-architecture (linux/amd64, linux/arm64).
+
+| Tag | Meaning |
+|---|---|
+| `v1.0.2` | A release. Immutable. |
+| `latest` | The newest release. Moves only when a release is tagged. |
+| `edge` | The tip of the `master` branch. Moves on every push. |
+| `sha-<short>` | One commit. Immutable. |
+
+Pin `vX.Y.Z` in production.
+
+The image runs as UID 65532, its entrypoint is `/easyp-svc`, and it declares a
+`HEALTHCHECK` that runs `easyp-svc health` against `/live` on the health port.
+The probe does not see the start command's `--cfg`, so if ports are set in a
+config file, point `EASYP_CONFIG` at that file on the container — both the
+service and the probe read it:
+
+```yaml
+environment:
+  EASYP_CONFIG: /etc/easyp/config.yml
+command: ["service", "start"]
+```
+
+Without it the container serves normally but reports `unhealthy`.
+
+## Helm
+
+```bash
+kubectl create secret generic easyp-env \
+  --from-literal=DB_POSTGRES_DSN='postgres://user:pass@host:5432/easyp?sslmode=require'
+
+helm install easyp oci://ghcr.io/easyp-tech/charts/easyp-service \
+  --version 1.0.2 \
+  --set secrets.existingSecret=easyp-env \
+  --set tls.enabled=false
+```
+
+That is a running service with no transport security and no writes enabled —
+enough to confirm it works, not enough to expose.
+
+### What the chart refuses to install without
+
+The chart checks these at render time and fails with a message naming the
+missing value:
+
+| Condition | Error names |
+|---|---|
+| No database DSN | `secrets.existingSecret` (or `secrets.create=true` with `secrets.data`) |
+| `tls.enabled=true` (the default) with no certificate | `tls.serverSecret` or `certManager.enabled` |
+| `ingress.enabled=true` with no trusted proxies | `config.server.trustedProxies` |
+| `generationTimeoutSeconds < forceShutdownAfterSeconds < terminationGracePeriodSeconds` violated | the three values |
+| `maxConcurrentGenerations × maxOutputSize` does not fit the memory limit | `resources.limits.memory` |
+| Cache volume not larger than `cacheMaxBytes` | `persistence.size` / `persistence.ephemeralSizeLimit` |
+
+### Secret keys
+
+The pod loads the secret with `envFrom`, so **the keys are environment variable
+names**:
+
+| Key | When |
+|---|---|
+| `DB_POSTGRES_DSN` | Always. |
+| `REGISTRY_S3_ACCESS_KEY_ID`, `REGISTRY_S3_SECRET_ACCESS_KEY` | When `config.registry.s3.bucket` is set. |
+| `LICENSE_KEY` | Enterprise. Absent means Community. |
+| `AUTH_WRITE_TOKENS` | To allow writes: `name=<sha256>,name=<sha256>`. Absent means no writes. |
+
+Prefer `secrets.existingSecret`. Values passed through `secrets.data` end up in
+Helm release history.
+
+### Values worth knowing
+
+| Value | Default | Why it matters |
+|---|---|---|
+| `replicaCount` | `1` | Do not raise it on a shared volume. See [Architecture](/docs/api-service/architecture#single-replica). |
+| `image.tag` | `""` (chart appVersion) | Pin it. |
+| `ports.grpc` / `metric` / `health` / `mcp` | `8080` / `8081` / `8082` / `8083` | The chart overrides the binary's 23410–23413. |
+| `mcp.enabled` | `false` | MCP sits outside the gRPC interceptor chain. |
+| `config.server.trustedProxies` | `[]` | Required behind an ingress, else every client shares one rate-limit bucket. |
+| `config.workerPool.*` | binary defaults | `workers: 4`, `queueSize: 16`, `maxConcurrentGenerations: 16`, `generationTimeoutSeconds: 120`. |
+| `config.registry.s3.bucket` | `""` | Empty means local mode. |
+| `config.license.publicKeys` | easyp.tech key `2026-08` | The licence trust anchor. Replace only if you issue your own licences. |
+| `tls.enabled` / `tls.clientCASecret` | `true` / `""` | With a CA the listener requires client certificates (mTLS). `"-"` disables the client check. |
+| `certManager.enabled` | `false` | Let cert-manager issue server and ingress client certificates. |
+| `ingress.*` | disabled, Traefik | Defaults target Traefik because it can express an mTLS backend leg (`ServersTransport`). |
+| `persistence.size` | `25Gi` | Must exceed `cacheMaxBytes`. |
+| `resources.limits` | `cpu: 4`, `memory: 4Gi` | Sized for 16 generations × 64 MiB output, twice. |
+| `serviceMonitor.enabled`, `prometheusRule.enabled` | `false` | Need the Prometheus Operator CRDs. Turn on where you run it. |
+| `prometheusRule.runbookBaseUrl` | `https://easyp.tech/docs/api-service/runbooks` | Every alert links to a section of [Runbooks](/docs/api-service/runbooks). |
+| `networkPolicy.enabled` | `true` | Egress limited to DNS, 5432, 443 and 4317. Add ports if your database, storage or collector use others. |
+| `reloader.enabled` | `true` | Restarts on certificate rotation if stakater/Reloader is installed. |
+
+The chart's own
+[README](https://github.com/easyp-tech/service/tree/master/deploy/charts/easyp-service)
+and `helm show values oci://ghcr.io/easyp-tech/charts/easyp-service --version 1.0.2`
+describe every value.
+
+<Callout type="info">
+The `NetworkPolicy` is the one isolation control that ships on by default. It is
+the chart's, not the service's: plugins inherit it only because they run in the
+same pod. See [Security](/docs/api-service/security).
+</Callout>
+
+## Docker Compose
+
+`deploy/docker-compose.yml` in the service repository is the development stack:
+PostgreSQL, RustFS as S3, Traefik with mutual TLS in front, and a Grafana/Loki/
+Tempo/Mimir/Pyroscope suite. It is driven by `task up` and is the reference for
+how the pieces fit, not a production template. A minimal compose file is in the
+[Quickstart](/docs/api-service/quickstart).
+
+## Binaries
+
+`easyp-svc` for linux and darwin, amd64 and arm64, on the
+[releases page](https://github.com/easyp-tech/service/releases). The same binary
+is the server and the [operator CLI](/docs/api-service/operator-cli).
+
+Plugins built by `easyp-svc plugins build` are Linux binaries, so a service
+running natively on macOS can register them but not execute them
+(`exec format error`). Run the service in a Linux container on macOS.
+
+## Go modules
+
+| Module | Licence | Use |
+|---|---|---|
+| `github.com/easyp-tech/service` | Elastic-2.0 | The service. Not meant to be imported. |
+| `github.com/easyp-tech/service/api` | Apache-2.0 | Generated gRPC contract. |
+| `github.com/easyp-tech/service/sdk` | Apache-2.0 | Go client. |
+
+They are tagged together: `v1.0.2`, `api/v1.0.2`, `sdk/v1.0.2`.

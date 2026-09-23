@@ -1,0 +1,179 @@
+---
+title: "Architecture"
+description: "The path of a GenerateCode request through the service: interceptors, worker pool, plugin storage, execution and audit."
+---
+
+## Components
+
+```
+                 ┌────────────────────────── easyp-svc (one process) ───────────────────────────┐
+ :23410 gRPC ───▶│ interceptor chain ─▶ API handlers ─▶ core ─▶ WorkerPool ─▶ Registry          │
+ :23411 HTTP ───▶│ /metrics                                        │            │   │            │
+ :23412 HTTP ───▶│ /live  /  (readiness: PostgreSQL)               │            │   └─▶ exec plugin
+ :23413 HTTP ───▶│ /mcp  (only when mcp.enabled)                   │            ▼                │
+                 │                                   audit worker ◀┘       plugin cache (disk)   │
+                 └───────────────────────────────────────┬──────────────────────┬───────────────┘
+                                                          ▼                      ▼
+                                                     PostgreSQL          S3-compatible storage
+                                                 plugins, audit_log        plugin archives
+```
+
+One binary, `easyp-svc`, is both the server (`service start`) and the operator
+CLI. There is no separate worker process and no container runtime.
+
+## The request path
+
+A `GenerateCode` call passes through these interceptors, outermost first:
+
+| # | Interceptor | What it does |
+|---|---|---|
+| 1 | trace logging | Puts the trace ID into the request logger. |
+| 2 | real IP | Takes the client address from `X-Forwarded-For`/`X-Real-IP`, but only from peers listed in `server.trusted_proxies`. |
+| 3 | caller IP | Records the resolved address for the limiters and the audit log. |
+| 4 | Prometheus | `easyp_api_grpc_server_*` metrics. |
+| 5 | logging | Structured request log. |
+| 6 | panic recovery | Turns a panic into `INTERNAL` and counts it in `easyp_panics_total`. |
+| 7 | validation | Calls `Validate()` on messages that implement it. The generated `easyp.generator.v1` messages do not, so in v1.0.2 this is a pass-through; names, versions and plugin configs are validated in the core instead. |
+| 8 | rate limit | Token bucket per client address: `rate_limit.requests_per_second`, `rate_limit.burst`. Refusal: `RESOURCE_EXHAUSTED`. |
+| 9 | concurrency limit | At most `rate_limit.max_concurrent_per_ip` requests in flight per address. Refusal: `RESOURCE_EXHAUSTED`. |
+| 10 | auth | Bearer token check: always for writes, for everything when `auth.require_authentication` is set. Refusal: `UNAUTHENTICATED`. |
+| 11 | licence | Refuses methods mapped to a feature the licence does not include (`PERMISSION_DENIED`). In v1.0.2 no method is mapped, so it passes everything; the licence is enforced in the core (audit, plugin count) and at start (worker ceilings). |
+| 12 | error code conversion | Innermost. Maps domain errors from the handler to gRPC codes and adds `google.rpc.ErrorInfo`. |
+
+The code converter is deliberately last: interceptors already produce gRPC
+statuses, and converting outside them would relabel those as `INTERNAL`.
+
+Audit is not an interceptor. The core records every operation, success or
+failure, after the fact.
+
+## Resolving the plugin
+
+The plugin name is `group/name:version`. `group` and `name` match
+`^[a-z][a-z0-9-]*$`; `version` matches `^v\d+\.\d+(\.\d+)?$` or is the literal
+`latest`. The service itself requires the `:version` part — the easyp CLI adds
+`:latest` when a `remote:` entry omits it.
+
+<Callout type="warn">
+`latest` selects the registered version that sorts last **as a string**
+(`ORDER BY version DESC` on a text column). With `v1.36.9` and `v1.36.10` both
+registered, `latest` is `v1.36.9`. Pin versions.
+</Callout>
+
+## Worker pool: two limits, one queue size
+
+Two separate resources are bounded, because they run out for different reasons:
+
+| Limit | Setting | Bounds |
+|---|---|---|
+| Lookup workers | `worker_pool.workers` (4) | Plugin resolution: a database read and, on a cache miss, the download and unpack. Network-bound. |
+| Generation slots | `worker_pool.max_concurrent_generations` (16) | Running plugin processes. CPU- and memory-bound. |
+
+Both use `worker_pool.queue_size` (16) as their waiting room:
+
+- Lookup: `Get()` does not block. If the job queue is full, it returns
+  `ErrServerOverloaded` immediately.
+- Generation: a request that finds no free slot waits, unless `queue_size`
+  requests are already waiting, in which case it is refused.
+
+The client sees `RESOURCE_EXHAUSTED` with reason `SERVER_OVERLOADED` in both
+cases. The service does not queue without bound: waiting requests hold
+connections and memory.
+
+Time spent waiting for a slot does not count against
+`worker_pool.generation_timeout` (120 s). A plugin's own `timeout` in its
+registered config applies inside that, so the shorter one wins.
+
+Retries on the server are narrow: up to `worker_pool.max_retries` (2) extra
+attempts, and only when the error text contains `connection refused` or
+`temporary failure`. A timeout is never retried.
+
+## Executing the plugin
+
+- The executable is `command[0]` from the plugin's registered config, with
+  `command[1:]` as arguments. It must resolve (after symlinks) to a path inside
+  `registry.plugins_dir`.
+- The environment is empty except for the `env` map in the plugin's config. The
+  service's own credentials are not inherited.
+- The request is written to stdin. Stdout is read up to
+  `registry.max_output_size` (64 MiB); more than that fails the generation.
+  Stderr is kept up to 1 MiB for the error message.
+- The process gets its own process group, and on timeout the whole group is
+  killed with `SIGKILL`.
+- The working directory is not set; it is the service's.
+
+That is the whole containment. See [Security](/docs/api-service/security) for
+what it does not cover.
+
+## Plugin storage
+
+**Local mode** (no `registry.s3.bucket`): plugin binaries must already be under
+`plugins_dir` — built there, mounted, or baked into an image. The registry row
+only points at them.
+
+**Object storage mode**: `plugins_dir` is a cache.
+
+1. The operator packs each version directory into
+   `{group}/{name}/{version}/plugin.tgz` and uploads it (`easyp-svc plugins push`).
+2. Registration (`CreatePlugin`) reads the archive from storage and records its
+   sha256 in the plugin config. If the archive is missing, registration fails
+   with `FAILED_PRECONDITION` / `BINARY_NOT_UPLOADED`. The client cannot supply
+   the hash.
+3. On the first request for that version, the archive is downloaded to
+   `plugins_dir/.tmp`, its sha256 compared with the recorded one, and unpacked.
+   Concurrent misses for the same key share one download.
+4. The unpacked directories are evicted least-recently-used once they exceed
+   `registry.cache_max_bytes` (20 GiB). The archive stays in storage.
+
+The order is therefore **build → push → register**. Re-pushing an archive with
+`--force` after registration changes the object under a recorded checksum, and
+the next download fails with `plugin archive checksum mismatch` until the
+plugin is registered again.
+
+A storage outage, or an archive that has disappeared from the bucket, fails
+generation with `UNAVAILABLE` / `STORAGE_UNAVAILABLE`.
+
+## PostgreSQL
+
+| Table | Content |
+|---|---|
+| `plugins` | One row per plugin version: `group_name`, `name`, `version` (text), `config` (command, env, timeout, sha256), `tags`. Unique on (group, name, version). |
+| `audit_log` | Enterprise audit trail, partitioned by month, plus `audit_log_default`. |
+| `goose_db_version` | Applied migrations. |
+
+Migrations are embedded and applied by the service at start, under a PostgreSQL
+session lock. There are no down migrations.
+
+If PostgreSQL is unreachable at start, the service retries with exponential
+backoff capped at 5 s. At runtime the readiness endpoint `/` on the health port
+reports 503 while the database does not answer; `/live` checks nothing and stays
+200, so orchestrators take the pod out of rotation instead of restarting it.
+
+## Audit
+
+- Emitted by the core for every operation (`GenerateCode`, `Plugins`,
+  `CreatePlugin`, `UpdatePlugin`, `DeletePlugin`), including failures.
+- `easyp_operations_total{operation,status}` is counted on every edition.
+- Rows are written only with an Enterprise licence; otherwise
+  `easyp_audit_events_skipped_total` counts what was not written.
+- Entries go through a bounded queue (`audit.buffer_size`, 1000) to a batch
+  writer (`audit.batch_size`, `audit.flush_interval`). An entry that finds no room
+  within `audit.enqueue_timeout` (1 s) is dropped and counted in
+  `easyp_audit_events_lost_total{reason="enqueue_timeout"}`. The operation itself
+  still succeeds: audit never fails a request.
+- Partitions for `audit.pre_create_months` ahead are created every
+  `audit.partition_check_interval`; partitions older than
+  `audit.retention_months` are dropped.
+
+## Single replica
+
+The plugin cache on disk is not safe to share between processes: unpacking ends
+with a remove and a rename serialised only by an in-process lock, and each
+process accounts `cache_max_bytes` separately. The Helm chart runs one replica
+with a `ReadWriteOnce` volume and the `Recreate` strategy. It *permits*
+`replicaCount > 1` with a `ReadWriteMany` volume; that combination is not
+supported and corrupts the cache under concurrent misses. The database side is
+safe for several processes (migrations and partition maintenance take locks),
+which is what makes a restart into a new version safe. Scale vertically:
+more CPU and a higher `max_concurrent_generations`, keeping
+`max_concurrent_generations × max_output_size` inside the memory limit (the
+chart refuses an install where it is not).
