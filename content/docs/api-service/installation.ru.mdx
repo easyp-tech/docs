@@ -1,0 +1,147 @@
+---
+title: "Установка"
+description: "Теги образа, Helm-чарт и его обязательные значения, compose-стек и бинарники релизов."
+---
+
+Каждый релиз публикует образ контейнера, Helm-чарт и бинарники. Текущий релиз —
+**v1.0.2** (версия чарта 1.0.2).
+
+## Что нужно сервису
+
+| Зависимость | Обязательна | Примечание |
+|---|---|---|
+| PostgreSQL | да | Одна строка подключения в `DB_POSTGRES_DSN`. Таблицы сервис создаёт сам. |
+| S3-совместимое объектное хранилище | нет | Без него бинарники плагинов должны уже лежать на диске сервиса в `registry.plugins_dir`. |
+| Том на запись под `plugins_dir` | да | Кеш плагинов и временные файлы скачивания. Размер — больше `registry.cache_max_bytes` (по умолчанию 20 ГиБ). |
+| Prometheus, OTLP-коллектор, Pyroscope | нет | Метрики отдаются всегда; трейсы и профили — только если задан адрес. |
+
+## Образ контейнера
+
+`ghcr.io/easyp-tech/service`, мультиархитектурный (linux/amd64, linux/arm64).
+
+| Тег | Значение |
+|---|---|
+| `v1.0.2` | Релиз. Неизменяемый. |
+| `latest` | Последний релиз. Двигается только при теге релиза. |
+| `edge` | Вершина ветки `master`. Двигается при каждом пуше. |
+| `sha-<short>` | Один коммит. Неизменяемый. |
+
+В продакшене фиксируйте `vX.Y.Z`.
+
+Образ работает от UID 65532, его entrypoint — `/easyp-svc`, и в нём объявлен
+`HEALTHCHECK`, который запускает `easyp-svc health` против `/live` на
+health-порту. Проба не видит `--cfg` из команды запуска, поэтому если порты
+заданы в файле конфигурации, укажите этот файл в `EASYP_CONFIG` контейнера — его
+прочитают и сервис, и проба:
+
+```yaml
+environment:
+  EASYP_CONFIG: /etc/easyp/config.yml
+command: ["service", "start"]
+```
+
+Без этого контейнер работает нормально, но считается `unhealthy`.
+
+## Helm
+
+```bash
+kubectl create secret generic easyp-env \
+  --from-literal=DB_POSTGRES_DSN='postgres://user:pass@host:5432/easyp?sslmode=require'
+
+helm install easyp oci://ghcr.io/easyp-tech/charts/easyp-service \
+  --version 1.0.2 \
+  --set secrets.existingSecret=easyp-env \
+  --set tls.enabled=false
+```
+
+Это работающий сервис без защиты транспорта и без права записи — достаточно,
+чтобы убедиться, что он работает, но не чтобы выставлять наружу.
+
+### Без чего чарт не устанавливается
+
+Чарт проверяет это при рендере и падает с сообщением, называющим недостающее
+значение:
+
+| Условие | Сообщение называет |
+|---|---|
+| Нет DSN базы | `secrets.existingSecret` (или `secrets.create=true` с `secrets.data`) |
+| `tls.enabled=true` (по умолчанию) без сертификата | `tls.serverSecret` или `certManager.enabled` |
+| `ingress.enabled=true` без доверенных прокси | `config.server.trustedProxies` |
+| Нарушено `generationTimeoutSeconds < forceShutdownAfterSeconds < terminationGracePeriodSeconds` | эти три значения |
+| `maxConcurrentGenerations × maxOutputSize` не помещается в лимит памяти | `resources.limits.memory` |
+| Том кеша не больше `cacheMaxBytes` | `persistence.size` / `persistence.ephemeralSizeLimit` |
+
+### Ключи секрета
+
+Под загружает секрет через `envFrom`, поэтому **ключи — это имена переменных
+окружения**:
+
+| Ключ | Когда |
+|---|---|
+| `DB_POSTGRES_DSN` | Всегда. |
+| `REGISTRY_S3_ACCESS_KEY_ID`, `REGISTRY_S3_SECRET_ACCESS_KEY` | Когда задан `config.registry.s3.bucket`. |
+| `LICENSE_KEY` | Enterprise. Без него — Community. |
+| `AUTH_WRITE_TOKENS` | Чтобы разрешить запись: `name=<sha256>,name=<sha256>`. Без него запись запрещена. |
+
+Предпочитайте `secrets.existingSecret`. Значения из `secrets.data` попадают в
+историю релизов Helm.
+
+### Значения, которые стоит знать
+
+| Значение | По умолчанию | Почему важно |
+|---|---|---|
+| `replicaCount` | `1` | Не увеличивайте на общем томе. См. [Архитектура](/ru/docs/api-service/architecture#single-replica). |
+| `image.tag` | `""` (appVersion чарта) | Зафиксируйте. |
+| `ports.grpc` / `metric` / `health` / `mcp` | `8080` / `8081` / `8082` / `8083` | Чарт переопределяет порты бинарника 23410–23413. |
+| `mcp.enabled` | `false` | MCP стоит вне цепочки gRPC-интерсепторов. |
+| `config.server.trustedProxies` | `[]` | Обязательно за ingress, иначе все клиенты делят одну корзину rate limit. |
+| `config.workerPool.*` | значения бинарника | `workers: 4`, `queueSize: 16`, `maxConcurrentGenerations: 16`, `generationTimeoutSeconds: 120`. |
+| `config.registry.s3.bucket` | `""` | Пусто — локальный режим. |
+| `config.license.publicKeys` | ключ easyp.tech `2026-08` | Якорь доверия лицензий. Меняйте, только если выпускаете лицензии сами. |
+| `tls.enabled` / `tls.clientCASecret` | `true` / `""` | С CA listener требует клиентские сертификаты (mTLS). `"-"` отключает проверку клиента. |
+| `certManager.enabled` | `false` | Выпуск серверного и клиентского (для ingress) сертификатов через cert-manager. |
+| `ingress.*` | выключен, Traefik | По умолчанию под Traefik: он умеет декларативно описать mTLS до бэкенда (`ServersTransport`). |
+| `persistence.size` | `25Gi` | Должен быть больше `cacheMaxBytes`. |
+| `resources.limits` | `cpu: 4`, `memory: 4Gi` | Рассчитано на 16 генераций × 64 МиБ вывода, дважды. |
+| `serviceMonitor.enabled`, `prometheusRule.enabled` | `false` | Нужны CRD Prometheus Operator. Включайте там, где он есть. |
+| `prometheusRule.runbookBaseUrl` | `https://easyp.tech/docs/api-service/runbooks` | Каждый алерт ссылается на раздел [Ранбуков](/ru/docs/api-service/runbooks). |
+| `networkPolicy.enabled` | `true` | Исходящий трафик только на DNS, 5432, 443 и 4317. Добавьте порты, если БД, хранилище или коллектор слушают другие. |
+| `reloader.enabled` | `true` | Перезапуск при ротации сертификата, если установлен stakater/Reloader. |
+
+Каждое значение описано в собственном
+[README чарта](https://github.com/easyp-tech/service/tree/master/deploy/charts/easyp-service)
+и в `helm show values oci://ghcr.io/easyp-tech/charts/easyp-service --version 1.0.2`.
+
+<Callout type="info">
+`NetworkPolicy` — единственная мера изоляции, включённая по умолчанию. Она
+принадлежит чарту, а не сервису: плагины попадают под неё только потому, что
+выполняются в том же поде. См. [Безопасность](/ru/docs/api-service/security).
+</Callout>
+
+## Docker Compose
+
+`deploy/docker-compose.yml` в репозитории сервиса — стенд для разработки:
+PostgreSQL, RustFS как S3, Traefik со взаимным TLS спереди и набор Grafana/Loki/
+Tempo/Mimir/Pyroscope. Им управляет `task up`; это образец того, как всё
+соединяется, а не шаблон для продакшена. Минимальный compose-файл — в
+[Быстром старте](/ru/docs/api-service/quickstart).
+
+## Бинарники
+
+`easyp-svc` для linux и darwin, amd64 и arm64, на
+[странице релизов](https://github.com/easyp-tech/service/releases). Тот же
+бинарник — и сервер, и [CLI оператора](/ru/docs/api-service/operator-cli).
+
+Плагины, собранные `easyp-svc plugins build`, — линуксовые бинарники, поэтому
+сервис, запущенный нативно на macOS, может их зарегистрировать, но не запустить
+(`exec format error`). На macOS запускайте сервис в Linux-контейнере.
+
+## Go-модули
+
+| Модуль | Лицензия | Назначение |
+|---|---|---|
+| `github.com/easyp-tech/service` | Elastic-2.0 | Сам сервис. Не для импорта. |
+| `github.com/easyp-tech/service/api` | Apache-2.0 | Сгенерированный gRPC-контракт. |
+| `github.com/easyp-tech/service/sdk` | Apache-2.0 | Go-клиент. |
+
+Они тегируются вместе: `v1.0.2`, `api/v1.0.2`, `sdk/v1.0.2`.

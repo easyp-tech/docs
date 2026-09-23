@@ -1,0 +1,169 @@
+---
+title: "CLI оператора"
+description: "easyp-svc: все команды и флаги бинарника, который одновременно сервер и инструмент оператора."
+---
+
+`easyp-svc` — один бинарник с шестью группами команд. Сервер — одна из них
+(`service start`); остальное оператор запускает с ноутбука или из CI.
+
+```
+easyp-svc service start
+easyp-svc plugins build | pack | push | register
+easyp-svc auth new-token
+easyp-svc api descriptor
+easyp-svc config validate | print
+easyp-svc health
+```
+
+Глобальные флаги: `--help`/`-h`, `--version`/`-v`.
+
+Каждая команда с `--cfg` читает путь и из `EASYP_CONFIG`.
+
+## service start
+
+Запускает listener'ы gRPC, метрик, health и (если включён) MCP.
+
+| Флаг | Смысл |
+|---|---|
+| `--cfg string` | Путь к YAML-конфигу. Без него — конфигурация только из окружения. |
+| `--log-level string` (также `--log_level`) | `debug`, `info`, `warn`, `error`. Переопределяет `log.level`. |
+
+## plugins build
+
+`easyp-svc plugins build [options] <registry-path>`
+
+Собирает бинарники плагинов по Dockerfile'ам реестра. Нужен Docker. Каждая
+версия из `plugin.yaml` собирается с `--build-arg VERSION=…`, а файловая система
+образа распаковывается в `<output>/{group}/{name}/{version}/`.
+
+| Флаг | По умолчанию | Смысл |
+|---|---|---|
+| `--output`, `-o` | `plugins` | Каталог результата. |
+| `--filter` | — | Glob по `group/name[:version]`, например `protocolbuffers/*`, `grpc/go:v1.5.1`. |
+| `--parallel`, `-p` | `4` | Одновременных Docker-сборок. |
+| `--force` | false | Пересобрать, даже если бинарник есть. |
+| `--dry-run` | false | Показать, что будет собрано. |
+| `--non-interactive` | false | Без интерактивного интерфейса и прогресс-баров. |
+| `--keep-going` | false | Продолжать после неудачной сборки. |
+
+## plugins pack
+
+`easyp-svc plugins pack [options] [path]`
+
+Пишет каталог каждой версии из `path` в
+`{out}/{group}/{name}/{version}/plugin.tgz` — ту же раскладку, что и ключи S3,
+так что дерево можно потом загрузить через `push --packed`.
+
+| Флаг | Смысл |
+|---|---|
+| `--out` | Куда писать архивы. |
+| `--filter` | Glob-фильтр. |
+| `--force` | Переупаковать существующие архивы. |
+| `--dry-run` | Только показать план. |
+| `--non-interactive` | Без интерактивного интерфейса. |
+
+## plugins push
+
+`easyp-svc plugins push [options] [path]`
+
+Упаковывает каталог каждой версии и загружает его в
+`{prefix}{group}/{name}/{version}/plugin.tgz`. Запускайте до `register`.
+Повторная загрузка уже зарегистрированной версии с `--force` делает недействительной
+записанную контрольную сумму: зарегистрируйте её заново.
+
+| Флаг | По умолчанию | Смысл |
+|---|---|---|
+| `--cfg` | — | **Полный** конфиг сервиса; `registry.s3` заполняет то, что не передано флагами. Фрагмент только с `registry.s3` отвергается. |
+| `--bucket` | — | Бакет (переопределяет конфиг). |
+| `--endpoint` | — | URL эндпоинта, например `http://localhost:9000`. |
+| `--region` | — | Регион. |
+| `--prefix` | — | Префикс ключей. |
+| `--force-path-style` | false | Path-style адресация (MinIO, RustFS). |
+| `--filter` | — | Glob-фильтр. |
+| `--packed` | false | `path` — дерево, записанное `plugins pack`. |
+| `--parallel`, `-p` | `8` | Одновременных загрузок. |
+| `--force` | false | Загрузить заново архивы, которые уже есть в хранилище. |
+| `--dry-run` | false | Показать план, не обращаясь к хранилищу. |
+| `--non-interactive` | false | Без интерактивного интерфейса. |
+
+Учётные данные берутся из стандартной цепочки AWS (`AWS_ACCESS_KEY_ID`,
+`AWS_SECRET_ACCESS_KEY`, профили). Прерванный запуск продолжается повторным
+запуском.
+
+## plugins register
+
+`easyp-svc plugins register [options] [path]`
+
+Вызывает `CreatePlugin` для каждой версии в `path` с путём к команде в том виде,
+в каком его видит сервис. С `--packed` `path` — дерево `pack`; этого достаточно,
+чтобы регистрировать с машины, которая плагины не собирала, если архивы уже в
+хранилище.
+
+| Флаг | По умолчанию | Смысл |
+|---|---|---|
+| `--addr` | `localhost:23410` | gRPC-адрес сервиса. |
+| `--cfg` | — | Конфиг сервиса; `registry.plugins_dir` используется как `--plugins-prefix`, если флаг не задан. |
+| `--plugins-prefix` | `/plugins` | `plugins_dir` на сервере. |
+| `--token` | `$EASYP_TOKEN` | Токен записи. |
+| `--tls-ca` | системное хранилище | CA, подписавший сертификат сервера. |
+| `--tls-cert`, `--tls-key` | — | Клиентский сертификат и ключ для взаимного TLS. |
+| `--insecure` | false | Без шифрования. Только для локальной разработки. |
+| `--filter` | — | Glob-фильтр. |
+| `--packed` | false | `path` — дерево `pack`. |
+| `--parallel`, `-p` | `8` | Одновременных регистраций. Сервер читает каждый архив, чтобы посчитать контрольную сумму; держите не выше `rate_limit.max_concurrent_per_ip` сервера. |
+| `--fail-on-error` | **true** | Ненулевой код выхода, если хоть одна регистрация не удалась. |
+| `--dry-run` | false | Показать запланированные вызовы, не обращаясь к серверу. |
+| `--non-interactive` | false | Без интерактивного интерфейса. |
+
+Уже зарегистрированная версия считается пропущенной, а не ошибкой.
+
+## auth new-token
+
+`easyp-svc auth new-token [--name string]`
+
+Генерирует случайный токен записи, один раз печатает его и печатает запись
+`auth.write_tokens` (имя и sha256), которая его разрешает. `--name` по умолчанию
+`unnamed`; это метка токена в логах и аудите.
+
+## api descriptor
+
+`easyp-svc api descriptor [--output string]`
+
+Пишет `FileDescriptorSet` API для `grpcurl -protoset`; сервер не отдаёт
+reflection. `--output`/`-o` по умолчанию `-` (stdout).
+
+## config validate
+
+`easyp-svc config validate [--cfg string]`
+
+Разрешает конфигурацию ровно так же, как `service start`, и завершается с
+ненулевым кодом, если сервис её отверг бы. Без `--cfg` проверяет только
+окружение.
+
+## config print
+
+`easyp-svc config print [options]`
+
+| Флаг | Смысл |
+|---|---|
+| `--cfg` | Файл конфигурации; без него — только окружение. |
+| `--origin` | Подписать у каждой настройки, из какого слоя она пришла. |
+| `--changed` | Печатать только отличия от значений по умолчанию — то, что нужно указать в файле. |
+| `--show-secrets` | Печатать учётные данные вместо заглушки. |
+
+## health
+
+`easyp-svc health [--addr host:port] [--cfg string]`
+
+Завершается с кодом 0, если `/live` на health-listener'е отвечает, иначе 1. Это
+`HEALTHCHECK` образа. Проверяется liveness, а не readiness: readiness зависит от
+PostgreSQL, а перезапуск контейнера при каждом сбое БД превращает простой в цикл
+падений. Без `--addr` порт берётся из `--cfg`/`EASYP_CONFIG`, затем из
+окружения, затем по умолчанию 23412.
+
+## Сокращения в Taskfile
+
+`Taskfile.yml` репозитория сервиса оборачивает эти команды для разработки:
+`task build-plugins`, `FILTER=… task build-plugins-filter`, `task push-plugins`,
+`task register-plugins`, `task up`, `task up-minimal`, `task run`, `task run-local`.
+Они рассчитаны на адреса и учётные данные стенда разработки.

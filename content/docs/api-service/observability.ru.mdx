@@ -1,0 +1,151 @@
+---
+title: "Наблюдаемость"
+description: "Метрики, трейсы, профили, логи, health-эндпоинты и правила алертов с ранбуком на каждый алерт."
+---
+
+## Эндпоинты
+
+| Порт (бинарник / чарт) | Путь | Содержимое |
+|---|---|---|
+| 23411 / 8081 | `/metrics` | Метрики Prometheus. Всегда включены. |
+| 23412 / 8082 | `/live` | Liveness. 200, как только процесс поднялся; больше ничего не проверяет. |
+| 23412 / 8082 | `/` | Readiness. 200, пока отвечает PostgreSQL; иначе и во время старта — 503. |
+
+Направляйте liveness-пробы на `/live`, а readiness — на `/`. Если использовать
+readiness как liveness, под будет перезапускаться при каждом сбое базы.
+
+## Метрики
+
+Все имена начинаются с `easyp_`. Большинство регистрируются при старте;
+помеченные *лениво* появляются после первого события, а метрики кеша — только
+при настроенном объектном хранилище.
+
+### Запросы
+
+| Метрика | Тип | Метки | Смысл |
+|---|---|---|---|
+| `easyp_api_grpc_server_started_total` | counter | `grpc_service`, `grpc_method`, `grpc_type` | Начатые RPC. |
+| `easyp_api_grpc_server_handled_total` | counter | + `grpc_code` | Завершённые RPC по коду статуса. |
+| `easyp_api_grpc_server_handling_seconds` | histogram | `grpc_service`, `grpc_method`, `grpc_type` | Задержка RPC. |
+| `easyp_api_grpc_server_msg_received_total`, `_msg_sent_total` | counter | те же | Сообщения. |
+| `easyp_operations_total` | counter | `operation`, `status` | Каждая операция core, успешная или нет, в обеих редакциях. |
+| `easyp_rate_limit_requests_total` | counter | `status` | Решения rate limiter'а. |
+| `easyp_rate_limit_active_clients` | gauge | — | Отслеживаемые корзины клиентов. |
+| `easyp_concurrency_rejected_total` | counter | — | Отказы лимита одновременных запросов на клиента. |
+| `easyp_concurrency_active_clients` | gauge | — | Клиенты с запросами в полёте. |
+| `easyp_auth_failures_total` *(лениво)* | counter | `reason` = `no_credentials` \| `unknown_token` | Отклонённые учётные данные. |
+
+### Генерация
+
+| Метрика | Тип | Метки | Смысл |
+|---|---|---|---|
+| `easyp_generated_plugin_code_total` | counter | `plugin` | Успешные генерации. |
+| `easyp_generation_duration_seconds` | histogram | `plugin` | Время работы плагина с повторами. |
+| `easyp_generation_errors_total` *(лениво)* | counter | `plugin`, `error_type` = `transient` \| `permanent` | Неудачные генерации (без учёта ушедших клиентов). |
+| `easyp_generation_retries_total` *(лениво)* | counter | `plugin` | Повторы на стороне сервера. |
+| `easyp_pool_generations_active` | gauge | — | Запущенные процессы плагинов. |
+| `easyp_pool_generations_waiting` | gauge | — | Запросы, ждущие слот генерации. |
+| `easyp_pool_generations_rejected_total` | counter | — | Отказы: очередь генераций заполнена. |
+| `easyp_pool_active_workers` | gauge | — | Занятые воркеры поиска. |
+| `easyp_pool_queue_depth` | gauge | — | Задания поиска в очереди. |
+| `easyp_pool_jobs_total` | counter | — | Принятые задания поиска. |
+| `easyp_pool_rejected_total` | counter | — | Отказы: очередь поиска заполнена. |
+
+### Кеш плагинов (режим объектного хранилища)
+
+| Метрика | Тип | Смысл |
+|---|---|---|
+| `easyp_plugin_cache_bytes` | gauge | Объём распакованных плагинов на диске. |
+| `easyp_plugin_cache_limit_bytes` | gauge | `registry.cache_max_bytes`. |
+| `easyp_plugin_cache_evictions_total` | counter | Вытесненные каталоги версий. |
+
+### Лицензия
+
+| Метрика | Тип | Метки | Смысл |
+|---|---|---|---|
+| `easyp_license_valid` | gauge | — | 1, если загружена действующая лицензия. |
+| `easyp_license_expiry_timestamp_seconds` | gauge | — | Срок действия; 0 без лицензии. |
+| `easyp_license_in_grace` | gauge | — | 1 в grace-период. |
+| `easyp_license_feature_denied_total` | counter | `feature` | Отказы в Enterprise-функциях на Community. |
+| `easyp_config_service_tier_mismatch` | gauge | — | 1, если `telemetry.service_tier` расходится с лицензией. |
+
+### Аудит
+
+| Метрика | Тип | Метки | Смысл |
+|---|---|---|---|
+| `easyp_audit_queue_depth` | gauge | — | Записи, ждущие писателя. |
+| `easyp_audit_batch_size` | histogram | — | Строк в одной записи. |
+| `easyp_audit_events_lost_total` | counter | `reason` = `enqueue_timeout` \| `save_failed` \| `shutdown_timeout` | Потерянные записи. |
+| `easyp_audit_events_skipped_total` | counter | — | Не записаны, потому что в лицензии нет аудита. |
+| `easyp_audit_save_failures_total` | counter | — | Неудачные записи пакетов. |
+| `easyp_audit_partitions_current` | gauge | — | Месячные партиции. |
+| `easyp_audit_partitions_created_total`, `_dropped_total` | counter | — | Обслуживание партиций. |
+| `easyp_audit_partition_maintenance_runs_total` | counter | `result` | Запуски обслуживания. |
+| `easyp_audit_partition_maintenance_last_success_seconds` | gauge | — | Последний успешный запуск. |
+| `easyp_audit_default_partition_used` | gauge | — | 1, если в `audit_log_default` есть строки. |
+
+### База данных и инвентарь
+
+| Метрика | Тип | Метки | Смысл |
+|---|---|---|---|
+| `easyp_repo_call_duration_seconds` | histogram | `func` | Задержка запросов. |
+| `easyp_repo_errors_total` | counter | `func` | Ошибки запросов. |
+| `easyp_db_open_connections`, `_idle_connections` | gauge | — | Состояние пула. |
+| `easyp_db_wait_count_total`, `_wait_duration_seconds_total` | counter | — | Ожидание соединения. |
+| `easyp_business_plugins_total` | gauge | — | Зарегистрированные версии плагинов. |
+| `easyp_business_plugins_by_group` | gauge | `group` | Версий по группам. |
+| `easyp_business_plugin_versions_count` | gauge | `group`, `name` | Версий на плагин. |
+| `easyp_business_audit_log_total` | gauge | — | Строк аудита. |
+| `easyp_panics_total` | counter | — | Перехваченные паники в хендлерах и фоновой работе. |
+
+Плюс стандартные коллекторы `go_*` и `process_*`.
+
+## Трейсы
+
+Задайте `telemetry.otlp_endpoint` (или `OTEL_EXPORTER_OTLP_ENDPOINT`) — адрес
+OTLP gRPC-коллектора. Core, реестр и каждый запуск плагина обёрнуты в спаны;
+`pool.Get` записывает время в очереди. Пустой адрес — экспортёр не создаётся и
+ничего не пытается отправить.
+
+## Профили
+
+Задайте `telemetry.pyroscope_endpoint` для непрерывного профилирования в
+Pyroscope.
+
+## Логи
+
+Структурированный JSON в stdout. При каждом старте пишется
+`configuration resolved` с настройками, отличающимися от значений по умолчанию,
+секреты скрыты. В системе логов стоит алертить на
+`gRPC server is running WITHOUT TLS`, `lowered to the licence tier's limit`,
+`licence expired`, `audit enqueue timed out`.
+
+## Алерты
+
+Helm-чарт поставляет `PrometheusRule` (`prometheusRule.enabled=true`, нужны CRD
+Prometheus Operator). У каждого алерта есть `runbook_url`: это
+`prometheusRule.runbookBaseUrl` плюс якорь с именем алерта.
+
+| Алерт | Срабатывает, когда | Ранбук |
+|---|---|---|
+| EasypLicenceExpiringSoon | Лицензия истекает в течение `licenceExpiryWarningDays` (14) | [ссылка](/ru/docs/api-service/runbooks#easyplicenceexpiringsoon) |
+| EasypLicenceInGrace | `easyp_license_in_grace == 1` 15 мин | [ссылка](/ru/docs/api-service/runbooks#easyplicenceingrace) |
+| EasypGenerationsRejected | `rate(easyp_pool_generations_rejected_total[5m]) > 0` 5 мин | [ссылка](/ru/docs/api-service/runbooks#easypgenerationsrejected) |
+| EasypGenerationQueueSaturated | `easyp_pool_generations_waiting > 0` 10 мин | [ссылка](/ru/docs/api-service/runbooks#easypgenerationqueuesaturated) |
+| EasypPluginCacheAtLimit | объём кеша / лимит > `cacheUsageWarningRatio` (0.95) 30 мин | [ссылка](/ru/docs/api-service/runbooks#easypplugincacheatlimit) |
+| EasypAuditEventsLost | `rate(easyp_audit_events_lost_total[5m]) > 0` 5 мин | [ссылка](/ru/docs/api-service/runbooks#easypauditeventslost) |
+| EasypAuditMaintenanceStale | нет успешного обслуживания партиций 24 ч | [ссылка](/ru/docs/api-service/runbooks#easypauditmaintenancestale) |
+| EasypAuditDefaultPartitionUsed | `easyp_audit_default_partition_used == 1` 15 мин | [ссылка](/ru/docs/api-service/runbooks#easypauditdefaultpartitionused) |
+| EasypGenerationErrorRate | доля ошибок > `generationErrorRatio` (0.05) 10 мин | [ссылка](/ru/docs/api-service/runbooks#easypgenerationerrorrate) |
+| EasypPanics | `increase(easyp_panics_total[5m]) > 0` | [ссылка](/ru/docs/api-service/runbooks#easyppanics) |
+| EasypAuthFailures | `rate(easyp_auth_failures_total[5m]) > authFailureRate` (0.5) 10 мин | [ссылка](/ru/docs/api-service/runbooks#easypauthfailures) |
+
+Compose-стек добавляет алерты хоста и edge, которые считает его собственный Mimir
+по тому, что собирает Grafana Alloy, — EasypHostDiskLow, EasypHostDiskFillingUp,
+EasypHostMemoryLow, EasypTargetDown, EasypServiceMissing,
+EasypCertificateExpiringSoon — в
+`deploy/observability/mimir/rules/anonymous/host.yaml`. Они тоже есть в
+[Ранбуках](/ru/docs/api-service/runbooks#the-host).
+
+`ServiceMonitor` (`serviceMonitor.enabled=true`) опрашивает `/metrics` каждые
+30 с.
