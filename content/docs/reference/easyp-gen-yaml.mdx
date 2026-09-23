@@ -3,7 +3,7 @@ title: "easyp.gen.yaml Reference"
 description: "Complete specification for easyp.gen.yaml, configuring consumer-side code generation, plugin outputs, WASM/remote execution, and managed package options."
 ---
 
-The `easyp.gen.yaml` file specifies **consumer-side code generation rules**. Residing alongside consuming applications or service projects, it defines which modules or packages to compile, which plugins to invoke, where generated artifacts should be written, and language-specific managed options (such as `package_prefix`).
+The `easyp.gen.yaml` file specifies **consumer-side code generation rules**. Residing alongside consuming applications or service projects, it defines which modules to compile, which plugins to invoke, where generated artifacts should be written, and managed options.
 
 In accordance with EasyP's zero-duplication principles, `easyp.gen.yaml` **never** contains dependency URLs or version numbers for Protobuf schemas—schema sources and versions are resolved strictly through `protobuf.mod` and `protobuf.lock`.
 
@@ -23,11 +23,11 @@ In accordance with EasyP's zero-duplication principles, `easyp.gen.yaml` **never
       type: "object"
     },
     "generate.modules": {
-      description: "List of module names or local paths to generate code for.",
+      description: "List of module identities or repository-relative local module paths to generate. Dependency identities must be present in the consumer module's protobuf.lock. If omitted, the nearest protobuf.mod is selected.",
       type: "string[]"
     },
     "generate.packages": {
-      description: "Fine-grained package path filters if full module generation is not required.",
+      description: "Reserved for future package filtering. v1 currently reports an error when this field is nonempty.",
       type: "string[]"
     },
     plugins: {
@@ -43,7 +43,7 @@ In accordance with EasyP's zero-duplication principles, `easyp.gen.yaml` **never
       type: "string"
     },
     "plugins[].version": {
-      description: "Strict version tag of the plugin. ':latest' is prohibited for reproducibility.",
+      description: "Required SemVer tag for remote plugins. Local and bundled plugins use the selected executable and reject a separate version field.",
       type: "string"
     },
     "plugins[].out": {
@@ -61,6 +61,10 @@ In accordance with EasyP's zero-duplication principles, `easyp.gen.yaml` **never
     "options.go.package_prefix": {
       description: "Base Go package prefix automatically prepended to generated go_package imports.",
       type: "string"
+    },
+    "generate.managed": {
+      description: "Existing managed descriptor rules: enabled, disable, and override, including module, package, path, and field selectors.",
+      type: "object"
     }
   }}
 />
@@ -81,12 +85,10 @@ generate:
 
 plugins:
   - name: go
-    version: v1.34.2
     out: ./gen/go
     opts:
       paths: source_relative
   - name: go-grpc
-    version: v1.4.0
     out: ./gen/go
     opts:
       paths: source_relative
@@ -121,3 +123,25 @@ plugins:
 Instead of requiring explicit file-level options (like `option go_package = "..."`) inside every individual `.proto` schema file, EasyP's managed `options` block groups settings logically by target language.
 
 For example, setting `options.go.package_prefix: github.com/acme/backend/gen/go` automatically computes import paths based on the module directory layout without mutating source `.proto` files.
+
+The existing managed-mode rules remain available under `generate.managed`. For example, a package-specific override can be written as:
+
+```yaml
+version: v1
+generate:
+  managed:
+    enabled: true
+    override:
+      - file_option: go_package_prefix
+        package: user.v1
+        value: github.com/acme/backend/gen/user
+plugins:
+  - name: go
+    out: ./gen/go
+```
+
+A repository-root `easyp.gen.yaml` may provide `options.go.package_prefix` as a default for nested generator files. Nested `generate.managed` rules take precedence over that inherited default. A prefix declared in the same generator file has the highest priority. Plugin lists stay local to each generator file.
+
+The current v1 generator selects complete modules. `generate.packages` is reserved for a later release, once its matching syntax is specified.
+
+Remote plugins require a `version` such as `v2.0.0`. EasyP sends that exact version to the remote generator. For local `protoc-gen-*` executables and bundled WASM plugins, the executable selected at runtime determines the version; the separate `version` field is rejected because EasyP cannot verify it.

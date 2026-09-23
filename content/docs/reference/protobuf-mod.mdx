@@ -63,4 +63,4 @@ replace github.com/acme/weather => ../weather-fork
 
 1. **Git-Native Identity**: The canonical identity of a module is its Git URL (e.g., `github.com/acme/weather`).
 2. **Per-Module Bounds**: Every module maintains its own independent `protobuf.mod`. MVS operates per-module rather than forcing global monorepo single-version constraints.
-3. **Replace Guardrail**: Active `replace` directives are permitted during local development, but cause CI validation to fail.
+3. **Replace Guardrail**: Local `replace` directives work during generation. `easyp mod tidy` and `easyp mod update` reject them until they are removed, so a reproducible Git lock never records a local path.

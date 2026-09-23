@@ -9,7 +9,7 @@ This guide demonstrates how to add a third-party or shared Protobuf module depen
 
 ## Workflow Overview
 
-1. **Declare Dependency**: Add the target module repository URL and version tag to `protobuf.mod` or reference it directly via `import` statements in your `.proto` schema files.
+1. **Declare Dependency**: Add the target Git repository identity and version tag to `protobuf.mod`. Use `import` statements to reference files from that declared dependency.
 2. **Run Resolution**: Execute `easyp mod tidy` to compute the transitive dependency graph.
 3. **Commit Lockfile**: Review the updated `protobuf.mod` and `protobuf.lock` files and commit them to version control.
 
@@ -28,7 +28,7 @@ require (
 )
 ```
 
-Alternatively, you can write an `import` statement directly in your Protobuf source file:
+Then import a file provided by that dependency in your Protobuf source:
 
 ```protobuf
 // proto/user/v1/user.proto
@@ -55,6 +55,18 @@ easyp mod tidy
 - Computes Minimal Version Selection (MVS) for transitive dependencies.
 - Appends transitive dependencies to `protobuf.mod` marked with `// indirect`.
 - Generates or updates `protobuf.lock` with Git commit hashes and cryptographic content digests.
+
+### Git repositories using Buf or older EasyP configs
+
+The consuming project still declares a Git source with `require`. The dependency repository may use another configuration format:
+
+- EasyP v1 `protobuf.mod`: reads `roots` and `require`.
+- Buf v2 `buf.yaml`: reads `modules[].path` as import roots.
+- Buf v1 `buf.work.yaml`: reads `directories`; a single-module v1 `buf.yaml` uses `.`.
+- Buf v1beta1 `buf.yaml`: reads `build.roots`, defaulting to `.`.
+- Older EasyP: reads `direct` dependencies from the old `protobuf.mod` and local `generate.inputs[].directory.root` plus Git inputs from `easyp.yaml`.
+
+For an old EasyP dependency without a version on one of its Git requirements, `mod tidy` selects its latest stable SemVer tag and pins the selected commit in the v1 lock. Buf Registry `deps` are not Git sources, so declare an appropriate Git module in the consuming `protobuf.mod` when those imports are needed. Buf `includes`/`excludes` filters are not yet supported for Git dependency import roots and produce an explicit error.
 
 Updated `protobuf.mod`:
 

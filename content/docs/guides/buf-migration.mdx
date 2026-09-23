@@ -28,11 +28,13 @@ This guide provides a comprehensive migration walkthrough for transitioning exis
 
 ### Step 1: Automatic Initial Migration
 
-Run `easyp init` in your project root. EasyP detects existing `buf.yaml` and `buf.gen.yaml` files and automatically generates initial `protobuf.mod`, `easyp.yaml`, and `easyp.gen.yaml` files.
+Run `easyp init` in a new project root to create `protobuf.mod`, `easyp.yaml`, and `easyp.gen.yaml`. Pass `--module` when the canonical Git module identity cannot be derived from the repository's `origin` remote.
 
 ```bash
-easyp init
+easyp init --module github.com/acme/my-service
 ```
+
+Automatic Buf Registry dependency conversion is deferred. If `buf.yaml` or `buf.yml` exists, `easyp init` stops before writing files because a `buf.build/...` identity cannot be safely treated as a Git module URL. Choose the Git source for each dependency, then create the v1 files explicitly.
 
 ### Step 2: Separate Dependencies into `protobuf.mod`
 
@@ -60,8 +62,6 @@ linters:
 
 breaking:
   baseline: git:main
-  categories:
-    - WIRE
 ```
 
 ### Step 4: Remove Inputs from Generator Configs
