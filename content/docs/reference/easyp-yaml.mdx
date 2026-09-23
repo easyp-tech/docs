@@ -3,7 +3,7 @@ title: "easyp.yaml Reference"
 description: "Complete specification for easyp.yaml, configuring producer-side linting rules, breaking change detection, path exclusions, and policy inheritance."
 ---
 
-The `easyp.yaml` file defines **producer-side policy configuration** for Protocol Buffer schema repositories. It specifies linting standards, breaking change checks against git baselines, path exclusion rules, and policy inheritance via `extends`.
+The `easyp.yaml` file defines **producer-side policy configuration** for Protocol Buffer schema repositories. It specifies linting standards, breaking change checks against Git baselines, and issue exclusions. Directory cascading is available; explicit `extends` references are reserved until their resolution rules are specified.
 
 `easyp.yaml` files cascade hierarchically down directory structures: for any given `.proto` file, EasyP traverses up the directory tree to find the nearest `easyp.yaml` and applies its configuration.
 
@@ -36,7 +36,7 @@ The `easyp.yaml` file defines **producer-side policy configuration** for Protoco
       type: "string[]"
     },
     "linters.extends": {
-      description: "Remote Git module or policy path to inherit base linter rules from.",
+      description: "Reserved for explicit policy inheritance; currently rejected because ref, path, and merge rules are unspecified.",
       type: "string"
     },
     "linters-settings": {
@@ -48,7 +48,7 @@ The `easyp.yaml` file defines **producer-side policy configuration** for Protoco
       type: "object"
     },
     "issues.exclude-rules": {
-      description: "Array of exclusion rules matching file path glob patterns to disabled linters.",
+      description: "Pathless rules disable the named linters for all files under the selected policy. An empty pathless rule suppresses all issues. Path globs are reserved until their base directory is specified.",
       type: "object[]"
     },
     breaking: {
@@ -56,22 +56,25 @@ The `easyp.yaml` file defines **producer-side policy configuration** for Protoco
       type: "object"
     },
     "breaking.baseline": {
-      description: "Git ref or tag target to compare schema changes against (e.g. git:main).",
+      description: "Git branch to compare schema changes against (e.g. git:main). When omitted, the existing --against flag applies.",
       type: "string",
-      default: "git:main"
+      default: "--against flag"
     },
     "breaking.categories": {
-      description: "Enforced breaking change categories: FILE, PACKAGE, WIRE_JSON, WIRE.",
-      type: "string[]",
-      default: "['WIRE']"
+      description: "Reserved for future category-specific checks; currently rejected when configured.",
+      type: "string[]"
     },
     "breaking.ignore_unstable": {
-      description: "When true, unstable proto packages (v1alpha, v1beta) bypass breaking checks.",
+      description: "Reserved for future unstable-package filtering; currently rejected when true.",
       type: "boolean",
-      default: "true"
+      default: "false"
+    },
+    "breaking.ignore": {
+      description: "Directories ignored by the existing breaking checker.",
+      type: "string[]"
     },
     "breaking.extends": {
-      description: "Remote Git policy module to inherit breaking change settings from.",
+      description: "Reserved for explicit policy inheritance; currently rejected because ref, path, and merge rules are unspecified.",
       type: "string"
     }
   }}
@@ -100,18 +103,13 @@ linters-settings:
 
 issues:
   exclude-rules:
-    - path: "gen/**"
-    - path: "**/legacy/**"
-      linters:
+    - linters:
         - FIELD_LOWER_SNAKE_CASE
-        - PACKAGE_DIRECTORY_MATCH
 
 breaking:
   baseline: git:main
-  categories:
-    - WIRE
-    - WIRE_JSON
-  ignore_unstable: true
+  ignore:
+    - gen
 ```
 
 ---
@@ -131,3 +129,5 @@ proto/
 ```
 
 Sections are inherited as whole units from the nearest declaring file, preventing confusing partial merges.
+
+The v1 `breaking.baseline` selects the Git branch used by the existing EasyP breaking checker. Its rule set is unchanged. Category selection and unstable-package filtering need separate rule semantics and are not active yet. A path-bearing `issues.exclude-rules` entry currently produces an error; pathless entries work without choosing an implicit glob base. Explicit `linters.extends` and `breaking.extends` currently produce errors: the syntax does not yet define a Git ref, policy path, merge precedence, or lock/integrity behavior.

@@ -38,12 +38,12 @@ When `replace` is active:
 
 ---
 
-## CI Build Guardrails
+## Reproducible Lock Guardrail
 
-To prevent local file paths from breaking production builds, EasyP enforces a **strict CI check**:
+To prevent a local path from entering the reproducible dependency lock, EasyP requires the replacement to be removed before resolving the lock:
 
 <Callout type="warn">
-EasyP CI commands fail immediately if an active `replace` directive is detected in `protobuf.mod`.
+`easyp mod tidy` and `easyp mod update` reject an active local `replace` directive. Run one of these commands in CI to enforce the guard.
 </Callout>
 
 ### Preparing for PR Submission

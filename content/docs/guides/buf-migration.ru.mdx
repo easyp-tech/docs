@@ -26,13 +26,15 @@ description: "Пошаговое руководство по миграции к
 
 ## Пошаговый процесс миграции
 
-### Шаг 1: Автоматическая первичная инициализация
+### Шаг 1: Первичная инициализация
 
-Запустите `easyp init` в корне вашего проекта. EasyP обнаружит существующие файлы `buf.yaml` и `buf.gen.yaml` и автоматически создаст первичные `protobuf.mod`, `easyp.yaml` и `easyp.gen.yaml`.
+В новом проекте `easyp init` создаёт `protobuf.mod`, `easyp.yaml` и `easyp.gen.yaml`. Укажите `--module`, если идентификатор Git-модуля нельзя получить из удалённого репозитория `origin`.
 
 ```bash
-easyp init
+easyp init --module github.com/acme/my-service
 ```
+
+Автоматический перенос зависимостей Buf Registry отложен. При наличии `buf.yaml` или `buf.yml` команда `easyp init` завершится до записи файлов: имя `buf.build/...` нельзя безопасно считать URL Git-модуля. Выберите Git-источник для каждой зависимости и создайте v1-файлы явно.
 
 ### Шаг 2: Вынос зависимостей в `protobuf.mod`
 
@@ -60,8 +62,6 @@ linters:
 
 breaking:
   baseline: git:main
-  categories:
-    - WIRE
 ```
 
 ### Шаг 4: Удаление блоков источников из генератора
@@ -78,7 +78,6 @@ generate:
 
 plugins:
   - name: go
-    version: v1.34.2
     out: ./gen/go
     opts:
       paths: source_relative
