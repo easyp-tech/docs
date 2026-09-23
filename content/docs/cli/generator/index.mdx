@@ -1,136 +1,55 @@
 ---
 title: "Generator"
+description: "Generate code from complete protobuf modules with the EasyP v1 pilot."
 ---
 
-EasyP includes a powerful generator that simplifies the process of generating code from proto files. By using YAML configurations, EasyP makes this process more user-friendly and intuitive compared to using the protoc command directly.
+`easyp generate` finds `easyp.gen.yaml` files beneath the current directory, selects complete modules, compiles their `.proto` files, and runs the listed plugins. Module identities, roots, and dependency versions come from `protobuf.mod` and `protobuf.lock`.
 
-## Key Features of the Generator
+## Configure a module
 
-1. **Simplified Code Generation**:
-    - Generate code from proto files using a `YAML` configuration.
-    - Avoid the need to write long and complex protoc commands.
+```text
+# protobuf.mod
+module github.com/acme/contracts
+roots proto
+require github.com/acme/shared v1.2.0
+```
 
-2. **Wrapper around protoc**:
-    - EasyP functions as a wrapper around protoc, providing a more convenient API through configuration files.
-    - Supports all options and plugins available in protoc.
+```yaml
+# easyp.gen.yaml
+version: v1
+generate:
+  modules: [github.com/acme/contracts]
+plugins:
+  - name: go
+    out: ./gen/go
+    opts:
+      paths: source_relative
+  - name: go-grpc
+    out: ./gen/go
+    opts:
+      paths: source_relative
+```
 
-3. **Flexibility and Customization**:
-    - Use the same parameters as protoc plugins, directly in the configuration file.
-    - Support for multiple plugins and their parameters in a single configuration.
+```bash
+easyp mod tidy
+easyp generate
+```
 
-4. **Generate Code from Multiple Sources**:
-    - Generate code from local directories or remote repositories.
-    - Easily integrate with existing projects and repositories.
+If `generate.modules` is omitted, the generator selects the nearest `protobuf.mod`. A module entry may also be a repository-relative local module path or a locked dependency identity. `generate.packages` is reserved for future package filtering and currently returns an error when nonempty.
 
-5. **Remote Generation**:
-    - Generate code from remote Git repositories without local checkout.
+## Select a project and output descriptors
 
-6. **Package Manager Integration**:
-    - Seamless integration with EasyP's package manager for dependency management.
-    - Automatic resolution and inclusion of proto dependencies.
+```bash
+easyp generate --project backend
+easyp generate --descriptor_set_out descriptors.pb --include_imports
+```
 
-## Configuration Reference
+`--project` selects one consumer directory containing `easyp.gen.yaml`. `--include_imports` adds transitive imports to the descriptor set. The v1 command has no `--path` or `--root` flag; source roots are declared in `protobuf.mod`.
 
-### Generator Configuration Comparison
+## Plugins and managed options
 
-<Tabs items={["easyp.gen.yaml", "buf.gen.yaml"]}>
-  <Tab value="easyp.gen.yaml">
-    ```yaml
-    # Package manager dependencies
-    deps:
-      - github.com/googleapis/googleapis@common-protos-1_3_1
-      - github.com/grpc-ecosystem/grpc-gateway@v2.19.1
-      - github.com/bufbuild/protoc-gen-validate@v0.10.1
+`plugins[].name` selects a local executable or a bundled WASM plugin. EasyP selects bundled plugins through the existing plugin resolver. A remote plugin uses `remote` with a separate pinned semantic `version`. Plugin outputs are relative to the generator file.
 
-    # Code generation configuration
-    generate:
-      plugins:
-        - name: go
-          out: ./gen/go
-          opts:
-            paths: source_relative
-            module: github.com/mycompany/myproject
-          with_imports: true
+The existing managed rules remain available under `generate.managed`, including module, package, path, and field selectors. `options.go.package_prefix` can provide a Go package prefix; a repository-root generator file can supply a default for nested generator files. See the full [`easyp.gen.yaml` reference](/docs/reference/easyp-gen-yaml).
 
-        - name: go-grpc
-          out: ./gen/go
-          opts:
-            paths: source_relative
-            require_unimplemented_servers: false
-    ```
-  </Tab>
-  <Tab value="buf.gen.yaml">
-    ```yaml
-    version: v2
-    plugins:
-      - remote: buf.build/protocolbuffers/go
-        out: gen/go
-        opt:
-          - paths=source_relative
-          - module=github.com/mycompany/myproject
-      - remote: buf.build/grpc/go
-        out: gen/go
-        opt:
-          - paths=source_relative
-          - require_unimplemented_servers=false
-    ```
-  </Tab>
-</Tabs>
-
-### Multi-Language Plugin Examples
-
-<Tabs items={["Go", "TypeScript", "Python"]}>
-  <Tab value="Go">
-    ```yaml
-    plugins:
-      - name: go
-        out: ./gen/go
-        opts:
-          paths: source_relative
-      - name: go-grpc
-        out: ./gen/go
-        opts:
-          paths: source_relative
-          require_unimplemented_servers: false
-    ```
-  </Tab>
-  <Tab value="TypeScript">
-    ```yaml
-    plugins:
-      - name: ts
-        out: ./src/gen
-        opts:
-          declaration: true
-          target: es2017
-      - name: grpc-web
-        out: ./src/gen
-        opts:
-          import_style: typescript
-          mode: grpcweb
-    ```
-  </Tab>
-  <Tab value="Python">
-    ```yaml
-    plugins:
-      - name: python
-        out: ./gen/python
-      - name: grpc_python
-        out: ./gen/python
-    ```
-  </Tab>
-</Tabs>
-
-## Execution Commands
-
-<Tabs items={["CLI", "Configuration"]}>
-  <Tab value="CLI">
-    ```bash
-    easyp generate
-    ```
-  </Tab>
-  <Tab value="Configuration">
-    ```bash
-    easyp --cfg custom-easyp.yaml generate
-    ```
-  </Tab>
-</Tabs>
+Dependency repositories may use v1 EasyP, older EasyP, Buf v1, or Buf v2 metadata for their proto roots. The consumer's generator still uses the v1 files.
