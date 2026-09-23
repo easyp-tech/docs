@@ -66,7 +66,7 @@ modules:
 ## Lifecycle Commands
 
 - `easyp mod tidy`: Resolves required imports, updates indirect dependencies, and regenerates `protobuf.lock`.
-- `easyp mod update`: Upgrades tagged dependencies to latest semver-compatible versions, preserves commit-pinned requirements, and updates `protobuf.lock`.
+- `easyp mod update`: Upgrades tagged dependencies to latest semver-compatible versions, refreshes versionless requirements to Git HEAD, preserves explicit commit pins, and updates `protobuf.lock`.
 - `easyp mod download`: Populates local cache strictly using `protobuf.lock` without reaching out to remote registries or modifying locked versions.
 
 The `hash` is computed with Go's `dirhash.Hash1` over every regular file tracked by Git at `commit`, using repository-relative paths. EasyP verifies the same digest for a newly downloaded module and for an existing cache entry. A missing cached commit still requires access to its Git repository.

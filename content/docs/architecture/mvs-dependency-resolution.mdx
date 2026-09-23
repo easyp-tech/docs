@@ -18,12 +18,12 @@ Traditional dependency resolution algorithms (such as Cargo's PubGrub or npm's M
 | Challenge in Proto Management | Traditional / Buf v2 Approach | EasyP MVS Approach |
 | --- | --- | --- |
 | **Diamond Dependency Conflicts** | Global workspace-wide resolution forces a single version across all consumers, causing cross-team coupling. | Per-module independent resolution graph. Each module resolves its own minimal requirements. |
-| **Registry Volatility** | `latest` resolution or registry updates can silently alter build output over time. | Deterministic resolution selecting `max(requested_minimums)`. No SAT solver or registry lookups. |
+| **Registry Volatility** | `latest` resolution or registry updates can silently alter build output over time. | SemVer requirements select `max(requested_minimums)`; versionless Git requirements are pinned on first tidy. Subsequent runs reuse the lock. |
 | **Proto Schema Collision** | Multiple major/minor versions compiled in one proto-root break Fully Qualified Names (FQNs). | Exactly one version of each dependency per module graph, strictly locked via `protobuf.lock`. |
 
 ### Core Algorithm Behavior
 
-1. **Explicit Version Bounds**: Every requirement in `protobuf.mod` specifies an explicit baseline version (e.g., `github.com/acme/weather v1.2.0`). This version is treated as a *minimum requirement*, not a range constraint.
+1. **Version Bounds or Git HEAD**: A SemVer requirement (for example, `github.com/acme/weather v1.2.0`) supplies a minimum version. A requirement without a version resolves Git HEAD and stores the commit in the lock.
 2. **Maximum of Minimums**: When multiple modules in a dependency graph request different minimum versions of the same dependency, MVS selects the **maximum** of those requested minimum versions.
 3. **High-Water Mark Determinism**: The resulting selected version is guaranteed to satisfy all minimum requirements without requiring complex backtracking or unexpected automatic major upgrades.
 
@@ -88,7 +88,7 @@ Unlike workspace-wide resolvers, EasyP resolves dependencies on a **per-module b
 
 Because each proto module maintains its own `protobuf.mod` and `protobuf.lock`, teams can update shared dependencies at their own pace without breaking neighboring services in a monorepo.
 
-The maximum-version rule applies to SemVer requirements. A full Git commit hash pins an exact revision without a tag. If the same module is required by two different commits, or by both a commit and a SemVer tag, resolution reports a conflict because those requirements have no common version ordering.
+The maximum-version rule applies to SemVer requirements. A versionless requirement resolves the repository's current HEAD on its first `mod tidy`; later tidy runs reuse the locked commit, and `mod update` refreshes it. A full Git commit hash pins an exact revision without a tag. If the same module is required by two different commits, or by both a commit and a SemVer tag, resolution reports a conflict because those requirements have no common version ordering.
 
 ---
 
@@ -119,7 +119,7 @@ replace github.com/acme/weather => ../weather-fork
 
 - **`module`**: Declares the required canonical module identity (URL/path).
 - **`roots`**: Defines the inner directory root containing `.proto` schema files (defaults to `.`). This ensures imports resolve cleanly without requiring prefix manipulation.
-- **`require`**: Declares direct and indirect module dependencies with explicit Semantic Version tags or full Git commit hashes.
+- **`require`**: Declares direct and indirect module dependencies. The version may be omitted for automatic Git HEAD resolution, or set to a Semantic Version tag or full Git commit hash.
   - **`// indirect`**: Appended automatically by `easyp mod tidy` for transitive dependencies not directly imported by the root module's `.proto` files.
 - **`replace`**: Overrides a module dependency with a local file path (`../weather-fork`) for development.
 
