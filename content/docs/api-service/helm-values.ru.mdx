@@ -1,0 +1,319 @@
+---
+title: "Справочник значений Helm"
+description: "Все значения Helm-чарта easyp-service 1.0.2 с описаниями из самого чарта."
+---
+
+{/* Сгенерировано из https://github.com/easyp-tech/service/blob/v1.0.2/deploy/charts/easyp-service/values.yaml командой `npm run sync:helm-values`. Не редактируйте вручную. */}
+
+Все значения `values.yaml` чарта `easyp-service` **1.0.2** (приложение v1.0.2),
+всего 117. Описания — это комментарии самого чарта, процитированные как есть, поэтому они на
+английском в обеих языковых версиях страницы. Что обязательно задать и что опасно — кратко в
+[Установке](/ru/docs/api-service/installation); значения `config.*` соответствуют
+[конфигурации сервиса](/ru/docs/api-service/configuration). Чарт в основном комментирует целые блоки, поэтому
+ключ с «—» описан абзацем над его таблицей или заметками под ней.
+
+Тот же файл для устанавливаемой версии:
+
+```bash
+helm show values oci://ghcr.io/easyp-tech/charts/easyp-service --version 1.0.2
+```
+
+Файл начинается с:
+
+> Default values for easyp-service. Three things have no working default and must be decided before the chart will install. Each is refused at install time rather than at runtime, so a missing one is a message naming it, not a pod that comes up wrong. 1. A database DSN — see `secrets`. There is nothing sensible to default to. 2. TLS material, because `tls.enabled` defaults to true. Supply one of: tls.serverSecret=&lt;kubernetes.io/tls Secret&gt; you bring the certificate certManager.enabled=true the chart issues it tls.enabled=false plaintext, trusted network The default stays on: a listener that speaks plaintext is the wrong thing to arrive at by saying nothing. But it does mean there is no install that consists only of a DSN, and this list said otherwise until v0.14.0. 3. `ingress.host`, and with it `config.server.trustedProxies`, if you want the gRPC API reachable from outside the cluster. Both are required together — see the comment on trustedProxies for why the second one is not optional.
+
+## replicaCount
+
+| Ключ | Тип | По умолчанию | Описание |
+|---|---|---|---|
+| <code>replicaCount</code> | integer | <code>1</code> | — |
+
+## image
+
+| Ключ | Тип | По умолчанию | Описание |
+|---|---|---|---|
+| <code>image.repository</code> | string | <code>"ghcr.io/easyp-tech/service"</code> | — |
+| <code>image.tag</code> | string | <code>""</code> | Empty means Chart.appVersion. Pin an explicit tag in production: a floating tag makes a rollout non-reproducible. |
+| <code>image.pullPolicy</code> | string | <code>"IfNotPresent"</code> | — |
+
+## imagePullSecrets
+
+| Ключ | Тип | По умолчанию | Описание |
+|---|---|---|---|
+| <code>imagePullSecrets</code> | list | <code>[]</code> | — |
+
+## nameOverride
+
+| Ключ | Тип | По умолчанию | Описание |
+|---|---|---|---|
+| <code>nameOverride</code> | string | <code>""</code> | — |
+
+## fullnameOverride
+
+| Ключ | Тип | По умолчанию | Описание |
+|---|---|---|---|
+| <code>fullnameOverride</code> | string | <code>""</code> | — |
+
+## serviceAccount
+
+| Ключ | Тип | По умолчанию | Описание |
+|---|---|---|---|
+| <code>serviceAccount.create</code> | boolean | <code>true</code> | — |
+| <code>serviceAccount.annotations</code> | map | <code>&#123;&#125;</code> | — |
+| <code>serviceAccount.name</code> | string | <code>""</code> | — |
+
+## podAnnotations
+
+| Ключ | Тип | По умолчанию | Описание |
+|---|---|---|---|
+| <code>podAnnotations</code> | map | <code>&#123;&#125;</code> | — |
+
+## podLabels
+
+| Ключ | Тип | По умолчанию | Описание |
+|---|---|---|---|
+| <code>podLabels</code> | map | <code>&#123;&#125;</code> | — |
+
+## nodeSelector
+
+| Ключ | Тип | По умолчанию | Описание |
+|---|---|---|---|
+| <code>nodeSelector</code> | map | <code>&#123;&#125;</code> | — |
+
+## tolerations
+
+| Ключ | Тип | По умолчанию | Описание |
+|---|---|---|---|
+| <code>tolerations</code> | list | <code>[]</code> | — |
+
+## affinity
+
+| Ключ | Тип | По умолчанию | Описание |
+|---|---|---|---|
+| <code>affinity</code> | map | <code>&#123;&#125;</code> | — |
+
+## topologySpreadConstraints
+
+| Ключ | Тип | По умолчанию | Описание |
+|---|---|---|---|
+| <code>topologySpreadConstraints</code> | list | <code>[]</code> | — |
+
+## reloader
+
+The service reads its certificate and key once, at startup, so a rotated certificate is not picked up until the pod restarts. With stakater/Reloader installed this annotation restarts the deployment when the secret changes. Without it, rotation is a manual `kubectl rollout restart`.
+
+| Ключ | Тип | По умолчанию | Описание |
+|---|---|---|---|
+| <code>reloader.enabled</code> | boolean | <code>true</code> | — |
+
+## resources
+
+Sized against what the service is configured to do, not guessed. The plugin's output is read into memory whole, so peak usage tracks config.workerPool.maxConcurrentGenerations × config.registry.maxOutputSize — 16 × 64 MiB = 1 GiB of buffers with the defaults below, and the same bytes again once marshalled into the gRPC response. _helpers.tpl refuses an install where that product no longer fits in the limit. The earlier default was 1Gi, which the buffers alone filled. The pod was OOMKilled under load, and an OOMKill reads as a crash rather than as overload: no log line, no rejected-generation counter, no saturation alert.
+
+| Ключ | Тип | По умолчанию | Описание |
+|---|---|---|---|
+| <code>resources.requests.cpu</code> | string | <code>"500m"</code> | — |
+| <code>resources.requests.memory</code> | string | <code>"1Gi"</code> | — |
+| <code>resources.requests.ephemeral-storage</code> | string | <code>"1Gi"</code> | Writable layer and logs only. Both the plugin cache and the archives staged mid-download live on the plugins volume, not here — the download used to land in /tmp on the writable layer, where a few hundred megabytes times the concurrent generations was an eviction rather than an overload. With persistence disabled see persistence.ephemeralSizeLimit, which is what actually bounds that volume. |
+| <code>resources.limits.cpu</code> | string | <code>"4"</code> | Four cores for sixteen concurrent plugin processes. On two they each ran at an eighth speed and approached generationTimeoutSeconds, which would have surfaced as DeadlineExceeded — a broken plugin, to anyone reading — rather than as the honest ResourceExhausted the limiter returns. |
+| <code>resources.limits.memory</code> | string | <code>"4Gi"</code> | — |
+| <code>resources.limits.ephemeral-storage</code> | string | <code>"2Gi"</code> | — |
+
+## ports
+
+Ports the container listens on. The service defaults to 23410-23413 when no configuration is given; the chart always sets them explicitly.
+
+| Ключ | Тип | По умолчанию | Описание |
+|---|---|---|---|
+| <code>ports.grpc</code> | integer | <code>8080</code> | — |
+| <code>ports.metric</code> | integer | <code>8081</code> | Singular, matching the service's own server.port.metric. It was `metrics` until v0.13.0 — one word with two spellings across three files. |
+| <code>ports.health</code> | integer | <code>8082</code> | — |
+| <code>ports.mcp</code> | integer | <code>8083</code> | — |
+
+## mcp
+
+The MCP endpoint: a read-only HTTP surface AI tooling uses to read the plugin catalog and the easyp.yaml schema. It exposes nothing the anonymous gRPC reads do not, but it sits outside the gRPC interceptor chain — no TLS, no rate limit, no audit — so serving it is a deployment's explicit decision. Off: the container does not listen on ports.mcp and the Service does not publish it. Turn it on inside a trusted network or behind an ingress that terminates TLS.
+
+| Ключ | Тип | По умолчанию | Описание |
+|---|---|---|---|
+| <code>mcp.enabled</code> | boolean | <code>false</code> | — |
+
+## service
+
+| Ключ | Тип | По умолчанию | Описание |
+|---|---|---|---|
+| <code>service.type</code> | string | <code>"ClusterIP"</code> | — |
+| <code>service.annotations</code> | map | <code>&#123;&#125;</code> | — |
+
+## terminationGracePeriodSeconds
+
+Seconds Kubernetes waits after SIGTERM before SIGKILL. Three numbers have to line up, and _helpers.tpl enforces the order: generationTimeoutSeconds &lt; forceShutdownAfterSeconds &lt; terminationGracePeriodSeconds A generation the service accepted must be able to finish; the process must be able to exit on its own after that; and Kubernetes must wait for both rather than reaching for SIGKILL first.
+
+| Ключ | Тип | По умолчанию | Описание |
+|---|---|---|---|
+| <code>terminationGracePeriodSeconds</code> | integer | <code>180</code> | — |
+
+## config
+
+Configuration that is not secret. Rendered into a ConfigMap and mounted at /etc/easyp/config.yml — the same config file every other deployment of this service reads. Secrets are not here; they arrive as environment variables from the secret above and override the file. The numbers below repeat the defaults compiled into the service, on purpose: this is the chart's documented interface and `helm show values` is where an operator looks them up. tests/render.sh checks that they still agree with the binary, so a default changed on one side and not the other fails there rather than in a cluster.
+
+| Ключ | Тип | По умолчанию | Описание |
+|---|---|---|---|
+| <code>config.logLevel</code> | string | <code>"info"</code> | — |
+| <code>config.server.trustedProxies</code> | list | <code>[]</code> | CIDRs whose X-Forwarded-For and X-Real-IP headers may be believed. Required once ingress.enabled is true, and the chart refuses the install without it. Behind a proxy every request arrives from the proxy's address, so with this empty the rate limit and the per-caller concurrency limit become one bucket shared by every client at once, and the audit log records the ingress instead of who acted. None of that fails visibly. Set it to the range your ingress controller's pods run in — the pod CIDR of that node pool, not the whole cluster: anything listed here can claim to be any client. |
+| <code>config.server.maxRecvMsgSize</code> | integer | <code>67108864</code> | Largest single gRPC message accepted and sent. gRPC's own defaults are 4 MiB in — which a request carrying a large proto tree exceeds — and effectively unlimited out. maxSendMsgSize must be at least config.registry.maxOutputSize or the service refuses to start: a plugin allowed to produce more than can be sent does its work for nothing. |
+| <code>config.server.maxSendMsgSize</code> | integer | <code>67108864</code> | — |
+| <code>config.server.maxConcurrentStreams</code> | integer | <code>256</code> | Concurrent streams one connection may hold. gRPC defaults to unlimited, which lets a single caller allocate goroutines and buffers until the pod is out of memory, before any limiter in the chain sees the requests. |
+| <code>config.forceShutdownAfterSeconds</code> | integer | <code>150</code> | Hard exit this long after SIGTERM, if graceful shutdown has not finished. Expressed in seconds so the chart can compare it with the two numbers on either side of it. |
+| <code>config.workerPool.workers</code> | integer | <code>4</code> | Concurrent plugin lookups: a database read, plus a download and unpack from object storage on a cache miss. |
+| <code>config.workerPool.queueSize</code> | integer | <code>16</code> | Waiting slots, applied to lookups and to generations alike. Beyond this the answer is ErrServerOverloaded rather than a longer queue. |
+| <code>config.workerPool.maxConcurrentGenerations</code> | integer | <code>16</code> | Concurrent plugin processes. Separate from workers on purpose: a worker is released once the plugin is located, and execution runs after that. |
+| <code>config.workerPool.generationTimeoutSeconds</code> | integer | <code>120</code> | Expressed in seconds (not "120s") so the chart can compare it against terminationGracePeriodSeconds. Rendered as a Go duration for the service. |
+| <code>config.workerPool.maxRetries</code> | integer | <code>2</code> | — |
+| <code>config.workerPool.shutdownTimeout</code> | string | <code>"30s"</code> | — |
+| <code>config.rateLimit.requestsPerSecond</code> | integer | <code>10</code> | — |
+| <code>config.rateLimit.burst</code> | integer | <code>20</code> | — |
+| <code>config.rateLimit.cleanupInterval</code> | string | <code>"10m"</code> | — |
+| <code>config.rateLimit.maxConcurrentPerIP</code> | integer | <code>2</code> | Requests one client may have in flight at once. Rate alone does not bound this: a caller staying under the rate can still hold every generation slot with long requests. 0 disables the check. |
+| <code>config.audit.bufferSize</code> | integer | <code>1000</code> | — |
+| <code>config.audit.batchSize</code> | integer | <code>100</code> | — |
+| <code>config.audit.flushInterval</code> | string | <code>"1s"</code> | — |
+| <code>config.audit.maxSaveRetries</code> | integer | <code>3</code> | — |
+| <code>config.audit.enqueueTimeout</code> | string | <code>"1s"</code> | How long an operation waits for room in the audit queue. This is the only place audit can slow a request down, and it takes a backed-up queue to get there: a healthy writer drains batchSize/flushInterval — a hundred entries a second — so this expires only when the database has stopped keeping up. An entry that never finds room is dropped and counted under easyp_audit_events_lost_total&#123;reason="enqueue_timeout"&#125;; the operation itself still succeeds. |
+| <code>config.audit.flushTimeout</code> | string | <code>"5s"</code> | Bound on one write to storage, retries included. A batch that misses it is lost rather than holding the writer up behind a database that has stopped answering. |
+| <code>config.audit.retentionMonths</code> | integer | <code>12</code> | Partitions older than this are dropped on a schedule — a real delete, so afterwards the only copy of that month is in a backup taken while it still existed. Backup retention has to *exceed* this rather than match it: matching means the month leaves the database and the archive at about the same time, leaving it nowhere. |
+| <code>config.audit.preCreateMonths</code> | integer | <code>3</code> | — |
+| <code>config.audit.partitionCheckInterval</code> | string | <code>"6h"</code> | — |
+| <code>config.audit.partitionOpTimeout</code> | string | <code>"30s"</code> | — |
+| <code>config.registry.pluginsDir</code> | string | <code>"/plugins"</code> | — |
+| <code>config.registry.maxOutputSize</code> | integer | <code>67108864</code> | — |
+| <code>config.registry.cacheMaxBytes</code> | integer | <code>21474836480</code> | Bound on the unpacked plugins on disk. Least recently used ones are dropped once this is exceeded; the archive in object storage is left alone, so an evicted plugin is one download away rather than lost. Keep it below persistence.size — eviction starts at the limit, and the volume needs room to reach it. 0 disables eviction. 20 GiB |
+| <code>config.registry.s3.endpoint</code> | string | <code>""</code> | — |
+| <code>config.registry.s3.bucket</code> | string | <code>""</code> | — |
+| <code>config.registry.s3.region</code> | string | <code>"us-east-1"</code> | — |
+| <code>config.registry.s3.prefix</code> | string | <code>""</code> | — |
+| <code>config.registry.s3.forcePathStyle</code> | boolean | <code>false</code> | — |
+| <code>config.telemetry.otlpEndpoint</code> | string | <code>""</code> | Empty means no collector, and the service then builds no exporter at all. These carry no fallback on purpose: the OTLP connection is lazy, so an endpoint nobody is listening on does not fail — it retries forever, and a pod with no observability stack would fill its log with connection errors while otherwise working. |
+| <code>config.telemetry.pyroscopeEndpoint</code> | string | <code>""</code> | — |
+| <code>config.telemetry.serviceTier</code> | string | <code>""</code> | Tags traces and profiles with the licence tier this release serves. Worth setting only where community and enterprise run side by side and their signals land in the same backends; on a cluster running one tier it would distinguish nothing. Metrics carry the same distinction already, so use the same word here that the metric label uses. |
+| <code>config.license.publicKeys</code> | map | <code>&#123;"2026-08":"81322461987167d5cfd529e9cb8b96f4797f12fce6be4399a0866e250c9b6bb5"&#125;</code> | Public halves of the keys licence tokens are signed with, keyed by the key id that appears in the token footer. The token names one; the rest are here so that a signing key can be rotated without every deployment having to change key on the same day. These are the trust anchor: whoever sets them decides which authority may issue licences for this installation. The default below is easyp.tech's own published key, so a customer holding a LICENSE_KEY needs nothing else. Replace it only if you issue your own licences. Source of truth is keys/ in the licence registry (easyp-tech/licenses); these must be kept in step with it. Without a key, LICENSE_KEY is ignored and the service runs in community mode. |
+
+- <code>config.registry.s3</code>: Leaving bucket empty disables S3 and makes pluginsDir the only source of plugin binaries.
+
+## extraEnv
+
+Extra environment variables, appended last. Use for settings the chart does not model yet.
+
+| Ключ | Тип | По умолчанию | Описание |
+|---|---|---|---|
+| <code>extraEnv</code> | list | <code>[]</code> | — |
+
+## secrets
+
+Secrets The pod loads them with envFrom, so the KEYS OF THE SECRET ARE THE ENVIRONMENT VARIABLE NAMES. A secret you bring yourself must use exactly these keys: DB_POSTGRES_DSN required REGISTRY_S3_ACCESS_KEY_ID required when config.registry.s3.bucket is set REGISTRY_S3_SECRET_ACCESS_KEY required when config.registry.s3.bucket is set LICENSE_KEY optional; absent means community mode The single-key LICENSE_PUBLIC_KEY was removed in v0.13.0. The trust anchor is config.license.publicKeys alone: an entry per key id, or one under "*" to verify any key id. Without a public key, LICENSE_KEY counts for nothing. AUTH_WRITE_TOKENS optional; absent means no writes are allowed AUTH_WRITE_TOKENS holds sha256 digests, never the tokens: "ci=&lt;64 hex&gt;,me=&lt;64 hex&gt;". Generate a token with `easyp-svc auth new-token --name ci`.
+
+| Ключ | Тип | По умолчанию | Описание |
+|---|---|---|---|
+| <code>secrets.existingSecret</code> | string | <code>""</code> | Bring your own secret (recommended). Values put in `data` below end up in Helm release history and in `helm get values`, which is why create defaults to false. |
+| <code>secrets.create</code> | boolean | <code>false</code> | — |
+| <code>secrets.data</code> | map | <code>&#123;&#125;</code> | — |
+
+## tls
+
+Transport security When enabled, the gRPC listener serves TLS. Adding clientCASecret turns it into mutual TLS: only callers holding a certificate signed by that CA get in, which is what keeps the listener private when the ingress is the only party meant to reach it.
+
+| Ключ | Тип | По умолчанию | Описание |
+|---|---|---|---|
+| <code>tls.enabled</code> | boolean | <code>true</code> | — |
+| <code>tls.serverSecret</code> | string | <code>""</code> | Secret of type kubernetes.io/tls holding tls.crt and tls.key for the server. |
+| <code>tls.clientCASecret</code> | string | <code>""</code> | Secret holding ca.crt used to verify client certificates. Empty falls back to ca.crt inside serverSecret, which is what cert-manager writes for a CA issuer. Set to "-" to serve plain server-side TLS with no client check. |
+| <code>tls.mountPath</code> | string | <code>"/certs"</code> | — |
+
+## certManager
+
+Optional: let cert-manager issue the certificates instead of supplying them.
+
+| Ключ | Тип | По умолчанию | Описание |
+|---|---|---|---|
+| <code>certManager.enabled</code> | boolean | <code>false</code> | — |
+| <code>certManager.issuerRef.name</code> | string | <code>""</code> | — |
+| <code>certManager.issuerRef.kind</code> | string | <code>"ClusterIssuer"</code> | — |
+| <code>certManager.issuerRef.group</code> | string | <code>"cert-manager.io"</code> | — |
+| <code>certManager.duration</code> | string | <code>"2160h"</code> | — |
+| <code>certManager.renewBefore</code> | string | <code>"360h"</code> | — |
+| <code>certManager.extraDnsNames</code> | list | <code>[]</code> | Extra SANs for the server certificate. The in-cluster service name is always included. |
+| <code>certManager.clientCertificate.enabled</code> | boolean | <code>true</code> | — |
+| <code>certManager.clientCertificate.commonName</code> | string | <code>"easyp-ingress"</code> | — |
+
+- <code>certManager.clientCertificate</code>: Issues the client certificate the ingress presents to the service.
+
+## ingress
+
+Ingress. Defaults target Traefik because it is the only controller that can express a mutual-TLS backend leg declaratively, via ServersTransport.
+
+| Ключ | Тип | По умолчанию | Описание |
+|---|---|---|---|
+| <code>ingress.enabled</code> | boolean | <code>false</code> | — |
+| <code>ingress.className</code> | string | <code>"traefik"</code> | — |
+| <code>ingress.host</code> | string | <code>""</code> | — |
+| <code>ingress.annotations</code> | map | <code>&#123;&#125;</code> | — |
+| <code>ingress.tlsSecret</code> | string | <code>""</code> | Secret holding the certificate served to external clients. |
+| <code>ingress.serversTransport.enabled</code> | boolean | <code>true</code> | — |
+| <code>ingress.serversTransport.clientSecret</code> | string | <code>""</code> | Secret of type kubernetes.io/tls with the client certificate the router presents to the service. |
+| <code>ingress.serversTransport.serverName</code> | string | <code>""</code> | Name the router expects on the service certificate. |
+| <code>ingress.serversTransport.insecureSkipVerify</code> | boolean | <code>false</code> | — |
+
+- <code>ingress.serversTransport</code>: Traefik ServersTransport describing how the router reaches the pod. Required whenever tls.enabled is true, otherwise the backend leg would be plaintext against a listener that demands a client certificate.
+
+## persistence
+
+Storage for the plugin cache. Plugin archives are downloaded lazily and unpacked here, and the directory is pruned: once it passes config.registry.cacheMaxBytes the least recently used plugin versions are removed. So size this for the working set you want resident, not for every plugin that could ever be requested. Eviction only ever removes local files. The archive stays in object storage, so an evicted plugin costs one download on its next request rather than being lost — which is why the cache can be sized to taste. Whichever of the two sizes below applies has to exceed cacheMaxBytes, and the chart refuses to install when it does not: eviction starts at the limit, so storage sized exactly to it is already full by the time the cache first needs headroom.
+
+| Ключ | Тип | По умолчанию | Описание |
+|---|---|---|---|
+| <code>persistence.enabled</code> | boolean | <code>true</code> | — |
+| <code>persistence.existingClaim</code> | string | <code>""</code> | — |
+| <code>persistence.storageClass</code> | string | <code>""</code> | — |
+| <code>persistence.accessMode</code> | string | <code>"ReadWriteOnce"</code> | — |
+| <code>persistence.size</code> | string | <code>"25Gi"</code> | — |
+| <code>persistence.ephemeralSizeLimit</code> | string | <code>"25Gi"</code> | Used when enabled=false, where the cache lives in an emptyDir on the node instead of a volume of its own. Without a limit here the cache grows into the node's ephemeral storage, and disk pressure there is resolved by the kubelet evicting pods — not necessarily this one. With it, an overrun stops at the pod that caused it. Remember this is per replica: with persistence off, every pod keeps its own copy, so plan for replicaCount × this much on the nodes. |
+
+## serviceMonitor
+
+| Ключ | Тип | По умолчанию | Описание |
+|---|---|---|---|
+| <code>serviceMonitor.enabled</code> | boolean | <code>false</code> | — |
+| <code>serviceMonitor.interval</code> | string | <code>"30s"</code> | — |
+| <code>serviceMonitor.scrapeTimeout</code> | string | <code>"10s"</code> | — |
+| <code>serviceMonitor.labels</code> | map | <code>&#123;&#125;</code> | — |
+
+## prometheusRule
+
+Alerting rules. Needs the Prometheus Operator CRDs, same as serviceMonitor, which is why this defaults to off rather than failing the install where they are absent. Turn it on wherever you actually run this. The rules worth having on day one are the licence ones: a licence that lapses breaks nothing loudly. The tier drops to community, audit stops, and the plugin limit starts rejecting registrations — all silently.
+
+| Ключ | Тип | По умолчанию | Описание |
+|---|---|---|---|
+| <code>prometheusRule.enabled</code> | boolean | <code>false</code> | — |
+| <code>prometheusRule.labels</code> | map | <code>&#123;&#125;</code> | Extra labels, usually what your Prometheus selects rules by. |
+| <code>prometheusRule.runbookBaseUrl</code> | string | <code>"https://easyp.tech/docs/api-service/runbooks"</code> | Where each alert's runbook_url points. Every alert gets one, anchored on its own name. Point this at your own copy if you keep runbooks internally — an alert that arrives at 3am with no procedure attached is where most of the time goes. |
+| <code>prometheusRule.licenceExpiryWarningDays</code> | integer | <code>14</code> | How long before expiry to start warning. The token also carries its own grace period, which runs after this; both exist so a renewal that slips does not take a customer's pipeline down. |
+| <code>prometheusRule.cacheUsageWarningRatio</code> | number | <code>0.95</code> | Fraction of config.registry.cacheMaxBytes that counts as full. |
+| <code>prometheusRule.generationErrorRatio</code> | number | <code>0.05</code> | Fraction of generations allowed to fail before alerting. |
+| <code>prometheusRule.authFailureRate</code> | number | <code>0.5</code> | Rejected write credentials per second before alerting. |
+
+## podDisruptionBudget
+
+| Ключ | Тип | По умолчанию | Описание |
+|---|---|---|---|
+| <code>podDisruptionBudget.enabled</code> | boolean | <code>false</code> | — |
+| <code>podDisruptionBudget.minAvailable</code> | integer | <code>1</code> | — |
+
+## networkPolicy
+
+On by default. This pod's whole job is running third-party binaries, so the set of places it can reach should be stated rather than inherited. If your database, object storage or collector is not on one of the ports below, add it here or the pod goes quiet in a way that looks like a hang. That is the one thing to check first after enabling this.
+
+| Ключ | Тип | По умолчанию | Описание |
+|---|---|---|---|
+| <code>networkPolicy.enabled</code> | boolean | <code>true</code> | — |
+| <code>networkPolicy.ingressNamespaceSelector</code> | map | <code>&#123;&#125;</code> | Selector matching the namespace your ingress controller runs in. Empty means the gRPC port accepts connections from anywhere in the cluster — set it once you know which namespace your controller runs in. |
+| <code>networkPolicy.egressPorts</code> | list | <code>[5432,443,4317]</code> | Ports the pod is allowed to reach outbound, beyond DNS. |

@@ -108,9 +108,8 @@ helm install easyp oci://ghcr.io/easyp-tech/charts/easyp-service \
 | `networkPolicy.enabled` | `true` | Исходящий трафик только на DNS, 5432, 443 и 4317. Добавьте порты, если БД, хранилище или коллектор слушают другие. |
 | `reloader.enabled` | `true` | Перезапуск при ротации сертификата, если установлен stakater/Reloader. |
 
-Каждое значение описано в собственном
-[README чарта](https://github.com/easyp-tech/service/tree/master/deploy/charts/easyp-service)
-и в `helm show values oci://ghcr.io/easyp-tech/charts/easyp-service --version 1.0.2`.
+Все значения с описаниями из самого чарта — в
+[справочнике значений Helm](/ru/docs/api-service/helm-values).
 
 <Callout type="info">
 `NetworkPolicy` — единственная мера изоляции, включённая по умолчанию. Она

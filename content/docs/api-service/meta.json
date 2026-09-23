@@ -5,6 +5,7 @@
     "quickstart",
     "architecture",
     "installation",
+    "helm-values",
     "configuration",
     "authentication-and-licensing",
     "security",
