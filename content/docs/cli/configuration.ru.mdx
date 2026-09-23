@@ -36,6 +36,9 @@ easyp breaking --path proto --against main
 | `breaking` | `--path` (`-p`), `--root` (`-r`), `--against` |
 | `init` | `--dir` (`-d`), `--module` |
 | `validate-config` | `--config` (псевдоним `--cfg`), `--format` |
+| `mod vendor` | Нет собственных флагов |
+| `ls-files` | `--include-imports` (по умолчанию `true`), `--format` (`json` или `text`) |
+| `schema-gen` | `--out-dir` (по умолчанию `schemas`) |
 
 Общие флаги: `--cfg` (псевдоним `--config`, по умолчанию `easyp.yaml`), `--debug` (`-d`) и `--format` (`-f`, `text` или `json`). Переменные `EASYP_CFG`, `EASYP_DEBUG` и `EASYP_FORMAT` задают значения по умолчанию. Кеш модулей находится в `EASYPPATH` или `$HOME/.easyp`.
 
@@ -47,7 +50,11 @@ easyp breaking --path proto --against main
 
 `validate-config --cfg <файл> --format json` принимает `easyp.yaml`, `easyp.gen.yaml`, `protobuf.mod` и `protobuf.lock`. Некорректная версия lock-файла, неполные записи и неверные хеши выдаются как ошибки проверки.
 
-В пилотной версии v1 нет команд `mod vendor` и `ls-files`.
+`mod vendor` проверяет зафиксированные Git-зависимости и копирует их `.proto` в `easyp_vendor` по import path. Старый каталог заменяется только после успешного копирования всех файлов. Совпадающие import path вызывают ошибку. Сначала выполните `mod tidy`; локальные `replace` нельзя вендорить.
+
+`ls-files` показывает локальные `.proto` из корней `protobuf.mod`. По умолчанию команда также включает достижимые импорты из зависимостей и встроенных well-known proto, разрешая зависимости через v1 lock или локальные замены. `--include-imports=false` показывает только локальные файлы без разрешения зависимостей. В JSON есть поля `files`, `roots` и, при проблемах с импортами, `errors`.
+
+`schema-gen --out-dir schemas` создаёт отдельные JSON Schema для `easyp.yaml`, `easyp.gen.yaml` и `protobuf.lock`: файлы с суффиксом `-v1.schema.json` и псевдонимы без версии. `protobuf.mod` — текстовый манифест; проверяйте его командой `validate-config`. CLI также проверяет семантические правила, не выраженные в JSON Schema.
 
 ## Минимальный пример
 

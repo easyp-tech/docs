@@ -26,14 +26,16 @@ require (
 | `easyp mod tidy` | Разрешает прямые и транзитивные требования и записывает `protobuf.lock` |
 | `easyp mod download` | Скачивает точные коммиты из lock и проверяет хеши |
 | `easyp mod update` | Обновляет требования в пределах текущих мажорных версий и пересоздаёт lock |
+| `easyp mod vendor` | Проверяет зафиксированные зависимости и копирует их `.proto` в `easyp_vendor` |
 
 ```bash
 easyp mod tidy
 easyp mod download
+easyp mod vendor
 easyp generate
 ```
 
-Храните `protobuf.mod` и `protobuf.lock` в репозитории для воспроизводимой сборки. Кеш по умолчанию расположен в `$HOME/.easyp/v1/git`; переменная `EASYPPATH` меняет его родительский каталог. Команды `mod vendor` в пилотной версии v1 нет.
+Храните `protobuf.mod` и `protobuf.lock` в репозитории для воспроизводимой сборки. Кеш по умолчанию расположен в `$HOME/.easyp/v1/git`; переменная `EASYPPATH` меняет его родительский каталог. `mod vendor` требует lock и отклоняет локальные замены и повторяющиеся import path. Каталог `easyp_vendor` — копия исходников зависимостей, а не замена lock-файла.
 
 ## Зависимости на Buf или старом EasyP
 

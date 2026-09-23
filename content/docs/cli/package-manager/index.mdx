@@ -26,14 +26,16 @@ require (
 | `easyp mod tidy` | Resolves direct and transitive requirements and writes `protobuf.lock` |
 | `easyp mod download` | Downloads the exact commits in `protobuf.lock` and verifies their hashes |
 | `easyp mod update` | Refreshes requirements within their current major versions, then updates the lock |
+| `easyp mod vendor` | Verifies locked dependencies and copies their `.proto` files into `easyp_vendor` |
 
 ```bash
 easyp mod tidy
 easyp mod download
+easyp mod vendor
 easyp generate
 ```
 
-Commit `protobuf.mod` and `protobuf.lock` for repeatable builds. The module cache is under `$HOME/.easyp/v1/git` by default; set `EASYPPATH` to change its parent directory. The v1 pilot does not have `mod vendor`.
+Commit `protobuf.mod` and `protobuf.lock` for repeatable builds. The module cache is under `$HOME/.easyp/v1/git` by default; set `EASYPPATH` to change its parent directory. `mod vendor` requires the lock and rejects local replacements and duplicate import paths. The `easyp_vendor` directory is a copy of dependency sources, not a replacement for the lock.
 
 ## Dependencies using Buf or older EasyP
 

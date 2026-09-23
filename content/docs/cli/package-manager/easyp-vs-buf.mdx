@@ -29,4 +29,4 @@ easyp generate
 
 `mod tidy` resolves the Git dependency and records the selected commit and content hash in `protobuf.lock`. Buf Registry dependency names are not converted into Git URLs automatically; declare a suitable Git source in the consumer manifest. Buf include/exclude filters are not yet supported for Git dependency import roots and produce an error.
 
-The v1 pilot does not provide `mod vendor`. See the [package manager guide](/docs/cli/package-manager) for the supported commands.
+After `mod tidy`, `mod vendor` can copy the locked Git dependency's `.proto` files into `easyp_vendor` using the roots extracted from its Buf configuration. See the [package manager guide](/docs/cli/package-manager).
