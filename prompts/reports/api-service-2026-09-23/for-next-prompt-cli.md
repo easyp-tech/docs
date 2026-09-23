@@ -76,3 +76,11 @@
   [стенд: `stat proto/proto: no such file or directory`]
 - Remote-генерация против сервиса v1.0.2 работает (стенд, `protoc-gen-go v1.36.10`).
 - Приоритет исполнителей: `command` > `remote` > builtin WASM (если нет в PATH) > локальный.
+
+## ASCII-схемы вне api-service (добавлено 2026-09-23)
+
+Сайт теперь рисует ```` ```mermaid ```` блоки (`components/mermaid.tsx`, `remarkMdxMermaid` в `source.config.ts`),
+а дерево файлов — компонентом `<Files>/<Folder>/<File>` из fumadocs-ui. В разделе API Service ASCII-схемы
+заменены. Остались псевдографикой (символы `┌─│▶`): `cli/configuration.mdx`, `cli/package-manager/index.mdx`,
+`cli/package-manager/easyp-vs-buf.mdx`, `guides/organization-lint-style.mdx`, `guides/microservice-isolation.mdx`
+(+ RU). Перевести на Mermaid / `<Files>`.
