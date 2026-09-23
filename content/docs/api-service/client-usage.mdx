@@ -1,0 +1,186 @@
+---
+title: "Client Usage"
+description: "Pointing the easyp CLI at the service, using the Go SDK, and calling the gRPC API directly."
+---
+
+## easyp CLI
+
+A plugin runs on the service when its entry in `generate.plugins` uses `remote:`
+instead of `name:`, `path:` or `command:`:
+
+```yaml
+generate:
+  inputs:
+    - directory:
+        path: .
+        root: proto
+  plugins:
+    - remote: "plugins.example.com/protocolbuffers/go:v1.36.10"
+      out: gen/go
+      opts:
+        paths: source_relative
+    - remote: "plugins.example.com/grpc/go:v1.6.2"
+      out: gen/go
+      opts:
+        paths: source_relative
+        require_unimplemented_servers: false
+```
+
+### The `remote:` value
+
+`[http://|https://]host[:port]/group/name[:version]`
+
+| Part | Behaviour |
+|---|---|
+| scheme | Optional. `https://` or no scheme → TLS; `http://` → plaintext. |
+| host | A host containing `localhost` or `127.0.0.1` is always plaintext unless `https://` is given. |
+| port | Optional. Without it the gRPC client's default applies (443 for TLS); the Helm chart's ingress serves on 443, a bare service listens on 23410. |
+| group/name | Must match a registered plugin. |
+| version | Optional. Omitted → `latest`, which is the version that sorts last as a string, not the newest semantic version. |
+
+`opts` are joined into the `CodeGeneratorRequest` parameter
+(`paths=source_relative,require_unimplemented_servers=false`), exactly as for
+local plugins.
+
+### What the CLI does and does not support
+
+- It parses and resolves `.proto` files locally, including dependencies from
+  `deps`. Only the resulting `CodeGeneratorRequest` is sent.
+- One gRPC call per plugin, each on a new connection, with a fixed **30-second**
+  deadline. The service's own limit is 120 s; a plugin that needs longer than 30 s
+  fails on the client side with `DeadlineExceeded` while the server may still be
+  running it.
+- TLS uses the system trust store. There is no option for a private CA: install
+  it into the system store of the machine running `easyp`.
+- **No token and no client certificate.** The CLI cannot talk to a service with
+  `auth.require_authentication: true` or a listener that requires mutual TLS.
+  Anonymous reads over TLS are the supported setup.
+- The protocol is EasyP's `easyp.generator.v1.GeneratorAPI`. A `remote:` value
+  pointing at `buf.build` does not reach Buf's remote plugins — Buf's registry
+  does not implement this API.
+
+`command:` takes precedence over `remote:`; a plugin entry must have exactly one
+source.
+
+## Go SDK
+
+`github.com/easyp-tech/service/sdk`, Apache-2.0.
+
+```go
+package main
+
+import (
+	"context"
+	"log"
+	"time"
+
+	"github.com/easyp-tech/service/sdk"
+	"google.golang.org/protobuf/types/pluginpb"
+)
+
+func main() {
+	client, err := sdk.NewClient(
+		"plugins.example.com:443",
+		sdk.WithGenerateCodeTimeout(2*time.Minute),
+	)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer client.Close()
+
+	ctx := context.Background()
+
+	plugins, err := client.ListPlugins(ctx,
+		sdk.WithFilter(sdk.PluginFilter{Group: "protocolbuffers"}))
+	if err != nil {
+		log.Fatal(err)
+	}
+	log.Printf("%d protocolbuffers plugins", len(plugins))
+
+	var req *pluginpb.CodeGeneratorRequest // built from your descriptors
+	resp, err := client.GenerateCode(ctx, "protocolbuffers/go:v1.36.10", req)
+	if err != nil {
+		log.Fatal(err)
+	}
+	log.Printf("%d files", len(resp.GetFile()))
+}
+```
+
+### Options
+
+| Option | Default | Purpose |
+|---|---|---|
+| (none) | TLS, system roots | Transport. |
+| `WithInsecure()` | — | Plaintext, for a local service. |
+| `WithTransportCredentials(creds)` | — | Private CA, client certificate (mTLS). |
+| `WithToken(token)` | — | `authorization: Bearer` on every call. Needed for writes, and for reads when the service requires authentication. |
+| `WithGenerateCodeTimeout(d)` | 30 s | Per-call deadline when the context has none. Raise it towards the server's `generation_timeout`. |
+| `WithListPluginsTimeout(d)` | 10 s | Spans the whole paginated walk. |
+| `WithCreatePluginTimeout(d)` | 120 s | Registration reads the archive from storage. |
+| `WithMaxRetries(n)`, `WithRetryBaseDelay(d)`, `WithRetryMaxDelay(d)` | 3, 100 ms, 5 s | Exponential backoff. |
+| `WithMaxRecvMsgSize(n)` | 64 MiB | Matches the server's output limit. |
+| `WithHealthCheck(interval)` | 30 s | Background connection-state check. |
+| `WithKeepaliveParams(p)` | — | gRPC keepalive. |
+| `WithUnaryInterceptor(i)`, `WithLoggingInterceptor(l)`, `WithMetricsInterceptor(c)` | — | Hooks. |
+
+Only `UNAVAILABLE` is retried. `RESOURCE_EXHAUSTED` (overload, rate limit, plugin
+ceiling) and `DEADLINE_EXCEEDED` are returned immediately: retrying the first
+adds load exactly when the server has none to spare, and retrying the second
+re-runs a generation that already used its full timeout.
+
+Methods: `GenerateCode`, `ListPlugins` (walks every page), `CreatePlugin`,
+`UpdatePlugin`, `DeletePlugin`, `Close`.
+
+## gRPC directly
+
+The contract is `easyp.generator.v1.GeneratorAPI` in
+`api/easyp/generator/v1/generator.proto`:
+
+```protobuf
+service GeneratorAPI {
+  rpc GenerateCode(GenerateCodeRequest) returns (GenerateCodeResponse);
+  rpc Plugins(PluginsRequest) returns (PluginsResponse);
+  rpc CreatePlugin(CreatePluginRequest) returns (CreatePluginResponse);
+  rpc UpdatePlugin(UpdatePluginRequest) returns (UpdatePluginResponse);
+  rpc DeletePlugin(DeletePluginRequest) returns (DeletePluginResponse);
+}
+```
+
+`GenerateCodeRequest` carries `code_generator_request` and `plugin_name`
+(`group/name:version`; the version is required at this level). The server does
+not serve reflection; write a descriptor set with the operator CLI:
+
+```bash
+easyp-svc api descriptor -o api.protoset
+grpcurl -protoset api.protoset -plaintext localhost:23410 \
+  easyp.generator.v1.GeneratorAPI/Plugins
+```
+
+`Plugins` is paginated: `page_size` defaults to 100 and is capped at 1000; pass
+`next_page_token` back as `page_token` with the same filters.
+
+### Errors
+
+Every non-OK status carries `google.rpc.ErrorInfo` with domain `easyp.tech` and a
+stable `reason`. Branch on the reason, not the message.
+
+| Reason | gRPC code | Typical cause |
+|---|---|---|
+| `NOT_FOUND` | `NOT_FOUND` | No such plugin or version. |
+| `INVALID_PLUGIN_NAME` | `INVALID_ARGUMENT` | Name not `group/name:version`. |
+| `INVALID_CONFIG` | `INVALID_ARGUMENT` | Bad plugin config on create/update. |
+| `GENERATION_FAILED` | `INTERNAL` | The plugin exited non-zero, wrote invalid output, or exceeded `max_output_size`. |
+| `SERVER_OVERLOADED` | `RESOURCE_EXHAUSTED` | Worker or generation queue full. |
+| `MAX_PLUGINS_EXCEEDED` | `RESOURCE_EXHAUSTED` | Community ceiling of 10 versions. |
+| `ALREADY_EXISTS` | `ALREADY_EXISTS` | Version already registered. |
+| `BINARY_NOT_UPLOADED` | `FAILED_PRECONDITION` | Registering before `plugins push`. |
+| `STORAGE_UNAVAILABLE` | `UNAVAILABLE` | Object storage down, or the archive is gone. |
+| `SHUTTING_DOWN` | `UNAVAILABLE` | The service is draining. |
+| `FEATURE_DENIED` | `PERMISSION_DENIED` | Licence does not include the feature. |
+| `DEADLINE_EXCEEDED` | `DEADLINE_EXCEEDED` | Plugin ran past its timeout. |
+| `CANCELED` | `CANCELLED` | Client went away. |
+| `INTERNAL` | `INTERNAL` | Anything else. |
+
+Rate-limit and per-client concurrency refusals come from interceptors: they are
+`RESOURCE_EXHAUSTED` without an `ErrorInfo` reason. Missing or unknown tokens are
+`UNAUTHENTICATED`.

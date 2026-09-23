@@ -1,0 +1,191 @@
+---
+title: "Configuration Reference"
+description: "Every setting the service reads: YAML key, environment variable, type, default and meaning."
+---
+
+## How settings are resolved
+
+Each setting has exactly one YAML key and one environment variable. For every
+setting the first of these that supplies a value wins:
+
+1. the environment;
+2. the YAML file named by `--cfg` (or `EASYP_CONFIG`);
+3. the default compiled into the binary.
+
+An unrecognised key in the YAML file refuses the start, so a typo is an error
+rather than a silently ignored setting. The only command-line flag that
+overrides a setting is `--log-level` on `service start`.
+
+The binary can tell you what applies:
+
+```bash
+easyp-svc config validate --cfg config.yml            # would it start?
+easyp-svc config print --cfg config.yml --origin      # value and source of each setting
+easyp-svc config print --cfg config.yml --changed     # only what differs from defaults
+```
+
+Without `--cfg` both resolve from the environment alone, which is how a Helm
+deployment is configured. Secrets are printed as a placeholder unless
+`--show-secrets` is given. At every start the service logs the same summary as
+one `configuration resolved` line.
+
+## Variables outside the settings tree
+
+| Variable | Read by | Meaning |
+|---|---|---|
+| `EASYP_CONFIG` | every command that takes `--cfg` | Path to the YAML file. Lets the image's `HEALTHCHECK` (`easyp-svc health`) find the same file as the service. |
+| `EASYP_TOKEN` | `plugins register` | Write token, when `--token` is not given. |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | the service | Alias of `TELEMETRY_OTLP_ENDPOINT`. |
+
+## Durations and sizes
+
+Durations use Go syntax: `30s`, `10m`, `6h`. Sizes are bytes as integers.
+
+## server
+
+| YAML key | Environment | Type | Default | Description |
+|---|---|---|---|---|
+| `server.host` | `SERVER_HOST` | string | `0.0.0.0` | Address all listeners bind to. |
+| `server.port.grpc` | `SERVER_PORT_GRPC` | string | `23410` | gRPC API. |
+| `server.port.metric` | `SERVER_PORT_METRIC` | string | `23411` | Prometheus `/metrics`. |
+| `server.port.health` | `SERVER_PORT_HEALTH` | string | `23412` | `/live` (liveness) and `/` (readiness). |
+| `server.port.mcp` | `SERVER_PORT_MCP` | string | `23413` | MCP endpoint `/mcp`, only when `mcp.enabled`. |
+| `server.tls.cert_file` | `SERVER_TLS_CERT_FILE` | string | — | Server certificate (PEM). Empty disables TLS: the gRPC listener is plaintext and logs a warning. |
+| `server.tls.key_file` | `SERVER_TLS_KEY_FILE` | string | — | Private key for `cert_file`. |
+| `server.tls.client_ca_file` | `SERVER_TLS_CLIENT_CA_FILE` | string | — | CA bundle; when set, clients must present a certificate signed by it (mutual TLS). Only the CA is checked, not the subject. |
+| `server.force_shutdown_after` | `SERVER_FORCE_SHUTDOWN_AFTER` | duration | `150s` | Hard exit this long after SIGTERM. Must exceed `worker_pool.generation_timeout`. |
+| `server.trusted_proxies` | `SERVER_TRUSTED_PROXIES` | list of CIDRs | — | Peers whose `X-Forwarded-For`/`X-Real-IP` are believed. Required behind a proxy, otherwise every caller shares one rate-limit bucket and the audit log records the proxy. |
+| `server.max_recv_msg_size` | `SERVER_MAX_RECV_MSG_SIZE` | int | `67108864` | Largest gRPC request, bytes. |
+| `server.max_send_msg_size` | `SERVER_MAX_SEND_MSG_SIZE` | int | `67108864` | Largest gRPC response, bytes. Must be at least `registry.max_output_size`. |
+| `server.max_concurrent_streams` | `SERVER_MAX_CONCURRENT_STREAMS` | uint32 | `256` | Concurrent streams per connection. |
+
+## db
+
+| YAML key | Environment | Type | Default | Description |
+|---|---|---|---|---|
+| `db.postgres` | `DB_POSTGRES_DSN` | string, secret | — | PostgreSQL connection string, e.g. `postgres://user:pass@host:5432/easyp?sslmode=require`. Required. |
+
+## registry
+
+| YAML key | Environment | Type | Default | Description |
+|---|---|---|---|---|
+| `registry.plugins_dir` | `REGISTRY_PLUGINS_DIR` | string | `/plugins` | Where plugin executables live (local mode) or are unpacked (object storage mode). Must be writable. A plugin's `command[0]` must resolve inside it. |
+| `registry.max_output_size` | `REGISTRY_MAX_OUTPUT_SIZE` | int64 | `67108864` | Largest plugin stdout, bytes. Larger output fails the generation. |
+| `registry.cache_max_bytes` | `REGISTRY_CACHE_MAX_BYTES` | int64 | `21474836480` | Bound on unpacked plugins on disk; least-recently-used versions are evicted beyond it. `0` disables eviction. Meaningful only with object storage. |
+| `registry.s3.endpoint` | `REGISTRY_S3_ENDPOINT` | string | — | S3 endpoint URL, e.g. `http://minio:9000`. Empty uses AWS. |
+| `registry.s3.bucket` | `REGISTRY_S3_BUCKET` | string | — | Bucket for plugin archives. **Empty disables object storage.** |
+| `registry.s3.region` | `REGISTRY_S3_REGION` | string | `us-east-1` | Region. |
+| `registry.s3.prefix` | `REGISTRY_S3_PREFIX` | string | — | Key prefix for archives. |
+| `registry.s3.access_key_id` | `REGISTRY_S3_ACCESS_KEY_ID` | string | — | Access key. When both keys are empty, the default AWS credential chain is used. |
+| `registry.s3.secret_access_key` | `REGISTRY_S3_SECRET_ACCESS_KEY` | string, secret | — | Secret key. |
+| `registry.s3.force_path_style` | `REGISTRY_S3_FORCE_PATH_STYLE` | bool | — (false) | Path-style addressing; required by MinIO and RustFS. |
+
+## worker_pool
+
+| YAML key | Environment | Type | Default | Description |
+|---|---|---|---|---|
+| `worker_pool.workers` | `WORKER_POOL_WORKERS` | int | `4` | Concurrent plugin lookups (database read, download on cache miss). Community caps it at 4. |
+| `worker_pool.queue_size` | `WORKER_POOL_QUEUE_SIZE` | int | `16` | Waiting room for lookups and for generations. Beyond it: `RESOURCE_EXHAUSTED` / `SERVER_OVERLOADED`. |
+| `worker_pool.max_concurrent_generations` | `WORKER_POOL_MAX_CONCURRENT_GENERATIONS` | int | `16` | Concurrent plugin processes. Community caps it at 16. |
+| `worker_pool.generation_timeout` | `WORKER_POOL_GENERATION_TIMEOUT` | duration | `120s` | Time one plugin run may take, excluding the wait for a slot. |
+| `worker_pool.max_retries` | `WORKER_POOL_MAX_RETRIES` | int | `2` | Extra attempts for errors containing `connection refused` or `temporary failure`. |
+| `worker_pool.shutdown_timeout` | `WORKER_POOL_SHUTDOWN_TIMEOUT` | duration | `30s` | Time the pool waits for queued lookups on shutdown. |
+
+Community ceilings lower `workers` and `max_concurrent_generations` at start and
+log `<setting> lowered to the licence tier's limit`; they do not refuse the
+configuration.
+
+## license
+
+| YAML key | Environment | Type | Default | Description |
+|---|---|---|---|---|
+| `license.key` | `LICENSE_KEY` | string, secret | — | PASETO v4.public licence token. Takes priority over `license.file`. |
+| `license.file` | `LICENSE_FILE` | string | — | Path to a file holding the token. |
+| `license.public_keys` | `LICENSE_PUBLIC_KEYS` | map key id → hex | — | Ed25519 public keys that may sign licences. Key id `"*"` verifies any token. Environment form: `<kid>:<hex>,<kid>:<hex>`. Without a key the token is ignored and the service runs as Community. |
+| `license.cache_ttl` | `LICENSE_CACHE_TTL` | duration | `5m` | How often the token is re-validated (expiry, grace). |
+
+## rate_limit
+
+| YAML key | Environment | Type | Default | Description |
+|---|---|---|---|---|
+| `rate_limit.requests_per_second` | `RATE_LIMIT_REQUESTS_PER_SECOND` | float | `10.0` | Token-bucket rate per client address. |
+| `rate_limit.burst` | `RATE_LIMIT_BURST` | int | `20` | Bucket size. |
+| `rate_limit.cleanup_interval` | `RATE_LIMIT_CLEANUP_INTERVAL` | duration | `10m` | How often idle client buckets are dropped. |
+| `rate_limit.max_concurrent_per_ip` | `RATE_LIMIT_MAX_CONCURRENT_PER_IP` | int | `2` | Requests one client address may have in flight. `0` disables the check. CI runners behind one NAT share an address. |
+
+## audit
+
+Audit rows are written only with an Enterprise licence.
+
+| YAML key | Environment | Type | Default | Description |
+|---|---|---|---|---|
+| `audit.buffer_size` | `AUDIT_BUFFER_SIZE` | int | `1000` | Queue between operations and the writer. |
+| `audit.batch_size` | `AUDIT_BATCH_SIZE` | int | `100` | Rows per insert. |
+| `audit.flush_interval` | `AUDIT_FLUSH_INTERVAL` | duration | `1s` | Flush period for partial batches. |
+| `audit.max_save_retries` | `AUDIT_MAX_SAVE_RETRIES` | int | `3` | Retries of a failed batch before it is counted as lost. |
+| `audit.enqueue_timeout` | `AUDIT_ENQUEUE_TIMEOUT` | duration | `1s` | How long an operation waits for queue space before dropping its entry. |
+| `audit.flush_timeout` | `AUDIT_FLUSH_TIMEOUT` | duration | `5s` | Bound on one write, retries included. |
+| `audit.retention_months` | `AUDIT_RETENTION_MONTHS` | int | `12` | Monthly partitions older than this are dropped — a real delete. |
+| `audit.pre_create_months` | `AUDIT_PRE_CREATE_MONTHS` | int | `3` | Partitions created ahead. |
+| `audit.partition_check_interval` | `AUDIT_PARTITION_CHECK_INTERVAL` | duration | `6h` | Partition maintenance period. |
+| `audit.partition_op_timeout` | `AUDIT_PARTITION_OP_TIMEOUT` | duration | `30s` | Bound on one partition create/drop. |
+
+## auth
+
+| YAML key | Environment | Type | Default | Description |
+|---|---|---|---|---|
+| `auth.write_tokens` | `AUTH_WRITE_TOKENS` | list of `{name, sha256}` | — | Tokens allowed to call `CreatePlugin`, `UpdatePlugin`, `DeletePlugin`. Only sha256 digests are stored. Environment form: `name=<64 hex>,name=<64 hex>`. **Empty denies all writes.** |
+| `auth.require_authentication` | `AUTH_REQUIRE_AUTHENTICATION` | bool | `false` | Require a token on every RPC (not Health) and on MCP. The easyp CLI cannot send a token, so it stops working against a service with this on. |
+
+## telemetry
+
+| YAML key | Environment | Type | Default | Description |
+|---|---|---|---|---|
+| `telemetry.otlp_endpoint` | `TELEMETRY_OTLP_ENDPOINT` | string | — | OTLP gRPC collector, `host:port` or `http://host:port`. Empty: no exporter is built. |
+| `telemetry.pyroscope_endpoint` | `TELEMETRY_PYROSCOPE_ENDPOINT` | string | — | Pyroscope server. Empty: no profiling. |
+| `telemetry.service_tier` | `TELEMETRY_SERVICE_TIER` | string | — | Tag for traces and profiles when Community and Enterprise deployments share backends. A value that disagrees with the licence tier sets `easyp_config_service_tier_mismatch`. |
+
+## mcp and log
+
+| YAML key | Environment | Type | Default | Description |
+|---|---|---|---|---|
+| `mcp.enabled` | `MCP_ENABLED` | bool | `false` | Serve `/mcp` on `server.port.mcp`. See [MCP](/docs/api-service/mcp). |
+| `log.level` | `LOG_LEVEL` | string | `info` | `debug`, `info`, `warn`, `error`. `--log-level` overrides it. |
+
+## Example file
+
+```yaml
+server:
+  tls:
+    cert_file: /certs/tls.crt
+    key_file: /certs/tls.key
+    client_ca_file: /certs/ca.crt
+  trusted_proxies: ["10.42.0.0/16"]
+
+registry:
+  plugins_dir: /plugins
+  s3:
+    endpoint: http://minio:9000
+    bucket: easyp-plugins
+    force_path_style: true
+
+worker_pool:
+  max_concurrent_generations: 16
+
+license:
+  public_keys:
+    "2026-08": "81322461987167d5cfd529e9cb8b96f4797f12fce6be4399a0866e250c9b6bb5"
+
+mcp:
+  enabled: false
+```
+
+Secrets — `DB_POSTGRES_DSN`, `REGISTRY_S3_ACCESS_KEY_ID`,
+`REGISTRY_S3_SECRET_ACCESS_KEY`, `LICENSE_KEY`, `AUTH_WRITE_TOKENS` — are better
+supplied through the environment than written into the file.
+
+<Callout type="info">
+This table was generated from the binary's own list of settings
+(`config.Leaves()` in `internal/config/fields.go`) for v1.0.2: 55 settings.
+`easyp-svc config print` on your version is the authority if they ever disagree.
+</Callout>
