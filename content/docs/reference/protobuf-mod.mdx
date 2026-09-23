@@ -24,7 +24,7 @@ The `protobuf.mod` file resides at the root of a Protocol Buffer module. Designe
       type: "directive block"
     },
     "require // indirect": {
-      description: "Transitive dependency marker automatically managed by 'easyp mod tidy'.",
+      description: "Transitive dependency marker written by 'easyp get' and 'easyp mod tidy'.",
       type: "annotation"
     },
     replace: {
@@ -63,7 +63,7 @@ replace github.com/acme/weather => ../weather-fork
 
 1. **Git-Native Identity**: The canonical identity of a module is its Git URL (e.g., `github.com/acme/weather`).
 2. **Per-Module Bounds**: Every module maintains its own independent `protobuf.mod`. MVS operates per-module rather than forcing global monorepo single-version constraints.
-3. **Replace Guardrail**: Local `replace` directives work during generation. `easyp mod tidy` and `easyp mod update` reject them until they are removed, so a reproducible Git lock never records a local path.
+3. **Replace Guardrail**: Local `replace` directives work during generation. `easyp get`, `easyp mod tidy`, and `easyp mod update` reject them until they are removed, so a reproducible Git lock never records a local path.
 
 For multiple modules in one repository, put a `protobuf.mod` in each module directory. Run `easyp mod tidy` from each local module directory; each writes its own `protobuf.lock`. `generate.modules` can select local modules by repository-relative path or module identity. A consumer declares each nested Git module separately by its declared identity. For example, `require github.com/acme/contracts/proto/user` needs no tag or manually supplied commit: `mod tidy` finds the repository's current HEAD and records its exact commit in `protobuf.lock`. Repeating `tidy` preserves that commit; `mod update` refreshes a versionless requirement to the current HEAD. An explicitly supplied full 40- or 64-character commit stays pinned during update. SemVer requirements remain supported for tagged releases; a nested module tagged `v1.2.3` uses `proto/user/v1.2.3`, matching the [Go multi-module tag convention](https://go.dev/ref/mod#mapping-versions-to-commits). Each required module has its own lock entry and source roots. A local `replace` can target a nested module directory.
 

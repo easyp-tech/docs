@@ -3,7 +3,7 @@ title: "protobuf.lock Reference"
 description: "Specification for protobuf.lock, the generated lockfile securing resolved Git commits, versions, and cryptographic hashes for hermetic builds."
 ---
 
-The `protobuf.lock` file is an auto-generated artifact created by EasyP dependency commands (`easyp mod tidy`, `easyp mod update`). It locks the exact transitive dependency graph to guarantee **100% hermetic, reproducible builds** across all local developer environments and CI pipelines.
+The `protobuf.lock` file is an auto-generated artifact created by EasyP dependency commands (`easyp get`, `easyp mod tidy`, `easyp mod update`). It locks the exact transitive dependency graph to guarantee **100% hermetic, reproducible builds** across all local developer environments and CI pipelines.
 
 ---
 
@@ -65,6 +65,7 @@ modules:
 
 ## Lifecycle Commands
 
+- `easyp get <module>[@version|@commit]`: Adds a direct requirement, records its transitive requirements as indirect, and updates `protobuf.lock`.
 - `easyp mod tidy`: Resolves required imports, updates indirect dependencies, and regenerates `protobuf.lock`.
 - `easyp mod update`: Upgrades tagged dependencies to latest semver-compatible versions, refreshes versionless requirements to Git HEAD, preserves explicit commit pins, and updates `protobuf.lock`.
 - `easyp mod download`: Populates local cache strictly using `protobuf.lock` without reaching out to remote registries or modifying locked versions.

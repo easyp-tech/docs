@@ -21,18 +21,20 @@ require (
 
 For a Git repository with multiple `protobuf.mod` files, require each nested module separately by the identity declared in its manifest. For untagged modules, write `require repo/foo` and `require repo/bar`; EasyP finds both manifests and locks the resolved commits without module-specific tags. Explicit commit hashes stay pinned during `mod update`. Tagged releases remain optional: a module in `foo/` uses a tag such as `foo/v1.2.3`. EasyP resolves each module's source roots independently.
 
+Run `easyp get <module>` from the directory containing your `protobuf.mod` to add a requirement without editing the file. Use `@v1.2.3` or `@<full-commit>` to select a specific version. A newly added requirement without a suffix resolves the current Git HEAD; repeating the command keeps its existing lock pin. The chosen module is a direct requirement; dependencies discovered through it are added to `protobuf.mod` with `// indirect`. Repeating the command does not duplicate requirements. If resolution fails, the manifest and lock are not changed.
+
 ## Commands
 
 | Command | Behavior |
 |---------|----------|
+| `easyp get <module>[@version\|@commit]` | Adds or promotes a direct requirement, resolves transitive requirements, and writes `protobuf.lock` |
 | `easyp mod tidy` | Resolves direct and transitive requirements and writes `protobuf.lock` |
 | `easyp mod download` | Downloads the exact commits in `protobuf.lock` and verifies their hashes |
 | `easyp mod update` | Refreshes requirements within their current major versions, then updates the lock |
 | `easyp mod vendor` | Verifies locked dependencies and copies their `.proto` files into `easyp_vendor` |
 
 ```bash
-easyp mod tidy
-easyp mod download
+easyp get github.com/acme/contracts/proto/user
 easyp mod vendor
 easyp generate
 ```
