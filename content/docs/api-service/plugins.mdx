@@ -19,7 +19,7 @@ configuration that matters.
 ## The catalogue
 
 The service repository's `registry/` directory holds a build recipe for every
-plugin easyp-tech publishes. In v1.0.2 that is **80 plugins with 1743 versions**
+plugin easyp-tech publishes. In v1.0.2 that is **80 plugins that build 1522 distinct versions** (1743 are listed; see the [catalog](/docs/api-service/plugin-catalog) for why)
 in ten groups:
 
 | Group | Plugins |
@@ -110,9 +110,17 @@ whose archive is absent fails with `FAILED_PRECONDITION` /
 `BINARY_NOT_UPLOADED`. The service computes the checksum itself, so a client
 cannot register a hash of its choosing.
 
-**`push --force` after register breaks the checksum.** The object changes under
-the recorded hash, and the next download fails with
-`plugin archive checksum mismatch`. Register again after re-pushing.
+### `push --force` after register breaks the checksum [#push-force-after-register]
+
+The object changes under
+the recorded hash. A service that already has the version unpacked keeps running
+the old binary, because the checksum is checked only on download; one with a cold
+cache fails with `plugin archive checksum mismatch`. Registering again does not
+help — `CreatePlugin` answers `ALREADY_EXISTS` and `plugins register` counts the
+version as skipped. Either publish the change as a new version, or delete the
+version first (`DeletePlugin` removes the row, the archive and the cached copy),
+then push and register. `UpdatePlugin` with a config recomputes the checksum
+but leaves an already unpacked copy in place.
 
 In **local mode** (no bucket) step 2 is skipped and the files must be present
 under `plugins_dir` on the service's disk — mounted, copied, or built into a

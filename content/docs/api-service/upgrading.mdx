@@ -154,8 +154,9 @@ Update now recomputes it, as Create does. **A plugin whose verification had been
 switched off this way is checked again on its next download**, and if the object
 in storage no longer matches what was registered it fails with
 `plugin archive checksum mismatch` instead of running. That is the correct
-outcome, but it can surface as a plugin that "suddenly broke": re-push the
-archive and re-register, or confirm why the object changed.
+outcome, but it can surface as a plugin that "suddenly broke": find out why the
+object changed, then restore the original archive or delete the version and
+push and register it again (registering over an existing version is skipped).
 
 ### Error messages changed shape
 

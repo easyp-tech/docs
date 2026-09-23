@@ -61,6 +61,15 @@ The service repository has a smoke client:
 go run ./cmd/mcp-smoke --endpoint http://localhost:23413/mcp
 ```
 
+<Callout type="warn">
+In the v1.0.2 tag this client still requires the `easyp_config_describe` tool,
+which the service stopped serving in v0.14.0, so against a healthy v1.0.2 it
+fails with `missing required tool "easyp_config_describe"; got: plugins_list`.
+The fix (commit `d5e0e43`) is on `master` but not in a release; run the client
+from `master`, or check with any MCP client that `tools/list` returns
+`plugins_list`.
+</Callout>
+
 Buf's registry also has an MCP server, with a different scope: it exposes the
 BSR Registry API (modules, commits, labels), including writes. See
 [EasyP vs Buf BSR](/docs/api-service/vs-buf-bsr).

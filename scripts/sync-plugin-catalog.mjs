@@ -32,7 +32,11 @@ function arg(name, fallback) {
 const serviceDir = path.resolve(ROOT, arg('service', '../service'))
 
 function git(...args) {
-  return execFileSync('git', ['-C', serviceDir, ...args], { encoding: 'utf8', maxBuffer: 64 << 20 })
+  return execFileSync('git', ['-C', serviceDir, ...args], {
+    encoding: 'utf8',
+    maxBuffer: 64 << 20,
+    stdio: ['ignore', 'pipe', 'pipe'],
+  })
 }
 
 function newestTag() {
@@ -57,6 +61,42 @@ function sourceOf(buildArgs = {}) {
   return null
 }
 
+function show(ref, file) {
+  try {
+    return git('show', `${ref}:${file}`)
+  } catch {
+    return null
+  }
+}
+
+// A recipe whose Dockerfile never reads VERSION, and whose versions carry no
+// overrides of their own, builds the same artifact for every listed version:
+// what gets installed is decided by the package.json or requirements.txt the
+// Dockerfile copies in. For those, the pinned package is the only version that
+// exists, and listing the rest would advertise binaries nobody can build.
+function pinnedBuild(ref, dir, doc, dockerfile) {
+  if (dockerfile === null) return null
+  const readsVersion = dockerfile.split('\n').some((line) => /VERSION/.test(line) && !/^\s*ARG\s+VERSION\b/.test(line))
+  const hasOverrides = (doc.versions ?? []).some((entry) => typeof entry === 'object' && (entry.build_args || entry.dockerfile))
+  if (readsVersion || hasOverrides || doc.dockerfile) return null
+
+  const packageJson = show(ref, `${dir}/package.json`)
+  if (packageJson !== null) {
+    const deps = JSON.parse(packageJson).dependencies ?? {}
+    const main = Object.keys(deps).find((dep) => dep !== 'esbuild' && dep !== 'typescript')
+    if (main) return { manager: 'npm', manifest: 'package.json', package: main, version: `v${semver.coerce(deps[main]).version}` }
+  }
+
+  const requirements = show(ref, `${dir}/requirements.txt`)
+  if (requirements !== null) {
+    const first = requirements.split('\n').map((l) => l.trim()).find((l) => l && !l.startsWith('#'))
+    const match = first?.match(/^([A-Za-z0-9_.-]+)==(.+)$/)
+    if (match) return { manager: 'pip', manifest: 'requirements.txt', package: match[1], version: `v${match[2]}` }
+  }
+
+  throw new Error(`${dir}: Dockerfile ignores VERSION but no pinned package was found`)
+}
+
 function readCatalog(ref) {
   const files = git('ls-tree', '-r', '--name-only', ref, 'registry')
     .split('\n')
@@ -64,14 +104,18 @@ function readCatalog(ref) {
 
   const plugins = files.map((file) => {
     const [, group, name] = file.split('/')
+    const dir = path.posix.dirname(file)
     const doc = YAML.parse(git('show', `${ref}:${file}`)) ?? {}
     const versions = (doc.versions ?? [])
       .map((entry) => (typeof entry === 'string' ? { version: entry } : entry))
       .filter((entry) => !entry.skip)
       .map((entry) => entry.version)
       .sort((a, b) => semver.rcompare(toSemver(a), toSemver(b)))
+    const pin = pinnedBuild(ref, dir, doc, show(ref, `${dir}/Dockerfile`))
+    // A single listed version that is the pinned one is simply correct.
+    const pinned = pin && !(versions.length === 1 && versions[0] === pin.version) ? pin : null
 
-    return { group, name, versions, source: sourceOf(doc.build_args) }
+    return { group, name, versions, pinned, source: sourceOf(doc.build_args) }
   })
 
   return plugins
@@ -83,11 +127,13 @@ const ref = arg('ref', undefined) ?? newestTag()
 const commit = git('rev-parse', `${ref}^{commit}`).trim()
 const plugins = readCatalog(ref)
 const versionCount = plugins.reduce((n, p) => n + p.versions.length, 0)
+const buildableCount = plugins.reduce((n, p) => n + (p.pinned ? 1 : p.versions.length), 0)
+const pinnedPlugins = plugins.filter((p) => p.pinned)
 
 const snapshot = {
   generatedBy: 'scripts/sync-plugin-catalog.mjs',
   service: { repository: REPO_URL, ref, commit },
-  counts: { plugins: plugins.length, versions: versionCount },
+  counts: { plugins: plugins.length, versions: versionCount, buildable: buildableCount, pinned: pinnedPlugins.length },
   plugins,
 }
 
@@ -96,19 +142,30 @@ fs.writeFileSync(path.join(ROOT, 'data/plugin-catalog.json'), `${JSON.stringify(
 
 const groups = [...new Set(plugins.map((p) => p.group))]
 
+const pinnedNames = pinnedPlugins.map((p) => `\`${p.group}/${p.name}\``).join(', ')
+
 const text = {
   en: {
     title: 'Plugin Catalog',
-    description: 'Every plugin recipe the EasyP API Service ships, with its versions.',
+    description: 'Every plugin recipe the EasyP API Service ships, with the versions each one can actually build.',
     intro: [
-      `This is the catalogue in the service repository at **${ref}**: **${plugins.length} plugins**`,
-      `in **${versionCount} versions**. Each entry is a build recipe in \`registry/\`, not a plugin that`,
+      `This is the catalogue in the service repository at **${ref}**: **${plugins.length} plugins** that can build`,
+      `**${buildableCount} distinct versions**. Each entry is a build recipe in \`registry/\`, not a plugin that`,
       'is running somewhere — a deployment has only the versions its operator built and registered',
       '(a Community licence allows 10). See [Plugins](/docs/api-service/plugins) for how to build and',
       'register them, and [Client usage](/docs/api-service/client-usage) for `easyp.yaml`.',
     ],
     usage: 'Once a version is registered on your service, reference it as:',
     pin: 'Always pin the version. Without one the service picks the registered version that sorts last *as a string*, so `v1.36.9` wins over `v1.36.10`. The versions below are sorted by semantic version, newest first.',
+    pinnedTitle: 'Recipes that build one version only',
+    pinned: [
+      `${pinnedPlugins.length} recipes — ${pinnedNames} — list several versions in \`plugin.yaml\` (${versionCount - buildableCount + pinnedPlugins.length} in total), but their`,
+      'Dockerfile never reads `VERSION`: it installs whatever `package.json` or `requirements.txt` pins. Every',
+      'listed version therefore builds the same binary, and registering it under a different version number',
+      'labels that binary with a version it is not. This catalogue shows only the pinned version for these recipes.',
+      'To get another version, change the pin in the recipe.',
+    ],
+    pinnedCell: (p) => `only \`${p.pinned.version}\` — \`${p.pinned.package}\` pinned in \`${p.pinned.manifest}\`; \`plugin.yaml\` lists ${p.versions.length}`,
     generated: `Generated from ${REPO_URL}/tree/${ref}/registry by \`npm run sync:plugins\`. Do not edit by hand.`,
     groupsHeading: 'Groups',
     groupCols: ['Group', 'Plugins', 'Versions'],
@@ -117,10 +174,10 @@ const text = {
   },
   ru: {
     title: 'Каталог плагинов',
-    description: 'Все рецепты плагинов, которые поставляет EasyP API Service, с их версиями.',
+    description: 'Все рецепты плагинов, которые поставляет EasyP API Service, и версии, которые каждый из них реально собирает.',
     intro: [
-      `Это каталог репозитория сервиса на **${ref}**: **${plugins.length} плагинов**`,
-      `в **${versionCount} версиях**. Каждая запись — рецепт сборки в \`registry/\`, а не плагин, который`,
+      `Это каталог репозитория сервиса на **${ref}**: **${plugins.length} плагинов**, из которых можно собрать`,
+      `**${buildableCount} различных версий**. Каждая запись — рецепт сборки в \`registry/\`, а не плагин, который`,
       'где-то уже работает: в развёртывании есть только версии, которые оператор собрал и',
       'зарегистрировал (лицензия Community допускает 10). Как их собрать и зарегистрировать —',
       'в [Плагинах](/ru/docs/api-service/plugins), как указать в `easyp.yaml` — в',
@@ -128,6 +185,15 @@ const text = {
     ],
     usage: 'Когда версия зарегистрирована на вашем сервисе, ссылайтесь на неё так:',
     pin: 'Всегда фиксируйте версию. Без неё сервис выбирает зарегистрированную версию, последнюю *при сравнении строк*, так что `v1.36.9` побеждает `v1.36.10`. Версии ниже отсортированы по семантической версии, самые новые первыми.',
+    pinnedTitle: 'Рецепты, которые собирают только одну версию',
+    pinned: [
+      `${pinnedPlugins.length} рецептов — ${pinnedNames} — перечисляют в \`plugin.yaml\` несколько версий (всего ${versionCount - buildableCount + pinnedPlugins.length}), но их`,
+      'Dockerfile не читает `VERSION`: он ставит то, что закреплено в `package.json` или `requirements.txt`. Поэтому',
+      'каждая перечисленная версия собирает один и тот же бинарник, а регистрация его под другим номером',
+      'подписывает бинарник чужой версией. Для этих рецептов каталог показывает только закреплённую версию.',
+      'Чтобы получить другую версию, измените закрепление в рецепте.',
+    ],
+    pinnedCell: (p) => `только \`${p.pinned.version}\` — \`${p.pinned.package}\` закреплён в \`${p.pinned.manifest}\`; в \`plugin.yaml\` перечислено ${p.versions.length}`,
     generated: `Сгенерировано из ${REPO_URL}/tree/${ref}/registry командой \`npm run sync:plugins\`. Не редактируйте вручную.`,
     groupsHeading: 'Группы',
     groupCols: ['Группа', 'Плагинов', 'Версий'],
@@ -141,6 +207,10 @@ function sourceCell(source) {
   if (source.kind === 'go') return `[Go \`${source.value}\`](https://pkg.go.dev/${source.value})`
   if (source.kind === 'crate') return `[crate \`${source.value}\`](https://crates.io/crates/${source.value})`
   return `[PyPI \`${source.value}\`](https://pypi.org/project/${source.value}/)`
+}
+
+function buildable(p) {
+  return p.pinned ? 1 : p.versions.length
 }
 
 function render(lang) {
@@ -168,24 +238,33 @@ function render(lang) {
     t.pin,
     '</Callout>',
     '',
+  ]
+
+  if (pinnedPlugins.length > 0) {
+    out.push('<Callout type="warn">', `**${t.pinnedTitle}.**`, ...t.pinned, '</Callout>', '')
+  }
+
+  out.push(
     `## ${t.groupsHeading}`,
     '',
     `| ${t.groupCols.join(' | ')} |`,
     '|---|---|---|',
     ...groups.map((g) => {
       const inGroup = plugins.filter((p) => p.group === g)
-      const n = inGroup.reduce((s, p) => s + p.versions.length, 0)
+      const n = inGroup.reduce((s, p) => s + buildable(p), 0)
       return `| [\`${g}\`](#${g}) | ${inGroup.length} | ${n} |`
     }),
     '',
-  ]
+  )
 
   for (const g of groups) {
     out.push(`## ${g}`, '', `| ${t.cols.join(' | ')} |`, '|---|---|---|---|---|')
     for (const p of plugins.filter((x) => x.group === g)) {
       const recipe = `${REPO_URL}/tree/${ref}/registry/${p.group}/${p.name}`
+      const newest = p.pinned ? p.pinned.version : p.versions[0]
+      const all = p.pinned ? t.pinnedCell(p) : p.versions.map((v) => `\`${v}\``).join(', ')
       out.push(
-        `| \`${p.group}/${p.name}\` ([${t.recipe}](${recipe})) | \`${p.versions[0]}\` | ${p.versions.length} | ${sourceCell(p.source)} | ${p.versions.map((v) => `\`${v}\``).join(', ')} |`,
+        `| \`${p.group}/${p.name}\` ([${t.recipe}](${recipe})) | \`${newest}\` | ${buildable(p)} | ${sourceCell(p.source)} | ${all} |`,
       )
     }
     out.push('')
@@ -198,4 +277,4 @@ const pageDir = path.join(ROOT, 'content/docs/api-service')
 fs.writeFileSync(path.join(pageDir, 'plugin-catalog.mdx'), render('en'))
 fs.writeFileSync(path.join(pageDir, 'plugin-catalog.ru.mdx'), render('ru'))
 
-console.log(`plugin catalogue ${ref} (${commit.slice(0, 7)}): ${plugins.length} plugins, ${versionCount} versions`)
+console.log(`plugin catalogue ${ref} (${commit.slice(0, 7)}): ${plugins.length} plugins, ${buildableCount} buildable versions (${versionCount} listed; ${pinnedPlugins.length} recipes pinned to one)`)

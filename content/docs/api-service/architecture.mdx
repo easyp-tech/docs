@@ -125,9 +125,13 @@ only points at them.
    `registry.cache_max_bytes` (20 GiB). The archive stays in storage.
 
 The order is therefore **build → push → register**. Re-pushing an archive with
-`--force` after registration changes the object under a recorded checksum, and
-the next download fails with `plugin archive checksum mismatch` until the
-plugin is registered again.
+`--force` after registration changes the object under a recorded checksum. A
+host that already has the version unpacked keeps running the old binary — the
+checksum is checked only on download — while a cold cache fails with
+`plugin archive checksum mismatch`. Registering again does not help: the
+version already exists and `plugins register` skips it. Publish a new version
+instead, or `DeletePlugin` the version (which removes the row, the archive and
+the cached copy), push, and register.
 
 A storage outage, or an archive that has disappeared from the bucket, fails
 generation with `UNAVAILABLE` / `STORAGE_UNAVAILABLE`.
