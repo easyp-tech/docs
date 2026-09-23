@@ -48,7 +48,13 @@ easyp breaking --path proto --against main
 
 `breaking` применяет ближайшую секцию `breaking` к каждому файлу с ошибкой. Если вложенные политики выбирают разные Git-базы, команда сравнивает файлы с каждой базой и относит ошибку только к выбравшей её политике.
 
-`validate-config --cfg <файл> --format json` принимает `easyp.yaml`, `easyp.gen.yaml`, `protobuf.mod` и `protobuf.lock`. Некорректная версия lock-файла, неполные записи и неверные хеши выдаются как ошибки проверки.
+`validate-config` рекурсивно проверяет все `easyp.yaml`, `easyp.gen.yaml`, `protobuf.mod` и `protobuf.lock` внутри текущего каталога. Передайте `--cfg <файл>`, чтобы проверить один файл, или `--cfg <каталог>`, чтобы проверить другой каталог. В JSON-ошибках указан файл, а для ошибок структуры YAML — строка и столбец. Некорректная версия lock-файла, неполные записи и неверные хеши выдаются как ошибки проверки.
+
+```bash
+easyp validate-config
+easyp validate-config --cfg ./services --format json
+easyp validate-config --cfg ./services/api/easyp.gen.yaml
+```
 
 `mod vendor` проверяет зафиксированные Git-зависимости и копирует их `.proto` в `easyp_vendor` по import path. Старый каталог заменяется только после успешного копирования всех файлов. Совпадающие import path вызывают ошибку. Сначала выполните `mod tidy`; локальные `replace` нельзя вендорить.
 
