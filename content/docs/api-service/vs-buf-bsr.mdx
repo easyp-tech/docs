@@ -34,7 +34,7 @@ and accept that plugins are not sandboxed.
 | Deployment | Public SaaS (`buf.build`); Pro: private instance on `<org>.buf.dev`; Enterprise: single-tenant or on-prem [¹](#sources) | Self-hosted only |
 | Where your `.proto` go during generation | To the BSR's plugin executor (buf.build, private instance, or your on-prem cluster) [²](#sources) | To your own service |
 | Plugin isolation | Sandbox with filesystem and network constraints [²](#sources) | None: child process on the host |
-| Public catalogue | bufbuild/plugins: 85 plugins, 1886 versions [³](#sources) | 80 plugins, 1738 versions (recipes; you build what you register) |
+| Public catalogue | bufbuild/plugins: 85 plugins, 1886 versions [³](#sources) | 80 plugins, 1743 versions (recipes; you build what you register) |
 | Private/custom plugins | Pro and above, on a private instance [⁴](#sources) | Any tier; Community allows 10 registered versions in total |
 | Generated SDKs via package managers | Yes: Go, npm, Maven/Gradle, PyPI, Cargo, Swift, NuGet, CMake, archives [⁵](#sources) | No |
 | Schema/module registry | Yes, same product | No (easyp CLI uses Git) |
