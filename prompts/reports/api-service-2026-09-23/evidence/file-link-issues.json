@@ -1,0 +1,32 @@
+[
+  {
+    "file": "content/docs/cli/configuration.mdx",
+    "link": "string",
+    "target": "cli/string"
+  },
+  {
+    "file": "content/docs/cli/configuration.ru.mdx",
+    "link": "string",
+    "target": "cli/string"
+  },
+  {
+    "file": "content/docs/guides/multi-target-generation.ru.mdx",
+    "link": "/ru/docs/guides/build-reproducibility",
+    "target": "guides/build-reproducibility"
+  },
+  {
+    "file": "content/docs/guides/breaking-checks-ci.ru.mdx",
+    "link": "/ru/docs/guides/adding-dependencies",
+    "target": "guides/adding-dependencies"
+  },
+  {
+    "file": "content/docs/guides/breaking-checks-ci.mdx",
+    "link": "/docs/guides/adding-dependencies",
+    "target": "guides/adding-dependencies"
+  },
+  {
+    "file": "content/docs/guides/multi-target-generation.mdx",
+    "link": "/docs/guides/build-reproducibility",
+    "target": "guides/build-reproducibility"
+  }
+]

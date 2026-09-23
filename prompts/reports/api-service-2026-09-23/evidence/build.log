@@ -1,0 +1,61 @@
+Автор: GPT-6 Astra Pro, 2026-09-23. Написано агентом, не человеком. Проверяйте выводы.
+
+
+> @easyp/docs@0.1.0 types:check
+> fumadocs-mdx && tsc --noEmit
+
+[MDX] generated files in 8.984708000000012ms
+
+TYPECHECK_EXIT=0
+
+> @easyp/docs@0.1.0 build
+> fumadocs-mdx && next build
+
+[MDX] generated files in 9.421125000000004ms
+▲ Next.js 16.3.0 (Turbopack)
+[MDX] generated files in 6.5217080000000465ms
+✓ Running next.config.mjs took 84ms
+
+  Creating an optimized production build ...
+✓ Compiled successfully in 1917ms
+  Running TypeScript ...
+  Finished TypeScript in 751ms ...
+  Collecting page data using 10 workers ...
+  Generating static pages using 10 workers (0/666) ...
+  Generating static pages using 10 workers (166/666)
+  Generating static pages using 10 workers (332/666)
+  Generating static pages using 10 workers (499/666)
+✓ Generating static pages using 10 workers (666/666) in 1914ms
+  Finalizing page optimization ...
+
+Route (app)                                                             Revalidate  Expire
+┌ ○ /                                                                           1h      1y
+├ ○ /_not-found
+├   /[lang]/docs/[[...slug]]
+│ ├ ● /en/docs
+│ ├ ● /en/docs/architecture/mvs-dependency-resolution
+│ ├ ● /en/docs/api-service/architecture
+│ └ ● [+217 more paths]
+├ ƒ /api/search
+├ ƒ /llms-full.txt
+├   /llms.mdx/docs/[[...slug]]
+│ ├ ● /llms.mdx/docs/content.md
+│ ├ ● /llms.mdx/docs/architecture/mvs-dependency-resolution/content.md
+│ ├ ● /llms.mdx/docs/api-service/architecture/content.md
+│ └ ● [+217 more paths]
+├ ○ /llms.txt
+└   /og/docs/[...slug]
+  ├ ● /og/docs/image.png
+  ├ ● /og/docs/architecture/mvs-dependency-resolution/image.png
+  ├ ● /og/docs/api-service/architecture/image.png
+  └ ● [+217 more paths]
+
+
+ƒ Proxy (Middleware)
+
+○  (Static)   prerendered as static content
+●  (SSG)      prerendered as static HTML (uses generateStaticParams)
+ƒ  (Dynamic)  server-rendered on demand
+
+
+BUILD_EXIT=0

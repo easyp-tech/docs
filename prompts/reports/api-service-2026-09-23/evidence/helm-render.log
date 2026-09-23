@@ -1,0 +1,84 @@
+Автор: GPT-6 Astra Pro, 2026-09-23. Написано агентом, не человеком. Проверяйте выводы.
+
+Helm v3.19.0; official archive SHA-256 verified: 31513e1193da4eb4ae042eb5f98ef9aca7890cfa136f4707c8d4f70e2115bef6
+== chart lint ==
+  ok    helm lint
+
+== licence public keys ==
+  ok    two keys reach the config file
+  ok    clearing the keys removes the section
+  ok    the defaults ship the published public key
+  ok    no private key reaches the rendered output
+  ok    mcp off by default: no listener, no service port, no config section
+  ok    mcp.enabled publishes the port and the config
+  ok    a key that is not 64 hex characters is rejected
+  ok    a non-hex key is rejected
+  ok    a key id containing a colon is rejected
+
+== numbers survive rendering ==
+  ok    large byte counts render as integers
+  ok    a volume smaller than the cache limit is rejected
+  ok    an unreadable volume size is rejected
+
+== the cache ceiling holds on both storage paths ==
+  ok    an emptyDir smaller than the cache limit is rejected
+  ok    an ephemeral-storage limit below the emptyDir limit is rejected
+  ok    the emptyDir carries a size limit
+  ok    ephemeral storage is declared
+
+== trusted proxies ==
+  ok    an ingress without trusted proxies is rejected
+  ok    trusted proxies reach the container
+  ok    no trusted proxies renders no key
+
+== message size limits ==
+  ok    message size limits render as integers
+  ok    send limit covers the plugin output cap
+
+== the rendered configuration ==
+  ok    the service accepts the rendered config
+  ok    values.yaml has not drifted from the binary's defaults
+
+== memory budget ==
+  ok    the default resources cover peak buffers
+  ok    concurrency beyond the memory limit is rejected
+  ok    a raised output cap beyond the memory limit is rejected
+  ok    no memory limit skips the check
+
+== rollout strategy ==
+  ok    a ReadWriteOnce volume forces Recreate
+  ok    a ReadWriteMany volume rolls
+  ok    no persistence rolls
+
+== network policy ==
+  ok    cert-manager issues the certificates the pod mounts
+
+  ok    the defaults ship a network policy
+
+== install paths a customer actually takes ==
+  ok    an install with only a DSN is refused, and the message names TLS
+  ok    the documented production path renders (cert-manager + ingress + mTLS)
+  ok    an ingress with no client certificate on either side is refused
+  ok    bring-your-own server certificate renders
+
+== alerting rules ==
+  ok    promtool accepts the rules (11 alerts)
+  ok    the generation error-rate alert can actually fire
+  ok    the expiry alert ignores installs with no licence
+  ok    runbookBaseUrl names the runbooks page
+  ok    every alert carries a runbook_url anchored on its own name
+  ok    promtool accepts the compose rules (11 alerts)
+  ok    the chart and the compose stack alert on the same things
+  ok    promtool accepts the host rules (6 alerts)
+  ok    every host alert carries a runbook_url anchored on its own name
+== compose mounts ==
+  ok    every path mimir.yaml names is mounted wherever mimir.yaml is (2 paths)
+== image tag ==
+  ok    the default image tag (v1.0.2) is shaped like a published release
+== certificates ==
+  ok    no container is given the CA private key
+  ok    every certificate a compose file mounts is one gen-dev-certs.sh writes
+
+all checks passed
+
+HELM_RENDER_EXIT=0

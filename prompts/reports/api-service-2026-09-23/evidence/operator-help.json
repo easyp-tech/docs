@@ -1,0 +1,82 @@
+{
+  "": {
+    "exit": 0,
+    "stdout": "NAME:\n   easyp-svc - EasyP Service CLI\n\nUSAGE:\n   easyp-svc [global options] [command [command options]]\n\nVERSION:\n   dev\n\nCOMMANDS:\n   service  Manage the easyp service\n   plugins  Manage plugins\n   auth     Manage credentials for the mutating API methods\n   api      Inspect the gRPC API contract\n   config   Inspect and check the service configuration\n   health   Exit 0 if the service answers its liveness endpoint, 1 otherwise\n   help, h  Shows a list of commands or help for one command\n\nGLOBAL OPTIONS:\n   --help, -h     show help\n   --version, -v  print the version\n",
+    "stderr": ""
+  },
+  "service": {
+    "exit": 0,
+    "stdout": "NAME:\n   easyp-svc service - Manage the easyp service\n\nUSAGE:\n   easyp-svc service [command [command options]]\n\nCOMMANDS:\n   start  Start the gRPC/MCP service\n\nOPTIONS:\n   --help, -h  show help\n",
+    "stderr": ""
+  },
+  "service start": {
+    "exit": 0,
+    "stdout": "NAME:\n   easyp-svc service start - Start the gRPC/MCP service\n\nUSAGE:\n   easyp-svc service start [options]\n\nOPTIONS:\n   --cfg string                            path to config file [$EASYP_CONFIG]\n   --log-level string, --log_level string  log level (debug, info, warn, error); overrides log.level from the configuration\n   --help, -h                              show help\n",
+    "stderr": ""
+  },
+  "plugins": {
+    "exit": 0,
+    "stdout": "NAME:\n   easyp-svc plugins - Manage plugins\n\nUSAGE:\n   easyp-svc plugins [command [command options]]\n\nCOMMANDS:\n   build     Build plugin binaries from registry Dockerfiles\n   pack      Pack built plugin version directories into tar.gz archives on disk\n   push      Upload built plugin archives to S3 binary storage\n   register  Register built plugin binaries with a running service via CreatePlugin\n\nOPTIONS:\n   --help, -h  show help\n",
+    "stderr": ""
+  },
+  "plugins build": {
+    "exit": 0,
+    "stdout": "NAME:\n   easyp-svc plugins build - Build plugin binaries from registry Dockerfiles\n\nUSAGE:\n   easyp-svc plugins build [options] <registry-path>\n\nOPTIONS:\n   --output string, -o string  output directory for built plugin binaries (default: \"plugins\")\n   --filter string             glob filter pattern for plugins (e.g. 'protocolbuffers/*' or 'grpc/go:v1.5.1')\n   --parallel int, -p int      number of concurrent docker builds (default: 4)\n   --force                     rebuild even if the binary already exists\n   --dry-run                   list what would be built without building\n   --non-interactive           disable interactive UI and dynamic progress bars\n   --keep-going                continue building remaining plugins after a failure\n   --help, -h                  show help\n",
+    "stderr": ""
+  },
+  "plugins pack": {
+    "exit": 0,
+    "stdout": "NAME:\n   easyp-svc plugins pack - Pack built plugin version directories into tar.gz archives on disk\n\nUSAGE:\n   easyp-svc plugins pack [options] [path]\n\nDESCRIPTION:\n   Writes each plugin version directory to {out}/{group}/{name}/{version}/plugin.tgz. The layout mirrors the S3 object keys used by `plugins push`, so a packed tree can be uploaded as-is later. Existing archives are skipped unless --force is set.\n\nOPTIONS:\n   --out string       directory to write archives to\n   --filter string    glob filter pattern for plugins (e.g. 'protocolbuffers/*' or 'grpc/go:v1.6.2')\n   --force            re-pack even if the archive already exists\n   --dry-run          print the pack plan without writing archives\n   --non-interactive  disable interactive UI and dynamic progress bars\n   --help, -h         show help\n",
+    "stderr": ""
+  },
+  "plugins push": {
+    "exit": 0,
+    "stdout": "NAME:\n   easyp-svc plugins push - Upload built plugin archives to S3 binary storage\n\nUSAGE:\n   easyp-svc plugins push [options] [path]\n\nDESCRIPTION:\n   Packs each plugin version directory into a tar.gz and uploads it to {group}/{name}/{version}/plugin.tgz. With --packed the path is instead a tree already written by `plugins pack`, whose archives are uploaded as they are. Run before `plugins register`: the service records the archive checksum at registration time. Re-pushing an already registered plugin with --force invalidates its recorded checksum — re-register it.\n\nOPTIONS:\n   --cfg string            path to service config YAML; registry.s3 is used for settings not passed as flags [$EASYP_CONFIG]\n   --bucket string         S3 bucket name (overrides registry.s3.bucket from --cfg)\n   --endpoint string       S3 endpoint URL, e.g. http://localhost:9000 for MinIO/RustFS\n   --region string         S3 region\n   --prefix string         S3 key prefix\n   --force-path-style      use path-style addressing (required by MinIO/RustFS)\n   --filter string         glob filter pattern for plugins (e.g. 'protocolbuffers/*' or 'grpc/go:v1.6.2')\n   --packed plugins pack   the path is a tree of archives written by plugins pack, not built plugin directories\n   --parallel int, -p int  archives to upload at once; storage usually caps a single connection, so more streams means more throughput (default: 8)\n   --force                 re-upload even if the archive already exists in storage\n   --dry-run               print the upload plan without contacting storage\n   --non-interactive       disable interactive UI and dynamic progress bars\n   --help, -h              show help\n",
+    "stderr": ""
+  },
+  "plugins register": {
+    "exit": 0,
+    "stdout": "NAME:\n   easyp-svc plugins register - Register built plugin binaries with a running service via CreatePlugin\n\nUSAGE:\n   easyp-svc plugins register [options] [path]\n\nDESCRIPTION:\n   Sends metadata and a command path for every plugin version found under the path. With --packed the path is a tree written by `plugins pack`, which names the same versions without holding their binaries — enough to register a catalogue from a machine that never built it, as long as the archives are already in storage.\n\nOPTIONS:\n   --addr string            gRPC server address (the chart publishes gRPC on 8080) (default: \"localhost:23410\")\n   --cfg string             path to service config YAML; registry.plugins_dir is used as --plugins-prefix when that flag is not set [$EASYP_CONFIG]\n   --filter string          glob filter pattern for plugins (e.g. 'connectrpc/*')\n   --packed plugins pack    the path is a tree of archives written by plugins pack, not built plugin directories\n   --parallel int, -p int   plugins to register at once; the server reads each archive from storage to checksum it, so this is worth raising, up to the server's rate_limit.max_concurrent_per_ip (default: 8)\n   --non-interactive        disable interactive UI and dynamic progress bars\n   --dry-run                scan and print planned CreatePlugin commands without contacting the server\n   --fail-on-error          exit with error if any plugin failed registration\n   --plugins-prefix string  prefix directory for plugins on the server (overrides registry.plugins_dir from --cfg) (default: \"/plugins\")\n   --tls-ca string          PEM bundle of the CA that signed the server certificate (default: system trust store)\n   --tls-cert string        client certificate presented to the server; required when the server enforces mTLS\n   --tls-key string         private key for --tls-cert\n   --insecure               connect over plaintext, disabling transport security entirely (local development only)\n   --token string           write token authorising CreatePlugin (falls back to EASYP_TOKEN)\n   --help, -h               show help\n",
+    "stderr": ""
+  },
+  "auth": {
+    "exit": 0,
+    "stdout": "NAME:\n   easyp-svc auth - Manage credentials for the mutating API methods\n\nUSAGE:\n   easyp-svc auth [command [command options]]\n\nCOMMANDS:\n   new-token  Generate a write token and print the config entry authorising it\n\nOPTIONS:\n   --help, -h  show help\n",
+    "stderr": ""
+  },
+  "auth new-token": {
+    "exit": 0,
+    "stdout": "NAME:\n   easyp-svc auth new-token - Generate a write token and print the config entry authorising it\n\nUSAGE:\n   easyp-svc auth new-token [options]\n\nOPTIONS:\n   --name string  label identifying this token in logs and the audit trail (default: \"unnamed\")\n   --help, -h     show help\n",
+    "stderr": ""
+  },
+  "api": {
+    "exit": 0,
+    "stdout": "NAME:\n   easyp-svc api - Inspect the gRPC API contract\n\nUSAGE:\n   easyp-svc api [command [command options]]\n\nCOMMANDS:\n   descriptor  Write a FileDescriptorSet for the API, for use with `grpcurl -protoset` (the server does not serve reflection)\n\nOPTIONS:\n   --help, -h  show help\n",
+    "stderr": ""
+  },
+  "api descriptor": {
+    "exit": 0,
+    "stdout": "NAME:\n   easyp-svc api descriptor - Write a FileDescriptorSet for the API, for use with `grpcurl -protoset` (the server does not serve reflection)\n\nUSAGE:\n   easyp-svc api descriptor [options]\n\nOPTIONS:\n   --output string, -o string  file to write to; \"-\" writes to stdout (default: \"-\")\n   --help, -h                  show help\n",
+    "stderr": ""
+  },
+  "config": {
+    "exit": 0,
+    "stdout": "NAME:\n   easyp-svc config - Inspect and check the service configuration\n\nUSAGE:\n   easyp-svc config [command [command options]]\n\nDESCRIPTION:\n   Settings come from three layers — the environment, the config file, and the defaults in the binary — and until now the only way to see what they resolved to was to start the service. Both subcommands resolve exactly as `service start` does; with no --cfg they read the environment alone, which is how a Helm deployment is configured.\n\nCOMMANDS:\n   validate  Check a configuration without starting the service\n   print     Print the configuration the service would run with\n\nOPTIONS:\n   --help, -h  show help\n",
+    "stderr": ""
+  },
+  "config validate": {
+    "exit": 0,
+    "stdout": "NAME:\n   easyp-svc config validate - Check a configuration without starting the service\n\nUSAGE:\n   easyp-svc config validate [options]\n\nOPTIONS:\n   --cfg string  path to config file; omit to check the environment alone [$EASYP_CONFIG]\n   --help, -h    show help\n",
+    "stderr": ""
+  },
+  "config print": {
+    "exit": 0,
+    "stdout": "NAME:\n   easyp-svc config print - Print the configuration the service would run with\n\nUSAGE:\n   easyp-svc config print [options]\n\nOPTIONS:\n   --cfg string    path to config file; omit to resolve from the environment alone [$EASYP_CONFIG]\n   --origin        annotate each setting with the layer it came from\n   --changed       print only the settings that differ from the built-in defaults, which is what a config file needs to state and no more\n   --show-secrets  print credentials instead of a placeholder; the output then belongs nowhere but a terminal\n   --help, -h      show help\n",
+    "stderr": ""
+  },
+  "health": {
+    "exit": 0,
+    "stdout": "NAME:\n   easyp-svc health - Exit 0 if the service answers its liveness endpoint, 1 otherwise\n\nUSAGE:\n   easyp-svc health [options]\n\nDESCRIPTION:\n   Meant for a container HEALTHCHECK, where no curl or wget is available. It probes /live, not readiness: readiness checks the database, and restarting a container every time the database blips turns a recoverable outage into a crash loop.\n\nOPTIONS:\n   --addr string  host:port of the health listener; derived from --cfg or the default port when empty\n   --cfg string   path to config file, used only to learn the health port [$EASYP_CONFIG]\n   --help, -h     show help\n",
+    "stderr": ""
+  }
+}

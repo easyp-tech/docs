@@ -1,0 +1,133 @@
+Автор: GPT-6 Astra Pro, 2026-09-23. Написано агентом, не человеком. Проверяйте выводы.
+
+$ docker image tag easyp-api-docs-audit:local easyp-service:local
+
+EXIT=0
+$ docker compose -p easyp-docs-audit-20260923-1790156574 -f <workspace>/scratch/demo/compose.yaml config --quiet
+
+EXIT=0
+$ docker compose -p easyp-docs-audit-20260923-1790156574 -f <workspace>/scratch/demo/compose.yaml up -d --wait --wait-timeout 120
+ Network easyp-docs-audit-20260923-1790156574_default Creating
+ Network easyp-docs-audit-20260923-1790156574_default Created
+ Volume easyp-docs-audit-20260923-1790156574_demo-db Creating
+ Volume easyp-docs-audit-20260923-1790156574_demo-db Created
+ Container easyp-docs-audit-20260923-1790156574-postgres-1 Creating
+ Container easyp-docs-audit-20260923-1790156574-postgres-1 Created
+ Container easyp-docs-audit-20260923-1790156574-service-1 Creating
+ Container easyp-docs-audit-20260923-1790156574-service-1 Created
+ Container easyp-docs-audit-20260923-1790156574-postgres-1 Starting
+ Container easyp-docs-audit-20260923-1790156574-postgres-1 Started
+ Container easyp-docs-audit-20260923-1790156574-postgres-1 Waiting
+ Container easyp-docs-audit-20260923-1790156574-postgres-1 Healthy
+ Container easyp-docs-audit-20260923-1790156574-service-1 Starting
+ Container easyp-docs-audit-20260923-1790156574-service-1 Started
+ Container easyp-docs-audit-20260923-1790156574-postgres-1 Waiting
+ Container easyp-docs-audit-20260923-1790156574-service-1 Waiting
+ Container easyp-docs-audit-20260923-1790156574-postgres-1 Healthy
+ Container easyp-docs-audit-20260923-1790156574-service-1 Healthy
+
+EXIT=0
+health /live 200
+health / 200
+$ <workspace>/scratch/easyp-svc plugins register --addr localhost:23410 --insecure --plugins-prefix /plugins --filter protocolbuffers/go:v1.36.11 --parallel 1 plugins
+Successfully registered protocolbuffers/go:v1.36.11
+
+Registration results:
+----------------------------------------
+Plugins found             : 1
+Registered                : 1
+Skipped (already exists)  : 0
+Failed                    : 0
+----------------------------------------
+
+EXIT=0
+$ <workspace>/scratch/easyp generate
+time=2026-09-23T12:43:03.456+03:00 level=INFO msg="starting code generation" directory=.
+time=2026-09-23T12:43:03.457+03:00 level=INFO msg="updating dependencies" count=0
+time=2026-09-23T12:43:03.457+03:00 level=INFO msg="update completed"
+time=2026-09-23T12:43:03.708+03:00 level=INFO msg="code generation completed"
+
+EXIT=0
+$ <workspace>/scratch/sdk-consumer -addr localhost:23410 -plaintext
+hello.pb.go: 3356 bytes
+
+EXIT=0
+GENERATED_FILE=<workspace>/scratch/demo/gen/proto/hello.pb.go SHA256=4e36eabd10374ff348da77c1819176fe85bd766a56ceeac209544a0b9c51fb7c
+$ docker compose -p easyp-docs-audit-20260923-1790156574 -f <workspace>/scratch/demo/compose.yaml stop postgres
+ Container easyp-docs-audit-20260923-1790156574-postgres-1 Stopping
+ Container easyp-docs-audit-20260923-1790156574-postgres-1 Stopped
+
+EXIT=0
+health /live 200
+health / 503
+$ docker compose -p easyp-docs-audit-20260923-1790156574 -f <workspace>/scratch/demo/compose.yaml up -d --wait postgres
+ Container easyp-docs-audit-20260923-1790156574-postgres-1 Starting
+ Container easyp-docs-audit-20260923-1790156574-postgres-1 Started
+ Container easyp-docs-audit-20260923-1790156574-postgres-1 Waiting
+ Container easyp-docs-audit-20260923-1790156574-postgres-1 Healthy
+
+EXIT=0
+health / 200
+$ docker compose -p easyp-docs-audit-20260923-1790156574 -f <workspace>/scratch/demo/compose.yaml exec -T postgres createdb -U easyp easyp_restore
+
+EXIT=0
+RESTORE_EXIT=0 DUMP_BYTES=21232
+$ docker compose -p easyp-docs-audit-20260923-1790156574 -f <workspace>/scratch/demo/compose.yaml exec -T postgres psql -U easyp -d easyp -Atc select count(*) from plugins;
+1
+
+EXIT=0
+$ docker compose -p easyp-docs-audit-20260923-1790156574 -f <workspace>/scratch/demo/compose.yaml exec -T postgres psql -U easyp -d easyp_restore -Atc select count(*) from plugins;
+1
+
+EXIT=0
+$ docker compose -p easyp-docs-audit-20260923-1790156574 -f <workspace>/scratch/demo/compose.yaml -f <workspace>/scratch/demo/restored.yaml up -d --wait service
+ Container easyp-docs-audit-20260923-1790156574-postgres-1 Running
+ Container easyp-docs-audit-20260923-1790156574-service-1 Recreate
+ Container easyp-docs-audit-20260923-1790156574-service-1 Recreated
+ Container easyp-docs-audit-20260923-1790156574-postgres-1 Waiting
+ Container easyp-docs-audit-20260923-1790156574-postgres-1 Healthy
+ Container easyp-docs-audit-20260923-1790156574-service-1 Starting
+ Container easyp-docs-audit-20260923-1790156574-service-1 Started
+ Container easyp-docs-audit-20260923-1790156574-postgres-1 Waiting
+ Container easyp-docs-audit-20260923-1790156574-service-1 Waiting
+ Container easyp-docs-audit-20260923-1790156574-postgres-1 Healthy
+ Container easyp-docs-audit-20260923-1790156574-service-1 Healthy
+
+EXIT=0
+$ <workspace>/scratch/easyp generate
+time=2026-09-23T12:43:15.925+03:00 level=INFO msg="starting code generation" directory=.
+time=2026-09-23T12:43:15.925+03:00 level=INFO msg="updating dependencies" count=0
+time=2026-09-23T12:43:15.925+03:00 level=INFO msg="update completed"
+time=2026-09-23T12:43:16.154+03:00 level=INFO msg="code generation completed"
+
+EXIT=0
+QUICKSTART_AND_LOCAL_RESTORE=PASS
+$ docker compose -p easyp-docs-audit-20260923-1790156574 -f <workspace>/scratch/demo/compose.yaml logs --no-color service
+service-1  | Starting easyp-svc with config: "/run/easyp/service.yaml"
+service-1  | {"time":"2026-09-23T09:43:10.342194719Z","level":"INFO","source":{"function":"main.logConfigSummary","file":"github.com/easyp-tech/service/cmd/easyp-svc/config.go","line":177},"msg":"configuration resolved","source":"/run/easyp/service.yaml","settings":55,"from_file":3,"from_environment":2,"at_defaults":50,"changed":"db:\n  postgres: \"***\"                                    # env DB_POSTGRES_DSN\nregistry:\n  cache_max_bytes: 0                                 # file\nauth:\n  write_tokens: [{name: local-registration, sha256: [disposable-token-digest-redacted]}] # env AUTH_WRITE_TOKENS\n"}
+service-1  | {"time":"2026-09-23T09:43:10.342423886Z","level":"INFO","source":{"function":"github.com/easyp-tech/service/internal/telemetry.Init","file":"github.com/easyp-tech/service/internal/telemetry/telemetry.go","line":104},"msg":"no OTLP endpoint configured, traces and metrics will not be exported","version":"v1.0.2-audit","app":"easyp"}
+service-1  | {"time":"2026-09-23T09:43:10.342603553Z","level":"INFO","source":{"function":"github.com/easyp-tech/service/internal/telemetry.Init","file":"github.com/easyp-tech/service/internal/telemetry/telemetry.go","line":163},"msg":"no Pyroscope endpoint configured, profiles will not be uploaded","version":"v1.0.2-audit","app":"easyp"}
+service-1  | {"time":"2026-09-23T09:43:10.344853594Z","level":"INFO","source":{"function":"main.startHealthServer","file":"github.com/easyp-tech/service/cmd/easyp-svc/start.go","line":381},"msg":"started health server","version":"v1.0.2-audit","app":"easyp","host":"0.0.0.0","port":23412}
+service-1  | {"time":"2026-09-23T09:43:10.352234053Z","level":"WARN","source":{"function":"github.com/easyp-tech/service/internal/grpchelper.BuildServerCreds","file":"github.com/easyp-tech/service/internal/grpchelper/tls.go","line":31},"msg":"gRPC server is running WITHOUT TLS: traffic is unencrypted and unauthenticated","version":"v1.0.2-audit","app":"easyp"}
+service-1  | {"time":"2026-09-23T09:43:10.353205344Z","level":"INFO","source":{"function":"main.serveApp","file":"github.com/easyp-tech/service/cmd/easyp-svc/start.go","line":871},"msg":"MCP endpoint disabled; set mcp.enabled to serve it","version":"v1.0.2-audit","app":"easyp","port":"23413"}
+service-1  | {"time":"2026-09-23T09:43:10.353391636Z","level":"INFO","source":{"function":"github.com/easyp-tech/service/internal/serve.HTTP.func1","file":"github.com/easyp-tech/service/internal/serve/http.go","line":27},"msg":"started HTTP server","version":"v1.0.2-audit","app":"easyp","module":"metric","host":"0.0.0.0","port":23411}
+service-1  | {"time":"2026-09-23T09:43:10.353458469Z","level":"INFO","source":{"function":"main.serveApp.GRPC.func2","file":"github.com/easyp-tech/service/internal/serve/grpc.go","line":24},"msg":"started gRPC server","version":"v1.0.2-audit","app":"easyp","module":"gRPC","host":"0.0.0.0","port":23410}
+service-1  | {"time":"2026-09-23T09:43:16.055256389Z","level":"INFO","source":{"function":"github.com/easyp-tech/service/internal/grpchelper.buildUnaryInterceptors.interceptorLogger.func3","file":"github.com/easyp-tech/service/internal/grpchelper/grpc_logs.go","line":38},"msg":"started call","version":"v1.0.2-audit","app":"easyp","trace_id":"72eca66af8c19bc4d40ddfa182282feb","span_id":"ad26efa8f043e8ab","protocol":"grpc","grpc.component":"server","grpc.service":"easyp.generator.v1.GeneratorAPI","grpc.method":"GenerateCode","grpc.method_type":"unary","peer.address":"172.18.0.1:61320","grpc.start_time":"2026-09-23T09:43:16Z","grpc.request.deadline":"2026-09-23T09:43:45Z","grpc.time_ms":"0.008"}
+service-1  | {"time":"2026-09-23T09:43:16.151061305Z","level":"INFO","source":{"function":"github.com/easyp-tech/service/internal/grpchelper.buildUnaryInterceptors.interceptorLogger.func3","file":"github.com/easyp-tech/service/internal/grpchelper/grpc_logs.go","line":38},"msg":"finished call","version":"v1.0.2-audit","app":"easyp","trace_id":"72eca66af8c19bc4d40ddfa182282feb","span_id":"ad26efa8f043e8ab","protocol":"grpc","grpc.component":"server","grpc.service":"easyp.generator.v1.GeneratorAPI","grpc.method":"GenerateCode","grpc.method_type":"unary","peer.address":"172.18.0.1:61320","grpc.start_time":"2026-09-23T09:43:16Z","grpc.request.deadline":"2026-09-23T09:43:45Z","grpc.code":"OK","grpc.time_ms":"95.814"}
+
+EXIT=0
+$ docker compose -p easyp-docs-audit-20260923-1790156574 -f <workspace>/scratch/demo/compose.yaml down --volumes
+ Container easyp-docs-audit-20260923-1790156574-service-1 Stopping
+ Container easyp-docs-audit-20260923-1790156574-service-1 Stopped
+ Container easyp-docs-audit-20260923-1790156574-service-1 Removing
+ Container easyp-docs-audit-20260923-1790156574-service-1 Removed
+ Container easyp-docs-audit-20260923-1790156574-postgres-1 Stopping
+ Container easyp-docs-audit-20260923-1790156574-postgres-1 Stopped
+ Container easyp-docs-audit-20260923-1790156574-postgres-1 Removing
+ Container easyp-docs-audit-20260923-1790156574-postgres-1 Removed
+ Volume easyp-docs-audit-20260923-1790156574_demo-db Removing
+ Network easyp-docs-audit-20260923-1790156574_default Removing
+ Volume easyp-docs-audit-20260923-1790156574_demo-db Removed
+ Network easyp-docs-audit-20260923-1790156574_default Removed
+
+EXIT=0

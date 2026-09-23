@@ -1,0 +1,50 @@
+Автор: GPT-6 Astra Pro, 2026-09-23. Написано агентом, не человеком. Проверяйте выводы.
+
+HTTP 200 /docs/api-service/overview
+HTTP 200 /docs/api-service/quickstart
+HTTP 200 /docs/api-service/architecture
+HTTP 200 /docs/api-service/installation
+HTTP 200 /docs/api-service/configuration
+HTTP 200 /docs/api-service/authentication-and-licensing
+HTTP 200 /docs/api-service/plugins
+HTTP 200 /docs/api-service/client-usage
+HTTP 200 /docs/api-service/operator-cli
+HTTP 200 /docs/api-service/observability
+HTTP 200 /docs/api-service/mcp
+HTTP 200 /docs/api-service/runbooks
+HTTP 200 /docs/api-service/backup
+HTTP 200 /docs/api-service/upgrading
+HTTP 200 /docs/api-service/vs-buf-bsr
+HTTP 200 /docs/api-service/migrating-from-bsr
+HTTP 200 /docs/api-service/security
+RUNBOOK_ANCHORS en 17 PASS
+HTTP 200 /ru/docs/api-service/overview
+HTTP 200 /ru/docs/api-service/quickstart
+HTTP 200 /ru/docs/api-service/architecture
+HTTP 200 /ru/docs/api-service/installation
+HTTP 200 /ru/docs/api-service/configuration
+HTTP 200 /ru/docs/api-service/authentication-and-licensing
+HTTP 200 /ru/docs/api-service/plugins
+HTTP 200 /ru/docs/api-service/client-usage
+HTTP 200 /ru/docs/api-service/operator-cli
+HTTP 200 /ru/docs/api-service/observability
+HTTP 200 /ru/docs/api-service/mcp
+HTTP 200 /ru/docs/api-service/runbooks
+HTTP 200 /ru/docs/api-service/backup
+HTTP 200 /ru/docs/api-service/upgrading
+HTTP 200 /ru/docs/api-service/vs-buf-bsr
+HTTP 200 /ru/docs/api-service/migrating-from-bsr
+HTTP 200 /ru/docs/api-service/security
+RUNBOOK_ANCHORS ru 17 PASS
+CONFIG_COVERAGE en 55 PASS
+CONFIG_COVERAGE ru 55 PASS
+EN_RU_STRUCTURE 17 PASS
+RAW_ENV_TAG_DECLARATIONS 76 PASS
+HELM_VALUES 117 PASS
+INTERNAL_LINK_TARGETS checked=242 api_errors=0 existing_elsewhere=6
+REPORTS 7 AUTHORSHIP PASS
+VALIDATION=PASS; navigation must also be checked after browser hydration
+
+NAVIGATION en 17 PASS (Chrome headless after hydration)
+NAVIGATION ru 17 PASS (production HTTP HTML)
+VISUAL_SMOKE overview-en.png inspected at 1440x1080: readable, no overlap
