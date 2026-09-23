@@ -1,0 +1,37 @@
+Автор: GPT-6 Astra Pro, 2026-09-23. Написано агентом, не человеком. Проверяйте выводы.
+
+/docs/api-service/overview 200
+/docs/api-service/quickstart 200
+/docs/api-service/architecture 200
+/docs/api-service/installation 200
+/docs/api-service/configuration 200
+/docs/api-service/authentication-and-licensing 200
+/docs/api-service/plugins 200
+/docs/api-service/client-usage 200
+/docs/api-service/operator-cli 200
+/docs/api-service/observability 200
+/docs/api-service/mcp 200
+/docs/api-service/runbooks 200
+/docs/api-service/backup 200
+/docs/api-service/upgrading 200
+/docs/api-service/vs-buf-bsr 200
+/docs/api-service/migrating-from-bsr 200
+/docs/api-service/security 200
+/ru/docs/api-service/overview 200
+/ru/docs/api-service/quickstart 200
+/ru/docs/api-service/architecture 200
+/ru/docs/api-service/installation 200
+/ru/docs/api-service/configuration 200
+/ru/docs/api-service/authentication-and-licensing 200
+/ru/docs/api-service/plugins 200
+/ru/docs/api-service/client-usage 200
+/ru/docs/api-service/operator-cli 200
+/ru/docs/api-service/observability 200
+/ru/docs/api-service/mcp 200
+/ru/docs/api-service/runbooks 200
+/ru/docs/api-service/backup 200
+/ru/docs/api-service/upgrading 200
+/ru/docs/api-service/vs-buf-bsr 200
+/ru/docs/api-service/migrating-from-bsr 200
+/ru/docs/api-service/security 200
+SUMMARY {"http_ok": 34, "http_total": 34, "runbooks_all": true, "navigation_all": false, "api_bad_links": 0, "site_bad_links": 66}

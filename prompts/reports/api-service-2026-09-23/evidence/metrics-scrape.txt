@@ -1,0 +1,549 @@
+# Автор: GPT-6 Astra Pro, 2026-09-23. Написано агентом, не человеком. Проверяйте выводы.
+# HELP easyp_api_grpc_server_handled_total Total number of RPCs completed on the server, regardless of success or failure.
+# TYPE easyp_api_grpc_server_handled_total counter
+easyp_api_grpc_server_handled_total{grpc_code="Aborted",grpc_method="Check",grpc_service="grpc.health.v1.Health",grpc_type="unary"} 0
+easyp_api_grpc_server_handled_total{grpc_code="Aborted",grpc_method="List",grpc_service="grpc.health.v1.Health",grpc_type="unary"} 0
+easyp_api_grpc_server_handled_total{grpc_code="Aborted",grpc_method="Watch",grpc_service="grpc.health.v1.Health",grpc_type="server_stream"} 0
+easyp_api_grpc_server_handled_total{grpc_code="AlreadyExists",grpc_method="Check",grpc_service="grpc.health.v1.Health",grpc_type="unary"} 0
+easyp_api_grpc_server_handled_total{grpc_code="AlreadyExists",grpc_method="List",grpc_service="grpc.health.v1.Health",grpc_type="unary"} 0
+easyp_api_grpc_server_handled_total{grpc_code="AlreadyExists",grpc_method="Watch",grpc_service="grpc.health.v1.Health",grpc_type="server_stream"} 0
+easyp_api_grpc_server_handled_total{grpc_code="Canceled",grpc_method="Check",grpc_service="grpc.health.v1.Health",grpc_type="unary"} 0
+easyp_api_grpc_server_handled_total{grpc_code="Canceled",grpc_method="List",grpc_service="grpc.health.v1.Health",grpc_type="unary"} 0
+easyp_api_grpc_server_handled_total{grpc_code="Canceled",grpc_method="Watch",grpc_service="grpc.health.v1.Health",grpc_type="server_stream"} 0
+easyp_api_grpc_server_handled_total{grpc_code="DataLoss",grpc_method="Check",grpc_service="grpc.health.v1.Health",grpc_type="unary"} 0
+easyp_api_grpc_server_handled_total{grpc_code="DataLoss",grpc_method="List",grpc_service="grpc.health.v1.Health",grpc_type="unary"} 0
+easyp_api_grpc_server_handled_total{grpc_code="DataLoss",grpc_method="Watch",grpc_service="grpc.health.v1.Health",grpc_type="server_stream"} 0
+easyp_api_grpc_server_handled_total{grpc_code="DeadlineExceeded",grpc_method="Check",grpc_service="grpc.health.v1.Health",grpc_type="unary"} 0
+easyp_api_grpc_server_handled_total{grpc_code="DeadlineExceeded",grpc_method="List",grpc_service="grpc.health.v1.Health",grpc_type="unary"} 0
+easyp_api_grpc_server_handled_total{grpc_code="DeadlineExceeded",grpc_method="Watch",grpc_service="grpc.health.v1.Health",grpc_type="server_stream"} 0
+easyp_api_grpc_server_handled_total{grpc_code="FailedPrecondition",grpc_method="Check",grpc_service="grpc.health.v1.Health",grpc_type="unary"} 0
+easyp_api_grpc_server_handled_total{grpc_code="FailedPrecondition",grpc_method="List",grpc_service="grpc.health.v1.Health",grpc_type="unary"} 0
+easyp_api_grpc_server_handled_total{grpc_code="FailedPrecondition",grpc_method="Watch",grpc_service="grpc.health.v1.Health",grpc_type="server_stream"} 0
+easyp_api_grpc_server_handled_total{grpc_code="Internal",grpc_method="Check",grpc_service="grpc.health.v1.Health",grpc_type="unary"} 0
+easyp_api_grpc_server_handled_total{grpc_code="Internal",grpc_method="List",grpc_service="grpc.health.v1.Health",grpc_type="unary"} 0
+easyp_api_grpc_server_handled_total{grpc_code="Internal",grpc_method="Watch",grpc_service="grpc.health.v1.Health",grpc_type="server_stream"} 0
+easyp_api_grpc_server_handled_total{grpc_code="InvalidArgument",grpc_method="Check",grpc_service="grpc.health.v1.Health",grpc_type="unary"} 0
+easyp_api_grpc_server_handled_total{grpc_code="InvalidArgument",grpc_method="List",grpc_service="grpc.health.v1.Health",grpc_type="unary"} 0
+easyp_api_grpc_server_handled_total{grpc_code="InvalidArgument",grpc_method="Watch",grpc_service="grpc.health.v1.Health",grpc_type="server_stream"} 0
+easyp_api_grpc_server_handled_total{grpc_code="NotFound",grpc_method="Check",grpc_service="grpc.health.v1.Health",grpc_type="unary"} 0
+easyp_api_grpc_server_handled_total{grpc_code="NotFound",grpc_method="List",grpc_service="grpc.health.v1.Health",grpc_type="unary"} 0
+easyp_api_grpc_server_handled_total{grpc_code="NotFound",grpc_method="Watch",grpc_service="grpc.health.v1.Health",grpc_type="server_stream"} 0
+easyp_api_grpc_server_handled_total{grpc_code="OK",grpc_method="Check",grpc_service="grpc.health.v1.Health",grpc_type="unary"} 0
+easyp_api_grpc_server_handled_total{grpc_code="OK",grpc_method="GenerateCode",grpc_service="easyp.generator.v1.GeneratorAPI",grpc_type="unary"} 1
+easyp_api_grpc_server_handled_total{grpc_code="OK",grpc_method="List",grpc_service="grpc.health.v1.Health",grpc_type="unary"} 0
+easyp_api_grpc_server_handled_total{grpc_code="OK",grpc_method="Plugins",grpc_service="easyp.generator.v1.GeneratorAPI",grpc_type="unary"} 1
+easyp_api_grpc_server_handled_total{grpc_code="OK",grpc_method="Watch",grpc_service="grpc.health.v1.Health",grpc_type="server_stream"} 0
+easyp_api_grpc_server_handled_total{grpc_code="OutOfRange",grpc_method="Check",grpc_service="grpc.health.v1.Health",grpc_type="unary"} 0
+easyp_api_grpc_server_handled_total{grpc_code="OutOfRange",grpc_method="List",grpc_service="grpc.health.v1.Health",grpc_type="unary"} 0
+easyp_api_grpc_server_handled_total{grpc_code="OutOfRange",grpc_method="Watch",grpc_service="grpc.health.v1.Health",grpc_type="server_stream"} 0
+easyp_api_grpc_server_handled_total{grpc_code="PermissionDenied",grpc_method="Check",grpc_service="grpc.health.v1.Health",grpc_type="unary"} 0
+easyp_api_grpc_server_handled_total{grpc_code="PermissionDenied",grpc_method="List",grpc_service="grpc.health.v1.Health",grpc_type="unary"} 0
+easyp_api_grpc_server_handled_total{grpc_code="PermissionDenied",grpc_method="Watch",grpc_service="grpc.health.v1.Health",grpc_type="server_stream"} 0
+easyp_api_grpc_server_handled_total{grpc_code="ResourceExhausted",grpc_method="Check",grpc_service="grpc.health.v1.Health",grpc_type="unary"} 0
+easyp_api_grpc_server_handled_total{grpc_code="ResourceExhausted",grpc_method="List",grpc_service="grpc.health.v1.Health",grpc_type="unary"} 0
+easyp_api_grpc_server_handled_total{grpc_code="ResourceExhausted",grpc_method="Watch",grpc_service="grpc.health.v1.Health",grpc_type="server_stream"} 0
+easyp_api_grpc_server_handled_total{grpc_code="Unauthenticated",grpc_method="Check",grpc_service="grpc.health.v1.Health",grpc_type="unary"} 0
+easyp_api_grpc_server_handled_total{grpc_code="Unauthenticated",grpc_method="GenerateCode",grpc_service="easyp.generator.v1.GeneratorAPI",grpc_type="unary"} 1
+easyp_api_grpc_server_handled_total{grpc_code="Unauthenticated",grpc_method="List",grpc_service="grpc.health.v1.Health",grpc_type="unary"} 0
+easyp_api_grpc_server_handled_total{grpc_code="Unauthenticated",grpc_method="Watch",grpc_service="grpc.health.v1.Health",grpc_type="server_stream"} 0
+easyp_api_grpc_server_handled_total{grpc_code="Unavailable",grpc_method="Check",grpc_service="grpc.health.v1.Health",grpc_type="unary"} 0
+easyp_api_grpc_server_handled_total{grpc_code="Unavailable",grpc_method="List",grpc_service="grpc.health.v1.Health",grpc_type="unary"} 0
+easyp_api_grpc_server_handled_total{grpc_code="Unavailable",grpc_method="Watch",grpc_service="grpc.health.v1.Health",grpc_type="server_stream"} 0
+easyp_api_grpc_server_handled_total{grpc_code="Unimplemented",grpc_method="Check",grpc_service="grpc.health.v1.Health",grpc_type="unary"} 0
+easyp_api_grpc_server_handled_total{grpc_code="Unimplemented",grpc_method="List",grpc_service="grpc.health.v1.Health",grpc_type="unary"} 0
+easyp_api_grpc_server_handled_total{grpc_code="Unimplemented",grpc_method="Watch",grpc_service="grpc.health.v1.Health",grpc_type="server_stream"} 0
+easyp_api_grpc_server_handled_total{grpc_code="Unknown",grpc_method="Check",grpc_service="grpc.health.v1.Health",grpc_type="unary"} 0
+easyp_api_grpc_server_handled_total{grpc_code="Unknown",grpc_method="List",grpc_service="grpc.health.v1.Health",grpc_type="unary"} 0
+easyp_api_grpc_server_handled_total{grpc_code="Unknown",grpc_method="Watch",grpc_service="grpc.health.v1.Health",grpc_type="server_stream"} 0
+# HELP easyp_api_grpc_server_handling_seconds Histogram of response latency (seconds) of gRPC that had been application-level handled by the server.
+# TYPE easyp_api_grpc_server_handling_seconds histogram
+easyp_api_grpc_server_handling_seconds_bucket{grpc_method="Check",grpc_service="grpc.health.v1.Health",grpc_type="unary",le="0.005"} 0
+easyp_api_grpc_server_handling_seconds_bucket{grpc_method="Check",grpc_service="grpc.health.v1.Health",grpc_type="unary",le="0.01"} 0
+easyp_api_grpc_server_handling_seconds_bucket{grpc_method="Check",grpc_service="grpc.health.v1.Health",grpc_type="unary",le="0.025"} 0
+easyp_api_grpc_server_handling_seconds_bucket{grpc_method="Check",grpc_service="grpc.health.v1.Health",grpc_type="unary",le="0.05"} 0
+easyp_api_grpc_server_handling_seconds_bucket{grpc_method="Check",grpc_service="grpc.health.v1.Health",grpc_type="unary",le="0.1"} 0
+easyp_api_grpc_server_handling_seconds_bucket{grpc_method="Check",grpc_service="grpc.health.v1.Health",grpc_type="unary",le="0.25"} 0
+easyp_api_grpc_server_handling_seconds_bucket{grpc_method="Check",grpc_service="grpc.health.v1.Health",grpc_type="unary",le="0.5"} 0
+easyp_api_grpc_server_handling_seconds_bucket{grpc_method="Check",grpc_service="grpc.health.v1.Health",grpc_type="unary",le="1"} 0
+easyp_api_grpc_server_handling_seconds_bucket{grpc_method="Check",grpc_service="grpc.health.v1.Health",grpc_type="unary",le="2.5"} 0
+easyp_api_grpc_server_handling_seconds_bucket{grpc_method="Check",grpc_service="grpc.health.v1.Health",grpc_type="unary",le="5"} 0
+easyp_api_grpc_server_handling_seconds_bucket{grpc_method="Check",grpc_service="grpc.health.v1.Health",grpc_type="unary",le="10"} 0
+easyp_api_grpc_server_handling_seconds_bucket{grpc_method="Check",grpc_service="grpc.health.v1.Health",grpc_type="unary",le="+Inf"} 0
+easyp_api_grpc_server_handling_seconds_sum{grpc_method="Check",grpc_service="grpc.health.v1.Health",grpc_type="unary"} 0
+easyp_api_grpc_server_handling_seconds_count{grpc_method="Check",grpc_service="grpc.health.v1.Health",grpc_type="unary"} 0
+easyp_api_grpc_server_handling_seconds_bucket{grpc_method="GenerateCode",grpc_service="easyp.generator.v1.GeneratorAPI",grpc_type="unary",le="0.005"} 1
+easyp_api_grpc_server_handling_seconds_bucket{grpc_method="GenerateCode",grpc_service="easyp.generator.v1.GeneratorAPI",grpc_type="unary",le="0.01"} 1
+easyp_api_grpc_server_handling_seconds_bucket{grpc_method="GenerateCode",grpc_service="easyp.generator.v1.GeneratorAPI",grpc_type="unary",le="0.025"} 1
+easyp_api_grpc_server_handling_seconds_bucket{grpc_method="GenerateCode",grpc_service="easyp.generator.v1.GeneratorAPI",grpc_type="unary",le="0.05"} 1
+easyp_api_grpc_server_handling_seconds_bucket{grpc_method="GenerateCode",grpc_service="easyp.generator.v1.GeneratorAPI",grpc_type="unary",le="0.1"} 2
+easyp_api_grpc_server_handling_seconds_bucket{grpc_method="GenerateCode",grpc_service="easyp.generator.v1.GeneratorAPI",grpc_type="unary",le="0.25"} 2
+easyp_api_grpc_server_handling_seconds_bucket{grpc_method="GenerateCode",grpc_service="easyp.generator.v1.GeneratorAPI",grpc_type="unary",le="0.5"} 2
+easyp_api_grpc_server_handling_seconds_bucket{grpc_method="GenerateCode",grpc_service="easyp.generator.v1.GeneratorAPI",grpc_type="unary",le="1"} 2
+easyp_api_grpc_server_handling_seconds_bucket{grpc_method="GenerateCode",grpc_service="easyp.generator.v1.GeneratorAPI",grpc_type="unary",le="2.5"} 2
+easyp_api_grpc_server_handling_seconds_bucket{grpc_method="GenerateCode",grpc_service="easyp.generator.v1.GeneratorAPI",grpc_type="unary",le="5"} 2
+easyp_api_grpc_server_handling_seconds_bucket{grpc_method="GenerateCode",grpc_service="easyp.generator.v1.GeneratorAPI",grpc_type="unary",le="10"} 2
+easyp_api_grpc_server_handling_seconds_bucket{grpc_method="GenerateCode",grpc_service="easyp.generator.v1.GeneratorAPI",grpc_type="unary",le="+Inf"} 2
+easyp_api_grpc_server_handling_seconds_sum{grpc_method="GenerateCode",grpc_service="easyp.generator.v1.GeneratorAPI",grpc_type="unary"} 0.08932049900000001
+easyp_api_grpc_server_handling_seconds_count{grpc_method="GenerateCode",grpc_service="easyp.generator.v1.GeneratorAPI",grpc_type="unary"} 2
+easyp_api_grpc_server_handling_seconds_bucket{grpc_method="List",grpc_service="grpc.health.v1.Health",grpc_type="unary",le="0.005"} 0
+easyp_api_grpc_server_handling_seconds_bucket{grpc_method="List",grpc_service="grpc.health.v1.Health",grpc_type="unary",le="0.01"} 0
+easyp_api_grpc_server_handling_seconds_bucket{grpc_method="List",grpc_service="grpc.health.v1.Health",grpc_type="unary",le="0.025"} 0
+easyp_api_grpc_server_handling_seconds_bucket{grpc_method="List",grpc_service="grpc.health.v1.Health",grpc_type="unary",le="0.05"} 0
+easyp_api_grpc_server_handling_seconds_bucket{grpc_method="List",grpc_service="grpc.health.v1.Health",grpc_type="unary",le="0.1"} 0
+easyp_api_grpc_server_handling_seconds_bucket{grpc_method="List",grpc_service="grpc.health.v1.Health",grpc_type="unary",le="0.25"} 0
+easyp_api_grpc_server_handling_seconds_bucket{grpc_method="List",grpc_service="grpc.health.v1.Health",grpc_type="unary",le="0.5"} 0
+easyp_api_grpc_server_handling_seconds_bucket{grpc_method="List",grpc_service="grpc.health.v1.Health",grpc_type="unary",le="1"} 0
+easyp_api_grpc_server_handling_seconds_bucket{grpc_method="List",grpc_service="grpc.health.v1.Health",grpc_type="unary",le="2.5"} 0
+easyp_api_grpc_server_handling_seconds_bucket{grpc_method="List",grpc_service="grpc.health.v1.Health",grpc_type="unary",le="5"} 0
+easyp_api_grpc_server_handling_seconds_bucket{grpc_method="List",grpc_service="grpc.health.v1.Health",grpc_type="unary",le="10"} 0
+easyp_api_grpc_server_handling_seconds_bucket{grpc_method="List",grpc_service="grpc.health.v1.Health",grpc_type="unary",le="+Inf"} 0
+easyp_api_grpc_server_handling_seconds_sum{grpc_method="List",grpc_service="grpc.health.v1.Health",grpc_type="unary"} 0
+easyp_api_grpc_server_handling_seconds_count{grpc_method="List",grpc_service="grpc.health.v1.Health",grpc_type="unary"} 0
+easyp_api_grpc_server_handling_seconds_bucket{grpc_method="Plugins",grpc_service="easyp.generator.v1.GeneratorAPI",grpc_type="unary",le="0.005"} 1
+easyp_api_grpc_server_handling_seconds_bucket{grpc_method="Plugins",grpc_service="easyp.generator.v1.GeneratorAPI",grpc_type="unary",le="0.01"} 1
+easyp_api_grpc_server_handling_seconds_bucket{grpc_method="Plugins",grpc_service="easyp.generator.v1.GeneratorAPI",grpc_type="unary",le="0.025"} 1
+easyp_api_grpc_server_handling_seconds_bucket{grpc_method="Plugins",grpc_service="easyp.generator.v1.GeneratorAPI",grpc_type="unary",le="0.05"} 1
+easyp_api_grpc_server_handling_seconds_bucket{grpc_method="Plugins",grpc_service="easyp.generator.v1.GeneratorAPI",grpc_type="unary",le="0.1"} 1
+easyp_api_grpc_server_handling_seconds_bucket{grpc_method="Plugins",grpc_service="easyp.generator.v1.GeneratorAPI",grpc_type="unary",le="0.25"} 1
+easyp_api_grpc_server_handling_seconds_bucket{grpc_method="Plugins",grpc_service="easyp.generator.v1.GeneratorAPI",grpc_type="unary",le="0.5"} 1
+easyp_api_grpc_server_handling_seconds_bucket{grpc_method="Plugins",grpc_service="easyp.generator.v1.GeneratorAPI",grpc_type="unary",le="1"} 1
+easyp_api_grpc_server_handling_seconds_bucket{grpc_method="Plugins",grpc_service="easyp.generator.v1.GeneratorAPI",grpc_type="unary",le="2.5"} 1
+easyp_api_grpc_server_handling_seconds_bucket{grpc_method="Plugins",grpc_service="easyp.generator.v1.GeneratorAPI",grpc_type="unary",le="5"} 1
+easyp_api_grpc_server_handling_seconds_bucket{grpc_method="Plugins",grpc_service="easyp.generator.v1.GeneratorAPI",grpc_type="unary",le="10"} 1
+easyp_api_grpc_server_handling_seconds_bucket{grpc_method="Plugins",grpc_service="easyp.generator.v1.GeneratorAPI",grpc_type="unary",le="+Inf"} 1
+easyp_api_grpc_server_handling_seconds_sum{grpc_method="Plugins",grpc_service="easyp.generator.v1.GeneratorAPI",grpc_type="unary"} 0.002030208
+easyp_api_grpc_server_handling_seconds_count{grpc_method="Plugins",grpc_service="easyp.generator.v1.GeneratorAPI",grpc_type="unary"} 1
+easyp_api_grpc_server_handling_seconds_bucket{grpc_method="Watch",grpc_service="grpc.health.v1.Health",grpc_type="server_stream",le="0.005"} 0
+easyp_api_grpc_server_handling_seconds_bucket{grpc_method="Watch",grpc_service="grpc.health.v1.Health",grpc_type="server_stream",le="0.01"} 0
+easyp_api_grpc_server_handling_seconds_bucket{grpc_method="Watch",grpc_service="grpc.health.v1.Health",grpc_type="server_stream",le="0.025"} 0
+easyp_api_grpc_server_handling_seconds_bucket{grpc_method="Watch",grpc_service="grpc.health.v1.Health",grpc_type="server_stream",le="0.05"} 0
+easyp_api_grpc_server_handling_seconds_bucket{grpc_method="Watch",grpc_service="grpc.health.v1.Health",grpc_type="server_stream",le="0.1"} 0
+easyp_api_grpc_server_handling_seconds_bucket{grpc_method="Watch",grpc_service="grpc.health.v1.Health",grpc_type="server_stream",le="0.25"} 0
+easyp_api_grpc_server_handling_seconds_bucket{grpc_method="Watch",grpc_service="grpc.health.v1.Health",grpc_type="server_stream",le="0.5"} 0
+easyp_api_grpc_server_handling_seconds_bucket{grpc_method="Watch",grpc_service="grpc.health.v1.Health",grpc_type="server_stream",le="1"} 0
+easyp_api_grpc_server_handling_seconds_bucket{grpc_method="Watch",grpc_service="grpc.health.v1.Health",grpc_type="server_stream",le="2.5"} 0
+easyp_api_grpc_server_handling_seconds_bucket{grpc_method="Watch",grpc_service="grpc.health.v1.Health",grpc_type="server_stream",le="5"} 0
+easyp_api_grpc_server_handling_seconds_bucket{grpc_method="Watch",grpc_service="grpc.health.v1.Health",grpc_type="server_stream",le="10"} 0
+easyp_api_grpc_server_handling_seconds_bucket{grpc_method="Watch",grpc_service="grpc.health.v1.Health",grpc_type="server_stream",le="+Inf"} 0
+easyp_api_grpc_server_handling_seconds_sum{grpc_method="Watch",grpc_service="grpc.health.v1.Health",grpc_type="server_stream"} 0
+easyp_api_grpc_server_handling_seconds_count{grpc_method="Watch",grpc_service="grpc.health.v1.Health",grpc_type="server_stream"} 0
+# HELP easyp_api_grpc_server_msg_received_total Total number of RPC stream messages received on the server.
+# TYPE easyp_api_grpc_server_msg_received_total counter
+easyp_api_grpc_server_msg_received_total{grpc_method="Check",grpc_service="grpc.health.v1.Health",grpc_type="unary"} 0
+easyp_api_grpc_server_msg_received_total{grpc_method="GenerateCode",grpc_service="easyp.generator.v1.GeneratorAPI",grpc_type="unary"} 2
+easyp_api_grpc_server_msg_received_total{grpc_method="List",grpc_service="grpc.health.v1.Health",grpc_type="unary"} 0
+easyp_api_grpc_server_msg_received_total{grpc_method="Plugins",grpc_service="easyp.generator.v1.GeneratorAPI",grpc_type="unary"} 1
+easyp_api_grpc_server_msg_received_total{grpc_method="Watch",grpc_service="grpc.health.v1.Health",grpc_type="server_stream"} 0
+# HELP easyp_api_grpc_server_msg_sent_total Total number of gRPC stream messages sent by the server.
+# TYPE easyp_api_grpc_server_msg_sent_total counter
+easyp_api_grpc_server_msg_sent_total{grpc_method="Check",grpc_service="grpc.health.v1.Health",grpc_type="unary"} 0
+easyp_api_grpc_server_msg_sent_total{grpc_method="GenerateCode",grpc_service="easyp.generator.v1.GeneratorAPI",grpc_type="unary"} 2
+easyp_api_grpc_server_msg_sent_total{grpc_method="List",grpc_service="grpc.health.v1.Health",grpc_type="unary"} 0
+easyp_api_grpc_server_msg_sent_total{grpc_method="Plugins",grpc_service="easyp.generator.v1.GeneratorAPI",grpc_type="unary"} 1
+easyp_api_grpc_server_msg_sent_total{grpc_method="Watch",grpc_service="grpc.health.v1.Health",grpc_type="server_stream"} 0
+# HELP easyp_api_grpc_server_started_total Total number of RPCs started on the server.
+# TYPE easyp_api_grpc_server_started_total counter
+easyp_api_grpc_server_started_total{grpc_method="Check",grpc_service="grpc.health.v1.Health",grpc_type="unary"} 0
+easyp_api_grpc_server_started_total{grpc_method="GenerateCode",grpc_service="easyp.generator.v1.GeneratorAPI",grpc_type="unary"} 2
+easyp_api_grpc_server_started_total{grpc_method="List",grpc_service="grpc.health.v1.Health",grpc_type="unary"} 0
+easyp_api_grpc_server_started_total{grpc_method="Plugins",grpc_service="easyp.generator.v1.GeneratorAPI",grpc_type="unary"} 1
+easyp_api_grpc_server_started_total{grpc_method="Watch",grpc_service="grpc.health.v1.Health",grpc_type="server_stream"} 0
+# HELP easyp_audit_batch_size Number of audit entries written per batch.
+# TYPE easyp_audit_batch_size histogram
+easyp_audit_batch_size_bucket{le="1"} 0
+easyp_audit_batch_size_bucket{le="2"} 0
+easyp_audit_batch_size_bucket{le="4"} 0
+easyp_audit_batch_size_bucket{le="8"} 0
+easyp_audit_batch_size_bucket{le="16"} 0
+easyp_audit_batch_size_bucket{le="32"} 0
+easyp_audit_batch_size_bucket{le="64"} 0
+easyp_audit_batch_size_bucket{le="128"} 0
+easyp_audit_batch_size_bucket{le="256"} 0
+easyp_audit_batch_size_bucket{le="512"} 0
+easyp_audit_batch_size_bucket{le="+Inf"} 0
+easyp_audit_batch_size_sum 0
+easyp_audit_batch_size_count 0
+# HELP easyp_audit_default_partition_used 1 when rows have landed in the default audit partition. Must stay 0: a non-empty default partition blocks creating the month it overlaps, and defeats partition pruning for every query filtering on created_at.
+# TYPE easyp_audit_default_partition_used gauge
+easyp_audit_default_partition_used 0
+# HELP easyp_audit_events_lost_total Total number of audit events lost, by reason.
+# TYPE easyp_audit_events_lost_total counter
+easyp_audit_events_lost_total{reason="enqueue_timeout"} 0
+easyp_audit_events_lost_total{reason="save_failed"} 0
+easyp_audit_events_lost_total{reason="shutdown_timeout"} 0
+# HELP easyp_audit_events_skipped_total Total number of audit events not recorded because the license does not include audit.
+# TYPE easyp_audit_events_skipped_total counter
+easyp_audit_events_skipped_total 3
+# HELP easyp_audit_partition_maintenance_last_success_seconds Unix timestamp of the last successful audit partition maintenance pass.
+# TYPE easyp_audit_partition_maintenance_last_success_seconds gauge
+easyp_audit_partition_maintenance_last_success_seconds 1.7901568675453434e+09
+# HELP easyp_audit_partition_maintenance_runs_total Total number of audit partition maintenance passes, by result.
+# TYPE easyp_audit_partition_maintenance_runs_total counter
+easyp_audit_partition_maintenance_runs_total{result="error"} 0
+easyp_audit_partition_maintenance_runs_total{result="skipped"} 0
+easyp_audit_partition_maintenance_runs_total{result="success"} 1
+# HELP easyp_audit_partitions_created_total Total number of audit_log partitions created.
+# TYPE easyp_audit_partitions_created_total counter
+easyp_audit_partitions_created_total 4
+# HELP easyp_audit_partitions_current Current number of monthly audit_log partitions.
+# TYPE easyp_audit_partitions_current gauge
+easyp_audit_partitions_current 4
+# HELP easyp_audit_partitions_dropped_total Total number of expired audit_log partitions dropped.
+# TYPE easyp_audit_partitions_dropped_total counter
+easyp_audit_partitions_dropped_total 0
+# HELP easyp_audit_queue_depth Current number of audit events in the queue.
+# TYPE easyp_audit_queue_depth gauge
+easyp_audit_queue_depth 0
+# HELP easyp_audit_save_failures_total Total number of failed audit write attempts, including those a retry later recovered.
+# TYPE easyp_audit_save_failures_total counter
+easyp_audit_save_failures_total 0
+# HELP easyp_auth_failures_total Total number of rejected authentication attempts.
+# TYPE easyp_auth_failures_total counter
+easyp_auth_failures_total{reason="no_credentials"} 1
+# HELP easyp_business_audit_log_total Approximate number of audit log entries, from the planner's row estimate. Lags bulk changes until autovacuum runs.
+# TYPE easyp_business_audit_log_total gauge
+easyp_business_audit_log_total 0
+# HELP easyp_business_plugin_versions_count Number of unique versions per plugin.
+# TYPE easyp_business_plugin_versions_count gauge
+easyp_business_plugin_versions_count{group="protocolbuffers",name="go"} 1
+# HELP easyp_business_plugins_by_group Number of plugins per group.
+# TYPE easyp_business_plugins_by_group gauge
+easyp_business_plugins_by_group{group="protocolbuffers"} 1
+# HELP easyp_business_plugins_total Total number of registered plugins.
+# TYPE easyp_business_plugins_total gauge
+easyp_business_plugins_total 1
+# HELP easyp_concurrency_active_clients Number of clients with at least one request in flight.
+# TYPE easyp_concurrency_active_clients gauge
+easyp_concurrency_active_clients 0
+# HELP easyp_concurrency_rejected_total Total requests rejected for exceeding the per-client concurrency limit.
+# TYPE easyp_concurrency_rejected_total counter
+easyp_concurrency_rejected_total 0
+# HELP easyp_config_service_tier_mismatch 1 when telemetry.service_tier disagrees with the licence tier this deployment resolved, which makes every tier-labelled metric and trace misleading.
+# TYPE easyp_config_service_tier_mismatch gauge
+easyp_config_service_tier_mismatch 0
+# HELP easyp_db_idle_connections Number of idle connections in the pool.
+# TYPE easyp_db_idle_connections gauge
+easyp_db_idle_connections 0
+# HELP easyp_db_open_connections Number of open connections to the database.
+# TYPE easyp_db_open_connections gauge
+easyp_db_open_connections 1
+# HELP easyp_db_wait_count_total Total number of connections waited for.
+# TYPE easyp_db_wait_count_total counter
+easyp_db_wait_count_total 0
+# HELP easyp_db_wait_duration_seconds_total Total time blocked waiting for a new connection.
+# TYPE easyp_db_wait_duration_seconds_total counter
+easyp_db_wait_duration_seconds_total 0
+# HELP easyp_generated_plugin_code_total Total number of generated code requests by plugin.
+# TYPE easyp_generated_plugin_code_total counter
+easyp_generated_plugin_code_total{plugin="protocolbuffers/go:v1.36.11"} 1
+# HELP easyp_generation_duration_seconds Duration of code generation in seconds.
+# TYPE easyp_generation_duration_seconds histogram
+easyp_generation_duration_seconds_bucket{plugin="protocolbuffers/go:v1.36.11",le="0.005"} 0
+easyp_generation_duration_seconds_bucket{plugin="protocolbuffers/go:v1.36.11",le="0.01"} 0
+easyp_generation_duration_seconds_bucket{plugin="protocolbuffers/go:v1.36.11",le="0.025"} 0
+easyp_generation_duration_seconds_bucket{plugin="protocolbuffers/go:v1.36.11",le="0.05"} 0
+easyp_generation_duration_seconds_bucket{plugin="protocolbuffers/go:v1.36.11",le="0.1"} 1
+easyp_generation_duration_seconds_bucket{plugin="protocolbuffers/go:v1.36.11",le="0.25"} 1
+easyp_generation_duration_seconds_bucket{plugin="protocolbuffers/go:v1.36.11",le="0.5"} 1
+easyp_generation_duration_seconds_bucket{plugin="protocolbuffers/go:v1.36.11",le="1"} 1
+easyp_generation_duration_seconds_bucket{plugin="protocolbuffers/go:v1.36.11",le="2.5"} 1
+easyp_generation_duration_seconds_bucket{plugin="protocolbuffers/go:v1.36.11",le="5"} 1
+easyp_generation_duration_seconds_bucket{plugin="protocolbuffers/go:v1.36.11",le="10"} 1
+easyp_generation_duration_seconds_bucket{plugin="protocolbuffers/go:v1.36.11",le="+Inf"} 1
+easyp_generation_duration_seconds_sum{plugin="protocolbuffers/go:v1.36.11"} 0.086258792
+easyp_generation_duration_seconds_count{plugin="protocolbuffers/go:v1.36.11"} 1
+# HELP easyp_license_expiry_timestamp_seconds Unix timestamp the licence expires at; 0 when no licence is configured.
+# TYPE easyp_license_expiry_timestamp_seconds gauge
+easyp_license_expiry_timestamp_seconds 0
+# HELP easyp_license_feature_denied_total Total number of feature access denials.
+# TYPE easyp_license_feature_denied_total counter
+easyp_license_feature_denied_total{feature="audit"} 3
+# HELP easyp_license_in_grace Whether the licence has expired and the service is running on its grace period (1) or not (0).
+# TYPE easyp_license_in_grace gauge
+easyp_license_in_grace 0
+# HELP easyp_license_valid Whether an Enterprise licence is in force (1) or the service runs in community mode (0).
+# TYPE easyp_license_valid gauge
+easyp_license_valid 0
+# HELP easyp_operations_total Total operations performed, by type and outcome. Counted in every tier, audit or not.
+# TYPE easyp_operations_total counter
+easyp_operations_total{operation="GENERATE_CODE",status="success"} 1
+easyp_operations_total{operation="LIST_PLUGINS",status="success"} 2
+# HELP easyp_panics_total Total number of panics recovered, in gRPC handlers and in background goroutines.
+# TYPE easyp_panics_total counter
+easyp_panics_total 0
+# HELP easyp_pool_active_workers Number of workers currently processing jobs.
+# TYPE easyp_pool_active_workers gauge
+easyp_pool_active_workers 0
+# HELP easyp_pool_generations_active Number of plugin processes currently running.
+# TYPE easyp_pool_generations_active gauge
+easyp_pool_generations_active 0
+# HELP easyp_pool_generations_rejected_total Total generations rejected because the wait queue was full.
+# TYPE easyp_pool_generations_rejected_total counter
+easyp_pool_generations_rejected_total 0
+# HELP easyp_pool_generations_waiting Number of requests waiting for a generation slot.
+# TYPE easyp_pool_generations_waiting gauge
+easyp_pool_generations_waiting 0
+# HELP easyp_pool_jobs_total Total number of jobs accepted into the queue.
+# TYPE easyp_pool_jobs_total counter
+easyp_pool_jobs_total 1
+# HELP easyp_pool_queue_depth Current number of jobs in the worker pool queue.
+# TYPE easyp_pool_queue_depth gauge
+easyp_pool_queue_depth 0
+# HELP easyp_pool_rejected_total Total number of jobs rejected due to full queue.
+# TYPE easyp_pool_rejected_total counter
+easyp_pool_rejected_total 0
+# HELP easyp_rate_limit_active_clients Current number of active client buckets
+# TYPE easyp_rate_limit_active_clients gauge
+easyp_rate_limit_active_clients 1
+# HELP easyp_rate_limit_requests_total Total number of requests processed by rate limiter
+# TYPE easyp_rate_limit_requests_total counter
+easyp_rate_limit_requests_total{status="allowed"} 3
+# HELP easyp_repo_call_duration_seconds DAL call latency.
+# TYPE easyp_repo_call_duration_seconds histogram
+easyp_repo_call_duration_seconds_bucket{func="Create",le="0.005"} 0
+easyp_repo_call_duration_seconds_bucket{func="Create",le="0.01"} 0
+easyp_repo_call_duration_seconds_bucket{func="Create",le="0.025"} 0
+easyp_repo_call_duration_seconds_bucket{func="Create",le="0.05"} 0
+easyp_repo_call_duration_seconds_bucket{func="Create",le="0.1"} 0
+easyp_repo_call_duration_seconds_bucket{func="Create",le="0.25"} 0
+easyp_repo_call_duration_seconds_bucket{func="Create",le="0.5"} 0
+easyp_repo_call_duration_seconds_bucket{func="Create",le="1"} 0
+easyp_repo_call_duration_seconds_bucket{func="Create",le="2.5"} 0
+easyp_repo_call_duration_seconds_bucket{func="Create",le="5"} 0
+easyp_repo_call_duration_seconds_bucket{func="Create",le="10"} 0
+easyp_repo_call_duration_seconds_bucket{func="Create",le="+Inf"} 0
+easyp_repo_call_duration_seconds_sum{func="Create"} 0
+easyp_repo_call_duration_seconds_count{func="Create"} 0
+easyp_repo_call_duration_seconds_bucket{func="Delete",le="0.005"} 0
+easyp_repo_call_duration_seconds_bucket{func="Delete",le="0.01"} 0
+easyp_repo_call_duration_seconds_bucket{func="Delete",le="0.025"} 0
+easyp_repo_call_duration_seconds_bucket{func="Delete",le="0.05"} 0
+easyp_repo_call_duration_seconds_bucket{func="Delete",le="0.1"} 0
+easyp_repo_call_duration_seconds_bucket{func="Delete",le="0.25"} 0
+easyp_repo_call_duration_seconds_bucket{func="Delete",le="0.5"} 0
+easyp_repo_call_duration_seconds_bucket{func="Delete",le="1"} 0
+easyp_repo_call_duration_seconds_bucket{func="Delete",le="2.5"} 0
+easyp_repo_call_duration_seconds_bucket{func="Delete",le="5"} 0
+easyp_repo_call_duration_seconds_bucket{func="Delete",le="10"} 0
+easyp_repo_call_duration_seconds_bucket{func="Delete",le="+Inf"} 0
+easyp_repo_call_duration_seconds_sum{func="Delete"} 0
+easyp_repo_call_duration_seconds_count{func="Delete"} 0
+easyp_repo_call_duration_seconds_bucket{func="DropExpiredPartitions",le="0.005"} 1
+easyp_repo_call_duration_seconds_bucket{func="DropExpiredPartitions",le="0.01"} 1
+easyp_repo_call_duration_seconds_bucket{func="DropExpiredPartitions",le="0.025"} 1
+easyp_repo_call_duration_seconds_bucket{func="DropExpiredPartitions",le="0.05"} 1
+easyp_repo_call_duration_seconds_bucket{func="DropExpiredPartitions",le="0.1"} 1
+easyp_repo_call_duration_seconds_bucket{func="DropExpiredPartitions",le="0.25"} 1
+easyp_repo_call_duration_seconds_bucket{func="DropExpiredPartitions",le="0.5"} 1
+easyp_repo_call_duration_seconds_bucket{func="DropExpiredPartitions",le="1"} 1
+easyp_repo_call_duration_seconds_bucket{func="DropExpiredPartitions",le="2.5"} 1
+easyp_repo_call_duration_seconds_bucket{func="DropExpiredPartitions",le="5"} 1
+easyp_repo_call_duration_seconds_bucket{func="DropExpiredPartitions",le="10"} 1
+easyp_repo_call_duration_seconds_bucket{func="DropExpiredPartitions",le="+Inf"} 1
+easyp_repo_call_duration_seconds_sum{func="DropExpiredPartitions"} 0.001369334
+easyp_repo_call_duration_seconds_count{func="DropExpiredPartitions"} 1
+easyp_repo_call_duration_seconds_bucket{func="EnsurePartitions",le="0.005"} 1
+easyp_repo_call_duration_seconds_bucket{func="EnsurePartitions",le="0.01"} 1
+easyp_repo_call_duration_seconds_bucket{func="EnsurePartitions",le="0.025"} 1
+easyp_repo_call_duration_seconds_bucket{func="EnsurePartitions",le="0.05"} 1
+easyp_repo_call_duration_seconds_bucket{func="EnsurePartitions",le="0.1"} 1
+easyp_repo_call_duration_seconds_bucket{func="EnsurePartitions",le="0.25"} 1
+easyp_repo_call_duration_seconds_bucket{func="EnsurePartitions",le="0.5"} 1
+easyp_repo_call_duration_seconds_bucket{func="EnsurePartitions",le="1"} 1
+easyp_repo_call_duration_seconds_bucket{func="EnsurePartitions",le="2.5"} 1
+easyp_repo_call_duration_seconds_bucket{func="EnsurePartitions",le="5"} 1
+easyp_repo_call_duration_seconds_bucket{func="EnsurePartitions",le="10"} 1
+easyp_repo_call_duration_seconds_bucket{func="EnsurePartitions",le="+Inf"} 1
+easyp_repo_call_duration_seconds_sum{func="EnsurePartitions"} 0.000561042
+easyp_repo_call_duration_seconds_count{func="EnsurePartitions"} 1
+easyp_repo_call_duration_seconds_bucket{func="Get",le="0.005"} 1
+easyp_repo_call_duration_seconds_bucket{func="Get",le="0.01"} 1
+easyp_repo_call_duration_seconds_bucket{func="Get",le="0.025"} 1
+easyp_repo_call_duration_seconds_bucket{func="Get",le="0.05"} 1
+easyp_repo_call_duration_seconds_bucket{func="Get",le="0.1"} 1
+easyp_repo_call_duration_seconds_bucket{func="Get",le="0.25"} 1
+easyp_repo_call_duration_seconds_bucket{func="Get",le="0.5"} 1
+easyp_repo_call_duration_seconds_bucket{func="Get",le="1"} 1
+easyp_repo_call_duration_seconds_bucket{func="Get",le="2.5"} 1
+easyp_repo_call_duration_seconds_bucket{func="Get",le="5"} 1
+easyp_repo_call_duration_seconds_bucket{func="Get",le="10"} 1
+easyp_repo_call_duration_seconds_bucket{func="Get",le="+Inf"} 1
+easyp_repo_call_duration_seconds_sum{func="Get"} 0.001975542
+easyp_repo_call_duration_seconds_count{func="Get"} 1
+easyp_repo_call_duration_seconds_bucket{func="List",le="0.005"} 2
+easyp_repo_call_duration_seconds_bucket{func="List",le="0.01"} 2
+easyp_repo_call_duration_seconds_bucket{func="List",le="0.025"} 2
+easyp_repo_call_duration_seconds_bucket{func="List",le="0.05"} 2
+easyp_repo_call_duration_seconds_bucket{func="List",le="0.1"} 2
+easyp_repo_call_duration_seconds_bucket{func="List",le="0.25"} 2
+easyp_repo_call_duration_seconds_bucket{func="List",le="0.5"} 2
+easyp_repo_call_duration_seconds_bucket{func="List",le="1"} 2
+easyp_repo_call_duration_seconds_bucket{func="List",le="2.5"} 2
+easyp_repo_call_duration_seconds_bucket{func="List",le="5"} 2
+easyp_repo_call_duration_seconds_bucket{func="List",le="10"} 2
+easyp_repo_call_duration_seconds_bucket{func="List",le="+Inf"} 2
+easyp_repo_call_duration_seconds_sum{func="List"} 0.002127333
+easyp_repo_call_duration_seconds_count{func="List"} 2
+easyp_repo_call_duration_seconds_bucket{func="Update",le="0.005"} 0
+easyp_repo_call_duration_seconds_bucket{func="Update",le="0.01"} 0
+easyp_repo_call_duration_seconds_bucket{func="Update",le="0.025"} 0
+easyp_repo_call_duration_seconds_bucket{func="Update",le="0.05"} 0
+easyp_repo_call_duration_seconds_bucket{func="Update",le="0.1"} 0
+easyp_repo_call_duration_seconds_bucket{func="Update",le="0.25"} 0
+easyp_repo_call_duration_seconds_bucket{func="Update",le="0.5"} 0
+easyp_repo_call_duration_seconds_bucket{func="Update",le="1"} 0
+easyp_repo_call_duration_seconds_bucket{func="Update",le="2.5"} 0
+easyp_repo_call_duration_seconds_bucket{func="Update",le="5"} 0
+easyp_repo_call_duration_seconds_bucket{func="Update",le="10"} 0
+easyp_repo_call_duration_seconds_bucket{func="Update",le="+Inf"} 0
+easyp_repo_call_duration_seconds_sum{func="Update"} 0
+easyp_repo_call_duration_seconds_count{func="Update"} 0
+easyp_repo_call_duration_seconds_bucket{func="observeDefaultPartition",le="0.005"} 1
+easyp_repo_call_duration_seconds_bucket{func="observeDefaultPartition",le="0.01"} 1
+easyp_repo_call_duration_seconds_bucket{func="observeDefaultPartition",le="0.025"} 1
+easyp_repo_call_duration_seconds_bucket{func="observeDefaultPartition",le="0.05"} 1
+easyp_repo_call_duration_seconds_bucket{func="observeDefaultPartition",le="0.1"} 1
+easyp_repo_call_duration_seconds_bucket{func="observeDefaultPartition",le="0.25"} 1
+easyp_repo_call_duration_seconds_bucket{func="observeDefaultPartition",le="0.5"} 1
+easyp_repo_call_duration_seconds_bucket{func="observeDefaultPartition",le="1"} 1
+easyp_repo_call_duration_seconds_bucket{func="observeDefaultPartition",le="2.5"} 1
+easyp_repo_call_duration_seconds_bucket{func="observeDefaultPartition",le="5"} 1
+easyp_repo_call_duration_seconds_bucket{func="observeDefaultPartition",le="10"} 1
+easyp_repo_call_duration_seconds_bucket{func="observeDefaultPartition",le="+Inf"} 1
+easyp_repo_call_duration_seconds_sum{func="observeDefaultPartition"} 0.0004555
+easyp_repo_call_duration_seconds_count{func="observeDefaultPartition"} 1
+# HELP easyp_repo_errors_total Amount of DAL errors.
+# TYPE easyp_repo_errors_total counter
+easyp_repo_errors_total{func="Create"} 0
+easyp_repo_errors_total{func="Delete"} 0
+easyp_repo_errors_total{func="Get"} 0
+easyp_repo_errors_total{func="List"} 0
+easyp_repo_errors_total{func="Update"} 0
+# HELP go_gc_duration_seconds A summary of the wall-time pause (stop-the-world) duration in garbage collection cycles.
+# TYPE go_gc_duration_seconds summary
+go_gc_duration_seconds{quantile="0"} 0.000105708
+go_gc_duration_seconds{quantile="0.25"} 0.000105708
+go_gc_duration_seconds{quantile="0.5"} 0.001264375
+go_gc_duration_seconds{quantile="0.75"} 0.001264375
+go_gc_duration_seconds{quantile="1"} 0.001264375
+go_gc_duration_seconds_sum 0.001370083
+go_gc_duration_seconds_count 2
+# HELP go_gc_gogc_percent Heap size target percentage configured by the user, otherwise 100. This value is set by the GOGC environment variable, and the runtime/debug.SetGCPercent function. Sourced from /gc/gogc:percent.
+# TYPE go_gc_gogc_percent gauge
+go_gc_gogc_percent 100
+# HELP go_gc_gomemlimit_bytes Go runtime memory limit configured by the user, otherwise math.MaxInt64. This value is set by the GOMEMLIMIT environment variable, and the runtime/debug.SetMemoryLimit function. Sourced from /gc/gomemlimit:bytes.
+# TYPE go_gc_gomemlimit_bytes gauge
+go_gc_gomemlimit_bytes 9.223372036854776e+18
+# HELP go_goroutines Number of goroutines that currently exist.
+# TYPE go_goroutines gauge
+go_goroutines 30
+# HELP go_info Information about the Go environment.
+# TYPE go_info gauge
+go_info{version="go1.26.8"} 1
+# HELP go_memstats_alloc_bytes Number of bytes allocated in heap and currently in use. Equals to /memory/classes/heap/objects:bytes.
+# TYPE go_memstats_alloc_bytes gauge
+go_memstats_alloc_bytes 3.118392e+06
+# HELP go_memstats_alloc_bytes_total Total number of bytes allocated in heap until now, even if released already. Equals to /gc/heap/allocs:bytes.
+# TYPE go_memstats_alloc_bytes_total counter
+go_memstats_alloc_bytes_total 4.482704e+06
+# HELP go_memstats_buck_hash_sys_bytes Number of bytes used by the profiling bucket hash table. Equals to /memory/classes/profiling/buckets:bytes.
+# TYPE go_memstats_buck_hash_sys_bytes gauge
+go_memstats_buck_hash_sys_bytes 1.450997e+06
+# HELP go_memstats_frees_total Total number of heap objects frees. Equals to /gc/heap/frees:objects + /gc/heap/tiny/allocs:objects.
+# TYPE go_memstats_frees_total counter
+go_memstats_frees_total 14737
+# HELP go_memstats_gc_sys_bytes Number of bytes used for garbage collection system metadata. Equals to /memory/classes/metadata/other:bytes.
+# TYPE go_memstats_gc_sys_bytes gauge
+go_memstats_gc_sys_bytes 3.319536e+06
+# HELP go_memstats_heap_alloc_bytes Number of heap bytes allocated and currently in use, same as go_memstats_alloc_bytes. Equals to /memory/classes/heap/objects:bytes.
+# TYPE go_memstats_heap_alloc_bytes gauge
+go_memstats_heap_alloc_bytes 3.118392e+06
+# HELP go_memstats_heap_idle_bytes Number of heap bytes waiting to be used. Equals to /memory/classes/heap/released:bytes + /memory/classes/heap/free:bytes.
+# TYPE go_memstats_heap_idle_bytes gauge
+go_memstats_heap_idle_bytes 5.758976e+06
+# HELP go_memstats_heap_inuse_bytes Number of heap bytes that are in use. Equals to /memory/classes/heap/objects:bytes + /memory/classes/heap/unused:bytes
+# TYPE go_memstats_heap_inuse_bytes gauge
+go_memstats_heap_inuse_bytes 5.677056e+06
+# HELP go_memstats_heap_objects Number of currently allocated objects. Equals to /gc/heap/objects:objects.
+# TYPE go_memstats_heap_objects gauge
+go_memstats_heap_objects 13343
+# HELP go_memstats_heap_released_bytes Number of heap bytes released to OS. Equals to /memory/classes/heap/released:bytes.
+# TYPE go_memstats_heap_released_bytes gauge
+go_memstats_heap_released_bytes 5.7344e+06
+# HELP go_memstats_heap_sys_bytes Number of heap bytes obtained from system. Equals to /memory/classes/heap/objects:bytes + /memory/classes/heap/unused:bytes + /memory/classes/heap/released:bytes + /memory/classes/heap/free:bytes.
+# TYPE go_memstats_heap_sys_bytes gauge
+go_memstats_heap_sys_bytes 1.1436032e+07
+# HELP go_memstats_last_gc_time_seconds Number of seconds since 1970 of last garbage collection.
+# TYPE go_memstats_last_gc_time_seconds gauge
+go_memstats_last_gc_time_seconds 1.7901568732690394e+09
+# HELP go_memstats_mallocs_total Total number of heap objects allocated, both live and gc-ed. Semantically a counter version for go_memstats_heap_objects gauge. Equals to /gc/heap/allocs:objects + /gc/heap/tiny/allocs:objects.
+# TYPE go_memstats_mallocs_total counter
+go_memstats_mallocs_total 28080
+# HELP go_memstats_mcache_inuse_bytes Number of bytes in use by mcache structures. Equals to /memory/classes/metadata/mcache/inuse:bytes.
+# TYPE go_memstats_mcache_inuse_bytes gauge
+go_memstats_mcache_inuse_bytes 32144
+# HELP go_memstats_mcache_sys_bytes Number of bytes used for mcache structures obtained from system. Equals to /memory/classes/metadata/mcache/inuse:bytes + /memory/classes/metadata/mcache/free:bytes.
+# TYPE go_memstats_mcache_sys_bytes gauge
+go_memstats_mcache_sys_bytes 32144
+# HELP go_memstats_mspan_inuse_bytes Number of bytes in use by mspan structures. Equals to /memory/classes/metadata/mspan/inuse:bytes.
+# TYPE go_memstats_mspan_inuse_bytes gauge
+go_memstats_mspan_inuse_bytes 137120
+# HELP go_memstats_mspan_sys_bytes Number of bytes used for mspan structures obtained from system. Equals to /memory/classes/metadata/mspan/inuse:bytes + /memory/classes/metadata/mspan/free:bytes.
+# TYPE go_memstats_mspan_sys_bytes gauge
+go_memstats_mspan_sys_bytes 146880
+# HELP go_memstats_next_gc_bytes Number of heap bytes when next garbage collection will take place. Equals to /gc/heap/goal:bytes.
+# TYPE go_memstats_next_gc_bytes gauge
+go_memstats_next_gc_bytes 4.744746e+06
+# HELP go_memstats_other_sys_bytes Number of bytes used for other system allocations. Equals to /memory/classes/other:bytes.
+# TYPE go_memstats_other_sys_bytes gauge
+go_memstats_other_sys_bytes 2.093779e+06
+# HELP go_memstats_stack_inuse_bytes Number of bytes obtained from system for stack allocator in non-CGO environments. Equals to /memory/classes/heap/stacks:bytes.
+# TYPE go_memstats_stack_inuse_bytes gauge
+go_memstats_stack_inuse_bytes 1.048576e+06
+# HELP go_memstats_stack_sys_bytes Number of bytes obtained from system for stack allocator. Equals to /memory/classes/heap/stacks:bytes + /memory/classes/os-stacks:bytes.
+# TYPE go_memstats_stack_sys_bytes gauge
+go_memstats_stack_sys_bytes 1.048576e+06
+# HELP go_memstats_sys_bytes Number of bytes obtained from system. Equals to /memory/classes/total:byte.
+# TYPE go_memstats_sys_bytes gauge
+go_memstats_sys_bytes 1.9527944e+07
+# HELP go_sched_gomaxprocs_threads The current runtime.GOMAXPROCS setting, or the number of operating system threads that can execute user-level Go code simultaneously. Sourced from /sched/gomaxprocs:threads.
+# TYPE go_sched_gomaxprocs_threads gauge
+go_sched_gomaxprocs_threads 14
+# HELP go_threads Number of OS threads created.
+# TYPE go_threads gauge
+go_threads 12
+# HELP process_cpu_seconds_total Total user and system CPU time spent in seconds.
+# TYPE process_cpu_seconds_total counter
+process_cpu_seconds_total 0.03
+# HELP process_max_fds Maximum number of open file descriptors.
+# TYPE process_max_fds gauge
+process_max_fds 1.048576e+06
+# HELP process_network_receive_bytes_total Number of bytes received by the process over the network.
+# TYPE process_network_receive_bytes_total counter
+process_network_receive_bytes_total 14369
+# HELP process_network_transmit_bytes_total Number of bytes sent by the process over the network.
+# TYPE process_network_transmit_bytes_total counter
+process_network_transmit_bytes_total 18357
+# HELP process_open_fds Number of open file descriptors.
+# TYPE process_open_fds gauge
+process_open_fds 12
+# HELP process_resident_memory_bytes Resident memory size in bytes.
+# TYPE process_resident_memory_bytes gauge
+process_resident_memory_bytes 3.0363648e+07
+# HELP process_start_time_seconds Start time of the process since unix epoch in seconds.
+# TYPE process_start_time_seconds gauge
+process_start_time_seconds 1.79015686715e+09
+# HELP process_virtual_memory_bytes Virtual memory size in bytes.
+# TYPE process_virtual_memory_bytes gauge
+process_virtual_memory_bytes 1.320484864e+09
+# HELP process_virtual_memory_max_bytes Maximum amount of virtual memory available in bytes.
+# TYPE process_virtual_memory_max_bytes gauge
+process_virtual_memory_max_bytes 1.8446744073709552e+19
+# HELP promhttp_metric_handler_requests_in_flight Current number of scrapes being served.
+# TYPE promhttp_metric_handler_requests_in_flight gauge
+promhttp_metric_handler_requests_in_flight 1
+# HELP promhttp_metric_handler_requests_total Total number of scrapes by HTTP status code.
+# TYPE promhttp_metric_handler_requests_total counter
+promhttp_metric_handler_requests_total{code="200"} 0
+promhttp_metric_handler_requests_total{code="500"} 0
+promhttp_metric_handler_requests_total{code="503"} 0

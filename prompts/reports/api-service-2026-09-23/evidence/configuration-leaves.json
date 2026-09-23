@@ -1,0 +1,497 @@
+[
+  {
+    "default": "0.0.0.0",
+    "env": "SERVER_HOST",
+    "has_default": true,
+    "secret": false,
+    "tag_default": "0.0.0.0",
+    "type": "string",
+    "yaml": "server.host"
+  },
+  {
+    "default": "23410",
+    "env": "SERVER_PORT_GRPC",
+    "has_default": true,
+    "secret": false,
+    "tag_default": "23410",
+    "type": "string",
+    "yaml": "server.port.grpc"
+  },
+  {
+    "default": "23411",
+    "env": "SERVER_PORT_METRIC",
+    "has_default": true,
+    "secret": false,
+    "tag_default": "23411",
+    "type": "string",
+    "yaml": "server.port.metric"
+  },
+  {
+    "default": "23412",
+    "env": "SERVER_PORT_HEALTH",
+    "has_default": true,
+    "secret": false,
+    "tag_default": "23412",
+    "type": "string",
+    "yaml": "server.port.health"
+  },
+  {
+    "default": "23413",
+    "env": "SERVER_PORT_MCP",
+    "has_default": true,
+    "secret": false,
+    "tag_default": "23413",
+    "type": "string",
+    "yaml": "server.port.mcp"
+  },
+  {
+    "default": "",
+    "env": "SERVER_TLS_CERT_FILE",
+    "has_default": false,
+    "secret": false,
+    "tag_default": "",
+    "type": "string",
+    "yaml": "server.tls.cert_file"
+  },
+  {
+    "default": "",
+    "env": "SERVER_TLS_KEY_FILE",
+    "has_default": false,
+    "secret": false,
+    "tag_default": "",
+    "type": "string",
+    "yaml": "server.tls.key_file"
+  },
+  {
+    "default": "",
+    "env": "SERVER_TLS_CLIENT_CA_FILE",
+    "has_default": false,
+    "secret": false,
+    "tag_default": "",
+    "type": "string",
+    "yaml": "server.tls.client_ca_file"
+  },
+  {
+    "default": "2m30s",
+    "env": "SERVER_FORCE_SHUTDOWN_AFTER",
+    "has_default": true,
+    "secret": false,
+    "tag_default": "150s",
+    "type": "time.Duration",
+    "yaml": "server.force_shutdown_after"
+  },
+  {
+    "default": "[]",
+    "env": "SERVER_TRUSTED_PROXIES",
+    "has_default": false,
+    "secret": false,
+    "tag_default": "",
+    "type": "[]string",
+    "yaml": "server.trusted_proxies"
+  },
+  {
+    "default": "67108864",
+    "env": "SERVER_MAX_RECV_MSG_SIZE",
+    "has_default": true,
+    "secret": false,
+    "tag_default": "67108864",
+    "type": "int",
+    "yaml": "server.max_recv_msg_size"
+  },
+  {
+    "default": "67108864",
+    "env": "SERVER_MAX_SEND_MSG_SIZE",
+    "has_default": true,
+    "secret": false,
+    "tag_default": "67108864",
+    "type": "int",
+    "yaml": "server.max_send_msg_size"
+  },
+  {
+    "default": "256",
+    "env": "SERVER_MAX_CONCURRENT_STREAMS",
+    "has_default": true,
+    "secret": false,
+    "tag_default": "256",
+    "type": "uint32",
+    "yaml": "server.max_concurrent_streams"
+  },
+  {
+    "default": "",
+    "env": "DB_POSTGRES_DSN",
+    "has_default": false,
+    "secret": true,
+    "tag_default": "",
+    "type": "string",
+    "yaml": "db.postgres"
+  },
+  {
+    "default": "/plugins",
+    "env": "REGISTRY_PLUGINS_DIR",
+    "has_default": true,
+    "secret": false,
+    "tag_default": "/plugins",
+    "type": "string",
+    "yaml": "registry.plugins_dir"
+  },
+  {
+    "default": "67108864",
+    "env": "REGISTRY_MAX_OUTPUT_SIZE",
+    "has_default": true,
+    "secret": false,
+    "tag_default": "67108864",
+    "type": "int64",
+    "yaml": "registry.max_output_size"
+  },
+  {
+    "default": "21474836480",
+    "env": "REGISTRY_CACHE_MAX_BYTES",
+    "has_default": true,
+    "secret": false,
+    "tag_default": "21474836480",
+    "type": "int64",
+    "yaml": "registry.cache_max_bytes"
+  },
+  {
+    "default": "",
+    "env": "REGISTRY_S3_ENDPOINT",
+    "has_default": false,
+    "secret": false,
+    "tag_default": "",
+    "type": "string",
+    "yaml": "registry.s3.endpoint"
+  },
+  {
+    "default": "",
+    "env": "REGISTRY_S3_BUCKET",
+    "has_default": false,
+    "secret": false,
+    "tag_default": "",
+    "type": "string",
+    "yaml": "registry.s3.bucket"
+  },
+  {
+    "default": "us-east-1",
+    "env": "REGISTRY_S3_REGION",
+    "has_default": true,
+    "secret": false,
+    "tag_default": "us-east-1",
+    "type": "string",
+    "yaml": "registry.s3.region"
+  },
+  {
+    "default": "",
+    "env": "REGISTRY_S3_PREFIX",
+    "has_default": false,
+    "secret": false,
+    "tag_default": "",
+    "type": "string",
+    "yaml": "registry.s3.prefix"
+  },
+  {
+    "default": "",
+    "env": "REGISTRY_S3_ACCESS_KEY_ID",
+    "has_default": false,
+    "secret": false,
+    "tag_default": "",
+    "type": "string",
+    "yaml": "registry.s3.access_key_id"
+  },
+  {
+    "default": "",
+    "env": "REGISTRY_S3_SECRET_ACCESS_KEY",
+    "has_default": false,
+    "secret": true,
+    "tag_default": "",
+    "type": "string",
+    "yaml": "registry.s3.secret_access_key"
+  },
+  {
+    "default": "false",
+    "env": "REGISTRY_S3_FORCE_PATH_STYLE",
+    "has_default": false,
+    "secret": false,
+    "tag_default": "",
+    "type": "bool",
+    "yaml": "registry.s3.force_path_style"
+  },
+  {
+    "default": "",
+    "env": "TELEMETRY_OTLP_ENDPOINT",
+    "has_default": false,
+    "secret": false,
+    "tag_default": "",
+    "type": "string",
+    "yaml": "telemetry.otlp_endpoint"
+  },
+  {
+    "default": "",
+    "env": "TELEMETRY_PYROSCOPE_ENDPOINT",
+    "has_default": false,
+    "secret": false,
+    "tag_default": "",
+    "type": "string",
+    "yaml": "telemetry.pyroscope_endpoint"
+  },
+  {
+    "default": "",
+    "env": "TELEMETRY_SERVICE_TIER",
+    "has_default": false,
+    "secret": false,
+    "tag_default": "",
+    "type": "string",
+    "yaml": "telemetry.service_tier"
+  },
+  {
+    "default": "4",
+    "env": "WORKER_POOL_WORKERS",
+    "has_default": true,
+    "secret": false,
+    "tag_default": "4",
+    "type": "int",
+    "yaml": "worker_pool.workers"
+  },
+  {
+    "default": "16",
+    "env": "WORKER_POOL_QUEUE_SIZE",
+    "has_default": true,
+    "secret": false,
+    "tag_default": "16",
+    "type": "int",
+    "yaml": "worker_pool.queue_size"
+  },
+  {
+    "default": "16",
+    "env": "WORKER_POOL_MAX_CONCURRENT_GENERATIONS",
+    "has_default": true,
+    "secret": false,
+    "tag_default": "16",
+    "type": "int",
+    "yaml": "worker_pool.max_concurrent_generations"
+  },
+  {
+    "default": "2m0s",
+    "env": "WORKER_POOL_GENERATION_TIMEOUT",
+    "has_default": true,
+    "secret": false,
+    "tag_default": "120s",
+    "type": "time.Duration",
+    "yaml": "worker_pool.generation_timeout"
+  },
+  {
+    "default": "2",
+    "env": "WORKER_POOL_MAX_RETRIES",
+    "has_default": true,
+    "secret": false,
+    "tag_default": "2",
+    "type": "int",
+    "yaml": "worker_pool.max_retries"
+  },
+  {
+    "default": "30s",
+    "env": "WORKER_POOL_SHUTDOWN_TIMEOUT",
+    "has_default": true,
+    "secret": false,
+    "tag_default": "30s",
+    "type": "time.Duration",
+    "yaml": "worker_pool.shutdown_timeout"
+  },
+  {
+    "default": "",
+    "env": "LICENSE_KEY",
+    "has_default": false,
+    "secret": true,
+    "tag_default": "",
+    "type": "string",
+    "yaml": "license.key"
+  },
+  {
+    "default": "",
+    "env": "LICENSE_FILE",
+    "has_default": false,
+    "secret": false,
+    "tag_default": "",
+    "type": "string",
+    "yaml": "license.file"
+  },
+  {
+    "default": "map[]",
+    "env": "LICENSE_PUBLIC_KEYS",
+    "has_default": false,
+    "secret": false,
+    "tag_default": "",
+    "type": "map[string]string",
+    "yaml": "license.public_keys"
+  },
+  {
+    "default": "5m0s",
+    "env": "LICENSE_CACHE_TTL",
+    "has_default": true,
+    "secret": false,
+    "tag_default": "5m",
+    "type": "time.Duration",
+    "yaml": "license.cache_ttl"
+  },
+  {
+    "default": "10",
+    "env": "RATE_LIMIT_REQUESTS_PER_SECOND",
+    "has_default": true,
+    "secret": false,
+    "tag_default": "10.0",
+    "type": "float64",
+    "yaml": "rate_limit.requests_per_second"
+  },
+  {
+    "default": "20",
+    "env": "RATE_LIMIT_BURST",
+    "has_default": true,
+    "secret": false,
+    "tag_default": "20",
+    "type": "int",
+    "yaml": "rate_limit.burst"
+  },
+  {
+    "default": "10m0s",
+    "env": "RATE_LIMIT_CLEANUP_INTERVAL",
+    "has_default": true,
+    "secret": false,
+    "tag_default": "10m",
+    "type": "time.Duration",
+    "yaml": "rate_limit.cleanup_interval"
+  },
+  {
+    "default": "2",
+    "env": "RATE_LIMIT_MAX_CONCURRENT_PER_IP",
+    "has_default": true,
+    "secret": false,
+    "tag_default": "2",
+    "type": "int",
+    "yaml": "rate_limit.max_concurrent_per_ip"
+  },
+  {
+    "default": "1000",
+    "env": "AUDIT_BUFFER_SIZE",
+    "has_default": true,
+    "secret": false,
+    "tag_default": "1000",
+    "type": "int",
+    "yaml": "audit.buffer_size"
+  },
+  {
+    "default": "100",
+    "env": "AUDIT_BATCH_SIZE",
+    "has_default": true,
+    "secret": false,
+    "tag_default": "100",
+    "type": "int",
+    "yaml": "audit.batch_size"
+  },
+  {
+    "default": "1s",
+    "env": "AUDIT_FLUSH_INTERVAL",
+    "has_default": true,
+    "secret": false,
+    "tag_default": "1s",
+    "type": "time.Duration",
+    "yaml": "audit.flush_interval"
+  },
+  {
+    "default": "3",
+    "env": "AUDIT_MAX_SAVE_RETRIES",
+    "has_default": true,
+    "secret": false,
+    "tag_default": "3",
+    "type": "int",
+    "yaml": "audit.max_save_retries"
+  },
+  {
+    "default": "1s",
+    "env": "AUDIT_ENQUEUE_TIMEOUT",
+    "has_default": true,
+    "secret": false,
+    "tag_default": "1s",
+    "type": "time.Duration",
+    "yaml": "audit.enqueue_timeout"
+  },
+  {
+    "default": "5s",
+    "env": "AUDIT_FLUSH_TIMEOUT",
+    "has_default": true,
+    "secret": false,
+    "tag_default": "5s",
+    "type": "time.Duration",
+    "yaml": "audit.flush_timeout"
+  },
+  {
+    "default": "12",
+    "env": "AUDIT_RETENTION_MONTHS",
+    "has_default": true,
+    "secret": false,
+    "tag_default": "12",
+    "type": "int",
+    "yaml": "audit.retention_months"
+  },
+  {
+    "default": "3",
+    "env": "AUDIT_PRE_CREATE_MONTHS",
+    "has_default": true,
+    "secret": false,
+    "tag_default": "3",
+    "type": "int",
+    "yaml": "audit.pre_create_months"
+  },
+  {
+    "default": "6h0m0s",
+    "env": "AUDIT_PARTITION_CHECK_INTERVAL",
+    "has_default": true,
+    "secret": false,
+    "tag_default": "6h",
+    "type": "time.Duration",
+    "yaml": "audit.partition_check_interval"
+  },
+  {
+    "default": "30s",
+    "env": "AUDIT_PARTITION_OP_TIMEOUT",
+    "has_default": true,
+    "secret": false,
+    "tag_default": "30s",
+    "type": "time.Duration",
+    "yaml": "audit.partition_op_timeout"
+  },
+  {
+    "default": "[]",
+    "env": "AUTH_WRITE_TOKENS",
+    "has_default": false,
+    "secret": false,
+    "tag_default": "",
+    "type": "config.TokenList",
+    "yaml": "auth.write_tokens"
+  },
+  {
+    "default": "false",
+    "env": "AUTH_REQUIRE_AUTHENTICATION",
+    "has_default": true,
+    "secret": false,
+    "tag_default": "false",
+    "type": "bool",
+    "yaml": "auth.require_authentication"
+  },
+  {
+    "default": "false",
+    "env": "MCP_ENABLED",
+    "has_default": true,
+    "secret": false,
+    "tag_default": "false",
+    "type": "bool",
+    "yaml": "mcp.enabled"
+  },
+  {
+    "default": "info",
+    "env": "LOG_LEVEL",
+    "has_default": true,
+    "secret": false,
+    "tag_default": "info",
+    "type": "string",
+    "yaml": "log.level"
+  }
+]
