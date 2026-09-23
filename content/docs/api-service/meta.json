@@ -2,8 +2,21 @@
   "title": "API Service",
   "pages": [
     "overview",
-    "upgrading",
+    "quickstart",
+    "architecture",
+    "installation",
+    "configuration",
+    "authentication-and-licensing",
+    "security",
+    "plugins",
+    "client-usage",
+    "operator-cli",
+    "observability",
+    "mcp",
     "runbooks",
-    "backup"
+    "backup",
+    "upgrading",
+    "vs-buf-bsr",
+    "migrating-from-bsr"
   ]
 }
