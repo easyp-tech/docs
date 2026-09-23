@@ -60,10 +60,20 @@ compose-стек, — и всерьёз работало только одно:
 Запросы на генерацию отклоняются с `ResourceExhausted`. Сервис делает это
 намеренно — это не ошибка, это полная очередь.
 
-1. `easyp_pool_queue_depth` против `config.workerPool.queueSize` и
-   `easyp_pool_active_workers` против `workers`.
-2. Определите, какой лимит реально связывает: воркеры,
-   `maxConcurrentGenerations` или пер-вызывающий `rateLimit.maxConcurrentPerIP`.
+Reason у отказа — `SERVER_OVERLOADED`. Алерт смотрит на
+`easyp_pool_generations_rejected_total`: все слоты генерации были заняты, и уже
+ждали `config.workerPool.queueSize` запросов.
+
+1. `easyp_pool_generations_active` против
+   `config.workerPool.maxConcurrentGenerations` и
+   `easyp_pool_generations_waiting` против `queueSize`. Сторона поиска
+   (`easyp_pool_active_workers`, `easyp_pool_queue_depth`,
+   `easyp_pool_rejected_total`) отказывает с тем же reason, и на неё стоит
+   посмотреть, если часты промахи кеша.
+2. Определите, какой лимит реально связывает: `maxConcurrentGenerations`,
+   `workers` или пер-вызывающий `rateLimit.maxConcurrentPerIP` (он виден в
+   `easyp_concurrency_rejected_total`, а не здесь). В Community генерации
+   ограничены 16, а воркеры 4, что бы ни было в конфигурации.
 3. Поднимите именно его — но сперва проверьте арифметику памяти. Пиковые буферы
    это `maxConcurrentGenerations × maxOutputSize × 2`, и чарт отказывает в
    установке, где это превышает лимит памяти. Поднять конкурентность, не подняв
@@ -77,8 +87,10 @@ compose-стек, — и всерьёз работало только одно:
 
 Работа стоит в очереди непрерывно десять минут. Ручки те же, что выше; разница в
 том, что это устойчиво, а не всплеском, — то есть утверждение о ёмкости, а не
-пик. Думайте про дополнительные реплики, а не про более глубокую очередь:
-длинная очередь лишь переставляет задержку с места на место.
+пик. Добавляйте мощность, а не глубину очереди: длинная очередь лишь
+переставляет задержку с места на место. Мощность здесь — это под побольше:
+больше CPU и выше `maxConcurrentGenerations` (с памятью под это). Несколько
+реплик на общем томе кеша не поддерживаются.
 
 ## EasypPluginCacheAtLimit
 
@@ -198,11 +210,15 @@ COMMIT;
 Больше `prometheusRule.generationErrorRatio` генераций падает.
 
 1. `easyp_generation_errors_total` по `plugin` и `error_type` — это почти всегда
-   один плагин, а не общая неисправность.
-2. Если `error_type` называет несовпадение контрольной суммы, бинарь на диске не
-   соответствует записанному для этой версии плагина. Не «чините» это
+   один плагин, а не общая неисправность. `error_type` — `transient` (в тексте
+   ошибки было `connection refused` или `temporary failure`, и её повторяли) или
+   `permanent` (всё остальное).
+2. Если в логах `plugin archive checksum mismatch`, архив в объектном хранилище
+   не соответствует записанному при регистрации. Не «чините» это
    перерегистрацией: выясните, почему он изменился.
-3. Иначе запустите плагин руками с тем же запросом. Отказы плагинов
+3. `output limit exceeded` означает, что плагин вывел больше
+   `config.registry.maxOutputSize`.
+4. Иначе запустите плагин руками с тем же запросом. Отказы плагинов
    докладываются добросовестно, так что собственный stderr плагина есть в логах.
 
 ## EasypPanics
@@ -212,9 +228,9 @@ COMMIT;
 молчаливой.
 
 `kubectl logs deploy/$REL | grep -A30 panic` за стеком либо
-`docker logs easyp-api-enterprise 2>&1 | grep -A30 panic`. Метка `name` барьера
-говорит, какая это была единица работы: `worker.process_job` для генерации,
-`audit.flush` для писателя аудита.
+`docker logs easyp-api-enterprise 2>&1 | grep -A30 panic`. У счётчика нет меток;
+какая единица работы запаниковала — gRPC-хендлер, воркер пула или писатель
+аудита, — видно из строки лога рядом со стеком.
 
 Алерт несёт метку `tier`; в compose-стеке она называет контейнер, так что
 читайте из неё `easyp-api-community`, когда паниковал именно он.
@@ -224,8 +240,12 @@ COMMIT;
 Учётные данные на запись отвергаются чаще, чем
 `prometheusRule.authFailureRate` в секунду.
 
-Чтения анонимны по замыслу, поэтому всё здесь — мутирующие вызовы:
-CreatePlugin, UpdatePlugin, DeletePlugin.
+По умолчанию чтения анонимны, поэтому всё здесь — мутирующие вызовы:
+CreatePlugin, UpdatePlugin, DeletePlugin. С включённым
+`config.auth.requireAuthentication` считаются и чтения — и каждый пользователь
+easyp CLI даёт отказ, потому что CLI не отправляет токен. Метка `reason` отличает
+`no_credentials` (ничего не прислали) от `unknown_token` (токен не совпал ни с
+одним дайджестом).
 
 1. Обычная причина — выкатка CI-учёток, которая не доехала: посмотрите, не
    началась ли частота с деплоя.
@@ -236,10 +256,12 @@ CreatePlugin, UpdatePlugin, DeletePlugin.
 
 ---
 
-## Хост
+## Хост [#the-host]
 
-Эти три приходят из `prometheus.exporter.unix` в `config.alloy` и существуют
-только в compose-стеке. В Kubernetes этой землёй владеет собственный мониторинг
+Эти шесть существуют только в compose-стеке, в
+`deploy/observability/mimir/rules/anonymous/host.yaml`. Алерты диска и памяти
+приходят из `prometheus.exporter.unix` в `config.alloy`, алерты целей и
+обнаружения — из собственного скрейпинга Alloy, алерт сертификата — из Traefik. В Kubernetes этой землёй владеет собственный мониторинг
 узлов кластера, поэтому чарт их не поставляет.
 
 Команды предполагают `ssh user@host` и стек в `~/easyp`.
