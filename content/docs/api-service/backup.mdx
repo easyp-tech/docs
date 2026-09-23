@@ -1,81 +1,42 @@
 ---
-title: "Backup and Restore"
-description: "What a backup of the API Service has to contain, how long to keep it, and the order a restore has to happen in."
+title: "Backup and restore"
 ---
 
-Deliberately tool-agnostic: whatever takes your Postgres backups today takes
-these. What follows is what has to be in the set and what the service assumes
-about it.
+## What must be recoverable
 
-## What has to be backed up
+PostgreSQL holds registrations, plugin configuration (including recorded archive hashes), and audit data. It does not contain plugin executables or generated files. In local-only mode, <code>registry.plugins&#95;dir</code> is authoritative and must be backed up. With S3, the bucket/prefix is authoritative and the local directory is a rebuildable cache **only when every needed object and matching registration are recoverable**.
 
-| What | Why it cannot be reconstructed |
-|------|-------------------------------|
-| **The `plugins` table** | The registry itself: which plugin versions exist, their config, their command line, their recorded checksums. Nothing else holds this. |
-| **The `audit_log` partitions** | The audit trail. Enterprise sells it; it exists nowhere else and there is no second copy. |
-| **The `goose_db_version` table** | Which migrations have run. Restoring data without it makes the next startup either re-run migrations or refuse to start. |
-| **The object storage bucket** | Plugin archives. The local cache is a cache — it is evicted — so the bucket is the only copy of the binaries. |
-| **`DB_POSTGRES_DSN`, `AUTH_WRITE_TOKENS`, S3 credentials** | Secrets are not in the database and are usually not in the cluster backup either. |
-| **`LICENSE_KEY` and `LICENSE_PUBLIC_KEYS`** | Recoverable from the licence registry, but not by you at 3am. Without them the restored service runs in community mode: no audit, four workers, ten plugins. |
+Keep a coordinated recovery set: a database dump/snapshot, plugin artifacts at the matching versions/hashes, the exact server image digest or binary, configuration, the trusted license public keys, and references to recoverable secrets/certificates in your secret-management system. Telemetry stores have independent retention and backup requirements. A PostgreSQL-only backup is not a complete service backup.
 
-The database and the bucket have to be recoverable to *roughly* the same point.
-They are not transactional with each other, and the direction of the skew is what
-matters: a `plugins` row without its archive fails generation with
-`BINARY_NOT_UPLOADED`, which is at least legible. An archive with no row is
-merely orphaned. **So prefer a bucket snapshot slightly newer than the database
-one** — never older.
+## Create a consistent backup
 
-## How much history to keep
+Freeze plugin registrations, updates, deletes, and object replacements for the snapshot window. Because a version can be overwritten and deletion spans different stores without a shared transaction, copying S3 before or after PostgreSQL is not by itself a consistency guarantee. For the strongest simple procedure, stop generation and administration, let the service drain, and then snapshot both stores. Audit generated during the window otherwise needs an explicit recovery-point policy.
 
-`config.audit.retentionMonths` (12 by default) is enforced by dropping whole
-partitions on a schedule. That is a real delete: after it, the only copy of that
-month is in a backup taken while it still existed.
+A PostgreSQL custom-format dump can be created and inspected with compatible PostgreSQL tools:
 
-So the backup retention has to exceed the audit retention, not match it. Matching
-them means the month drops out of the database and out of the archive at
-approximately the same time, which leaves nothing anywhere. If you are asked to
-keep audit history for a compliance window, that window is a constraint on the
-*backups*, and `retentionMonths` is only the size of the working set.
+~~~sh
+pg_dump --dbname="$DB_POSTGRES_DSN" --format=custom --file=easyp.dump
+pg_restore --list easyp.dump > easyp.dump.contents.txt
+~~~
+For local-only artifacts, archive the complete directory, preserving executable modes, symlinks, and sidecars; copying only the entrypoint is insufficient:
 
-An RPO of hours is fine for `plugins` — plugin registration is a deliberate,
-infrequent act and is easily repeated. For `audit_log` the RPO *is* the size of
-the gap in the audit trail, so it should be measured in minutes if audit is
-being relied on.
+~~~sh
+tar -C "$PLUGINS_DIR" -czf plugins.tar.gz .
+~~~
+For S3, use your storage system’s versioning/snapshot or an artifact copy manifest that records object keys and versions/hashes. Include <code>prefix/group/name/version/plugin.tgz</code>. An uncoordinated <code>sync</code> to a newer bucket can lose deleted objects or replace bytes under an existing version. Encrypt and access-control backup sets; registration configuration and audit can contain sensitive data. Record checksums and test that the dump can be read before declaring the backup successful.
 
-## Restoring
+## Restore into an isolated deployment
 
-1. **Restore the database first**, then the bucket. The reverse order leaves the
-   service briefly able to serve plugins it has no rows for.
-2. **Do not run migrations by hand.** The service applies them itself at startup
-   and serialises that across replicas. Start one replica and let it.
-3. **Check `goose_db_version` against the binary you are restoring onto.** A
-   database restored from a newer release than the binary **starts anyway** —
-   this is not caught. goose objects only to migrations missing *below* the
-   database's highest version; one it has never heard of, above that mark,
-   leaves it with nothing to apply and no complaint. Pinned by
-   `TestRollbackOntoAnOlderBinary`.
+Create an empty compatible PostgreSQL database and restore the selected snapshot with a role that will own the restored objects. Do not point this procedure at a live production database:
 
-   So the limit on running an older binary is not a startup check, it is time.
-   The older binary has no partition maintainer for anything migration `00002`
-   introduced, so once the months that migration pre-created are used up, audit
-   rows land in `audit_log_default` — and a non-empty default partition blocks
-   creating the month that would overlap it, which is a problem you inherit on
-   the way *forward*. **Treat a rollback as bounded by
-   `config.audit.preCreateMonths`** (three by default), and prefer restoring
-   onto the matching release.
-4. **Expect the plugin cache to be empty.** It is a cache, and with
-   `persistence.enabled=false` it is empty after every restart anyway. The first
-   request for each plugin re-downloads it. Watch
-   `easyp_plugin_cache_bytes` climb; nothing needs doing.
-5. **Verify audit continuity before declaring done.** Partition maintenance runs
-   every `config.audit.partitionCheckInterval`, so a restore landing in a month
-   whose partition was never created writes into the default partition —
-   `easyp_audit_default_partition_used` goes to 1 and stays there. See
-   [Runbooks](/docs/api-service/runbooks).
+~~~sh
+pg_restore --dbname="$RESTORE_POSTGRES_DSN" \
+  --no-owner --no-privileges --exit-on-error easyp.dump
+~~~
+Restore the matching plugin tree or S3 object versions, configuration, and independently managed credentials. Use the original server build first; starting a newer build automatically applies its embedded forward migrations. In S3 mode, a fresh private cache is useful for a recovery test because warm files can conceal missing objects or checksum mismatches. In local-only mode, an empty cache directory is not recoverable automatically.
 
-## Verifying
+Keep restored workers disconnected from production clients and from any production audit/metadata database while testing. Check registration counts and selected exact versions, HTTP readiness, one cold generation per critical plugin, a repeated warm generation, and the output files expected by the consuming build. Verify Enterprise audit recording and retention only with a valid authorized license; a successful Community generation does not validate Enterprise recovery.
 
-A backup that has never been restored is a hypothesis. The cheap version of the
-test: restore into a scratch namespace, start the service against it, and check
-that `easyp_business_plugins_total` matches what production reports and that the
-newest `audit_log` row is inside the RPO you think you have.
+## Recovery limits
+
+There is no built-in backup scheduler, cross-store point-in-time transaction, durable audit queue, or audit replay. The latest buffered events can be lost at a crash even when a database backup is current. Recovery time depends on restore size, plugin downloads, database performance, and the number of critical versions to validate; this documentation does not promise an RPO or RTO. Exercise the restore procedure using your actual artifact set and record the measured result. See [Upgrading](./upgrading) and [Runbooks](./runbooks).

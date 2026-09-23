@@ -1,0 +1,224 @@
+---
+title: "Installation and Helm values"
+---
+
+## Deployment prerequisites
+
+Every deployment needs PostgreSQL and a directory accessible to the service account for trusted plugin executables. S3-compatible storage is optional. A fresh database is migrated at startup; the database role needs the corresponding DDL permissions. Installing the server does not install or register the plugin catalog. See [Plugins](./plugins).
+
+This page follows service/SDK release **v1.0.2**, Helm chart **1.0.2** (appVersion **v1.0.2**), and Go **1.26.6** from the checked manifests. The checked runtime source matches that release; later source changes concern documentation and the development Compose healthcheck.
+
+## Docker image and release channels
+
+The release workflow names the image <code>ghcr.io/easyp-tech/service</code>. Its channels have different meanings:
+
+| Tag | Meaning | Selection advice |
+| --- | --- | --- |
+| <code>v1.0.2</code> / <code>vX.Y.Z</code> | Versioned release. | Match configuration and release notes; retain the resolved digest. |
+| <code>latest</code> | Most recent published release, not current master. | Mutable; avoid it as a reproducibility guarantee. |
+| <code>edge</code> | Successful build from master. | Moving development channel; not a release promise. |
+| <code>sha-&lt;seven-character-commit&gt;</code> | Commit-addressed edge build. | More specific than edge, but the immutable content identity is still the digest. |
+
+Workflows build Linux amd64 and arm64 images. Version/commit tags are naming conventions, not proof that a registry prevents replacement. Published image/chart availability was not exercised by this documentation audit.
+
+The image entrypoint is <code>/easyp-svc</code> and **has no default command**: pass <code>service start</code>. The runtime is Debian Bookworm slim with CA certificates and UID/GID 65532; it does not bundle every language runtime needed by arbitrary plugins. Mount the configured file and set <code>EASYP&#95;CONFIG</code> so the separate image healthcheck sees it too:
+
+~~~sh
+docker run --rm --name easyp-service \
+  -e EASYP_CONFIG=/run/easyp/service.yaml \
+  -p 127.0.0.1:23410:23410 \
+  -p 127.0.0.1:23412:23412 \
+  --mount type=bind,src="$PWD/service.yaml",dst=/run/easyp/service.yaml,readonly \
+  --mount type=bind,src="$PWD/plugins",dst=/plugins \
+  ghcr.io/easyp-tech/service:v1.0.2 service start
+~~~
+Prepare <code>service.yaml</code> with a database reachable **from the container**. <code>localhost</code> inside the container is not the host’s PostgreSQL. The plugin mount must be readable/executable by UID 65532 and writable when S3 cache extraction is used. Bind published development ports to loopback; configure TLS and access controls before exposing them. The image healthcheck probes liveness <code>/live</code>, not database readiness.
+
+For a source build that does not use GHCR:
+
+~~~sh
+git clone --branch v1.0.2 https://github.com/easyp-tech/service.git
+cd service
+docker build --build-arg VERSION=v1.0.2 -t easyp-service:local .
+~~~
+Dockerfile build steps can fetch dependencies and base images. This is not an air-gapped build recipe; pre-stage and verify those artifacts for disconnected environments.
+
+## Compose
+
+The repository contains a development Compose stack and a larger deployment/observability stack. The latter includes site-specific routing, credentials, tier assumptions, and telemetry services; it is not a universal one-command production installation. Use the isolated [Quickstart](./quickstart) for one PostgreSQL instance, one service, and one plugin. Do not copy production hostnames or credentials from historical examples.
+
+Always inspect <code>docker compose config</code> before starting a stack. Keep the server config path consistent with its healthcheck via <code>EASYP&#95;CONFIG</code> or an explicit healthcheck <code>--cfg</code>. Database readiness and an actual generation are separate checks.
+
+## Standalone binaries
+
+The GoReleaser configuration builds <code>easyp-svc</code> for Linux and macOS, amd64 and arm64, with CGO disabled. Release archives use the name <code>easyp-svc&#95;1.0.2&#95;&lt;os&gt;&#95;&lt;arch&gt;.tar.gz</code> and include LICENSE and README; the release workflow also produces checksums and software-bill-of-materials artifacts. Obtain the appropriate archive from the [service release](https://github.com/easyp-tech/service/releases/tag/v1.0.2), verify its checksum, and retain the exact artifact. This audit compiled local binaries but did not verify downloaded release assets.
+
+~~~sh
+go build -trimpath -ldflags='-X main.version=v1.0.2' \
+  -o ./easyp-svc ./cmd/easyp-svc
+./easyp-svc config validate --cfg ./service.yaml
+./easyp-svc service start --cfg ./service.yaml
+~~~
+The Go version in go.mod is the source-build requirement. A Linux executable extracted from a plugin build is not runnable by a macOS server merely because the operator binary is available on macOS. Match each plugin artifact and its sidecars to the server OS, architecture, and installed runtime.
+
+## Helm installation
+
+The chart reference is <code>oci://ghcr.io/easyp-tech/charts/easyp-service</code>. It deploys the service, not PostgreSQL or your object store. Before installation, provide an existing Kubernetes Secret with <code>DB&#95;POSTGRES&#95;DSN</code> and any required <code>AUTH&#95;WRITE&#95;TOKENS</code>, license, or S3 credential environment values; alternatively set <code>secrets.create</code> and <code>secrets.data</code> through a protected values source. Do not commit credentials into a values file.
+
+With TLS enabled, provide <code>tls.serverSecret</code> or enable cert-manager with a configured issuer. The default empty <code>tls.clientCASecret</code> means the server Secret must also contain <code>ca.crt</code> and the service requires client certificates. Set it to <code>"-"</code> only when server-authenticated TLS without mTLS is the deliberate policy. Application bearer authentication remains independent.
+
+~~~yaml
+secrets:
+  existingSecret: easyp-service-env
+tls:
+  enabled: true
+  serverSecret: easyp-service-tls
+  clientCASecret: "-"
+extraEnv:
+  - name: AUTH_REQUIRE_AUTHENTICATION
+    value: "true"
+~~~
+This example requires a bearer-capable client such as the Go SDK; the current <code>easyp</code> remote executor cannot supply the token. It also needs an artifact provisioning strategy: S3 configured in the values below or a populated local plugin volume.
+
+~~~sh
+helm template easyp ./deploy/charts/easyp-service --values values.yaml
+helm upgrade --install easyp oci://ghcr.io/easyp-tech/charts/easyp-service \
+  --version 1.0.2 --namespace easyp --create-namespace --values values.yaml
+~~~
+The first command renders a local checkout; the second installs into the user’s cluster and accesses the registry. They are instructions, not actions performed by this audit.
+
+## Required and hazardous chart choices
+
+The default one-replica deployment uses Recreate and a ReadWriteOnce volume. Multiple replicas with RWO are rejected by the chart. Although RWX passes that check, the plugin cache has no cross-process coordination: do not turn that validation escape into a shared-cache high-availability recommendation. Plan separate private caches and test the complete topology.
+
+Storage must be strictly larger than the positive cache budget. With persistence disabled, the ephemeral-storage limit must also exceed the emptyDir limit; simply switching persistence off with the shipped 2 GiB resource limit and 25 GiB emptyDir does not render successfully. The memory guard checks <code>2 × maxConcurrentGenerations × maxOutputSize</code>; this is not a cap on child memory or a complete capacity model. Shutdown must satisfy <code>terminationGracePeriodSeconds &gt; forceShutdownAfterSeconds &gt; generationTimeoutSeconds</code>.
+
+Ingress requires a hostname and trusted-proxy CIDRs. Current chart validation additionally demands a client certificate for its enabled ServersTransport even when <code>clientCASecret: "-"</code> selects server-only TLS: treat this as a chart limitation, not a service mTLS requirement. Traefik-specific resources require the appropriate CRDs/controller configuration.
+
+NetworkPolicy is enabled by default. An empty ingress namespace selector does not restrict gRPC callers to a chosen namespace. Allowed egress ports are not destination allowlists. **The template does not add an ingress rule for MCP when MCP is enabled**; supply an explicitly reviewed additional policy for authorized MCP access. Its default egress also does not include every possible S3 or profiling port.
+
+ServiceMonitor/PrometheusRule require monitoring CRDs. The reloader annotation works only if a compatible reloader controller is installed; it is not built-in secret hot-reload. Review permissions and exposure of metrics and health as operational data.
+
+## Complete chart values reference
+
+The table is generated from the checked <code>values.yaml</code>. Empty maps/lists are extension points for the corresponding Kubernetes objects; their arbitrary nested Kubernetes keys are not service YAML settings. <code>config.&#42;</code> values map to the [service configuration](./configuration); durations ending in <code>Seconds</code> are rendered as duration strings.
+
+| values.yaml key | Type / Тип | Default / Дефолт | Purpose |
+| --- | --- | --- | --- |
+| <code>replicaCount</code> | integer | <code>1</code> | Number of service replicas; review cache/storage constraints. |
+| <code>image.repository</code> | string | <code>"ghcr.io/easyp-tech/service"</code> | Container image selection; empty tag uses appVersion. |
+| <code>image.tag</code> | string | <code>""</code> | Container image selection; empty tag uses appVersion. |
+| <code>image.pullPolicy</code> | string | <code>"IfNotPresent"</code> | Container image selection; empty tag uses appVersion. |
+| <code>imagePullSecrets</code> | list | <code>[]</code> | Image-registry credential Secret references. |
+| <code>nameOverride</code> | string | <code>""</code> | Override the chart name in resource names. |
+| <code>fullnameOverride</code> | string | <code>""</code> | Override the full resource-name prefix. |
+| <code>serviceAccount.create</code> | boolean | <code>true</code> | Kubernetes ServiceAccount creation, name, or annotations. |
+| <code>serviceAccount.annotations</code> | map | <code>&#123;&#125;</code> | Kubernetes ServiceAccount creation, name, or annotations. |
+| <code>serviceAccount.name</code> | string | <code>""</code> | Kubernetes ServiceAccount creation, name, or annotations. |
+| <code>podAnnotations</code> | map | <code>&#123;&#125;</code> | Additional pod annotations. |
+| <code>podLabels</code> | map | <code>&#123;&#125;</code> | Additional pod labels. |
+| <code>nodeSelector</code> | map | <code>&#123;&#125;</code> | Kubernetes node-selection labels. |
+| <code>tolerations</code> | list | <code>[]</code> | Tolerations for node taints. |
+| <code>affinity</code> | map | <code>&#123;&#125;</code> | Kubernetes pod and node affinity rules. |
+| <code>topologySpreadConstraints</code> | list | <code>[]</code> | Pod topology spread constraints. |
+| <code>reloader.enabled</code> | boolean | <code>true</code> | Annotation for an external reloader controller; does not install it. |
+| <code>resources.requests.cpu</code> | string | <code>"500m"</code> | Pod requests and limits; include plugin and extraction headroom. |
+| <code>resources.requests.memory</code> | string | <code>"1Gi"</code> | Pod requests and limits; include plugin and extraction headroom. |
+| <code>resources.requests.ephemeral-storage</code> | string | <code>"1Gi"</code> | Pod requests and limits; include plugin and extraction headroom. |
+| <code>resources.limits.cpu</code> | string | <code>"4"</code> | Pod requests and limits; include plugin and extraction headroom. |
+| <code>resources.limits.memory</code> | string | <code>"4Gi"</code> | Pod requests and limits; include plugin and extraction headroom. |
+| <code>resources.limits.ephemeral-storage</code> | string | <code>"2Gi"</code> | Pod requests and limits; include plugin and extraction headroom. |
+| <code>ports.grpc</code> | integer | <code>8080</code> | Helm listener port; differs from the binary default. |
+| <code>ports.metric</code> | integer | <code>8081</code> | Helm listener port; differs from the binary default. |
+| <code>ports.health</code> | integer | <code>8082</code> | Helm listener port; differs from the binary default. |
+| <code>ports.mcp</code> | integer | <code>8083</code> | Helm listener port; differs from the binary default. |
+| <code>mcp.enabled</code> | boolean | <code>false</code> | Enable the separate MCP HTTP listener. |
+| <code>service.type</code> | string | <code>"ClusterIP"</code> | Kubernetes Service type and annotations. |
+| <code>service.annotations</code> | map | <code>&#123;&#125;</code> | Kubernetes Service type and annotations. |
+| <code>terminationGracePeriodSeconds</code> | integer | <code>180</code> | Termination budget; greater than the server hard deadline. |
+| <code>config.logLevel</code> | string | <code>"info"</code> | Service configuration; see the full Configuration reference. |
+| <code>config.server.trustedProxies</code> | list | <code>[]</code> | Service configuration; see the full Configuration reference. |
+| <code>config.server.maxRecvMsgSize</code> | integer | <code>67108864</code> | Service configuration; see the full Configuration reference. |
+| <code>config.server.maxSendMsgSize</code> | integer | <code>67108864</code> | Service configuration; see the full Configuration reference. |
+| <code>config.server.maxConcurrentStreams</code> | integer | <code>256</code> | Service configuration; see the full Configuration reference. |
+| <code>config.forceShutdownAfterSeconds</code> | integer | <code>150</code> | Service configuration; see the full Configuration reference. |
+| <code>config.workerPool.workers</code> | integer | <code>4</code> | Service configuration; see the full Configuration reference. |
+| <code>config.workerPool.queueSize</code> | integer | <code>16</code> | Service configuration; see the full Configuration reference. |
+| <code>config.workerPool.maxConcurrentGenerations</code> | integer | <code>16</code> | Service configuration; see the full Configuration reference. |
+| <code>config.workerPool.generationTimeoutSeconds</code> | integer | <code>120</code> | Service configuration; see the full Configuration reference. |
+| <code>config.workerPool.maxRetries</code> | integer | <code>2</code> | Service configuration; see the full Configuration reference. |
+| <code>config.workerPool.shutdownTimeout</code> | string | <code>"30s"</code> | Service configuration; see the full Configuration reference. |
+| <code>config.rateLimit.requestsPerSecond</code> | number | <code>10.0</code> | Service configuration; see the full Configuration reference. |
+| <code>config.rateLimit.burst</code> | integer | <code>20</code> | Service configuration; see the full Configuration reference. |
+| <code>config.rateLimit.cleanupInterval</code> | string | <code>"10m"</code> | Service configuration; see the full Configuration reference. |
+| <code>config.rateLimit.maxConcurrentPerIP</code> | integer | <code>2</code> | Service configuration; see the full Configuration reference. |
+| <code>config.audit.bufferSize</code> | integer | <code>1000</code> | Service configuration; see the full Configuration reference. |
+| <code>config.audit.batchSize</code> | integer | <code>100</code> | Service configuration; see the full Configuration reference. |
+| <code>config.audit.flushInterval</code> | string | <code>"1s"</code> | Service configuration; see the full Configuration reference. |
+| <code>config.audit.maxSaveRetries</code> | integer | <code>3</code> | Service configuration; see the full Configuration reference. |
+| <code>config.audit.enqueueTimeout</code> | string | <code>"1s"</code> | Service configuration; see the full Configuration reference. |
+| <code>config.audit.flushTimeout</code> | string | <code>"5s"</code> | Service configuration; see the full Configuration reference. |
+| <code>config.audit.retentionMonths</code> | integer | <code>12</code> | Service configuration; see the full Configuration reference. |
+| <code>config.audit.preCreateMonths</code> | integer | <code>3</code> | Service configuration; see the full Configuration reference. |
+| <code>config.audit.partitionCheckInterval</code> | string | <code>"6h"</code> | Service configuration; see the full Configuration reference. |
+| <code>config.audit.partitionOpTimeout</code> | string | <code>"30s"</code> | Service configuration; see the full Configuration reference. |
+| <code>config.registry.pluginsDir</code> | string | <code>"/plugins"</code> | Service configuration; see the full Configuration reference. |
+| <code>config.registry.maxOutputSize</code> | integer | <code>67108864</code> | Service configuration; see the full Configuration reference. |
+| <code>config.registry.cacheMaxBytes</code> | integer | <code>21474836480</code> | Service configuration; see the full Configuration reference. |
+| <code>config.registry.s3.endpoint</code> | string | <code>""</code> | Service configuration; see the full Configuration reference. |
+| <code>config.registry.s3.bucket</code> | string | <code>""</code> | Service configuration; see the full Configuration reference. |
+| <code>config.registry.s3.region</code> | string | <code>"us-east-1"</code> | Service configuration; see the full Configuration reference. |
+| <code>config.registry.s3.prefix</code> | string | <code>""</code> | Service configuration; see the full Configuration reference. |
+| <code>config.registry.s3.forcePathStyle</code> | boolean | <code>false</code> | Service configuration; see the full Configuration reference. |
+| <code>config.telemetry.otlpEndpoint</code> | string | <code>""</code> | Service configuration; see the full Configuration reference. |
+| <code>config.telemetry.pyroscopeEndpoint</code> | string | <code>""</code> | Service configuration; see the full Configuration reference. |
+| <code>config.telemetry.serviceTier</code> | string | <code>""</code> | Service configuration; see the full Configuration reference. |
+| <code>config.license.publicKeys.2026-08</code> | string | <code>"81322461987167d5cfd529e9cb8b96f4797f12fce6be4399a0866e250c9b6bb5"</code> | Service configuration; see the full Configuration reference. |
+| <code>extraEnv</code> | list | <code>[]</code> | Additional container environment entries; use canonical service names. |
+| <code>secrets.existingSecret</code> | string | <code>""</code> | Environment Secret; DB_POSTGRES_DSN is mandatory. |
+| <code>secrets.create</code> | boolean | <code>false</code> | Environment Secret; DB_POSTGRES_DSN is mandatory. |
+| <code>secrets.data</code> | map | <code>&#123;&#125;</code> | Environment Secret; DB_POSTGRES_DSN is mandatory. |
+| <code>tls.enabled</code> | boolean | <code>true</code> | gRPC TLS and client CA; review the CA sentinel. |
+| <code>tls.serverSecret</code> | string | <code>""</code> | gRPC TLS and client CA; review the CA sentinel. |
+| <code>tls.clientCASecret</code> | string | <code>""</code> | gRPC TLS and client CA; review the CA sentinel. |
+| <code>tls.mountPath</code> | string | <code>"/certs"</code> | gRPC TLS and client CA; review the CA sentinel. |
+| <code>certManager.enabled</code> | boolean | <code>false</code> | Certificate and issuer settings; requires cert-manager CRDs. |
+| <code>certManager.issuerRef.name</code> | string | <code>""</code> | Certificate and issuer settings; requires cert-manager CRDs. |
+| <code>certManager.issuerRef.kind</code> | string | <code>"ClusterIssuer"</code> | Certificate and issuer settings; requires cert-manager CRDs. |
+| <code>certManager.issuerRef.group</code> | string | <code>"cert-manager.io"</code> | Certificate and issuer settings; requires cert-manager CRDs. |
+| <code>certManager.duration</code> | string | <code>"2160h"</code> | Certificate and issuer settings; requires cert-manager CRDs. |
+| <code>certManager.renewBefore</code> | string | <code>"360h"</code> | Certificate and issuer settings; requires cert-manager CRDs. |
+| <code>certManager.extraDnsNames</code> | list | <code>[]</code> | Certificate and issuer settings; requires cert-manager CRDs. |
+| <code>certManager.clientCertificate.enabled</code> | boolean | <code>true</code> | Certificate and issuer settings; requires cert-manager CRDs. |
+| <code>certManager.clientCertificate.commonName</code> | string | <code>"easyp-ingress"</code> | Certificate and issuer settings; requires cert-manager CRDs. |
+| <code>ingress.enabled</code> | boolean | <code>false</code> | Ingress/Traefik transport; review proxy trust, TLS, and CRDs. |
+| <code>ingress.className</code> | string | <code>"traefik"</code> | Ingress/Traefik transport; review proxy trust, TLS, and CRDs. |
+| <code>ingress.host</code> | string | <code>""</code> | Ingress/Traefik transport; review proxy trust, TLS, and CRDs. |
+| <code>ingress.annotations</code> | map | <code>&#123;&#125;</code> | Ingress/Traefik transport; review proxy trust, TLS, and CRDs. |
+| <code>ingress.tlsSecret</code> | string | <code>""</code> | Ingress/Traefik transport; review proxy trust, TLS, and CRDs. |
+| <code>ingress.serversTransport.enabled</code> | boolean | <code>true</code> | Ingress/Traefik transport; review proxy trust, TLS, and CRDs. |
+| <code>ingress.serversTransport.clientSecret</code> | string | <code>""</code> | Ingress/Traefik transport; review proxy trust, TLS, and CRDs. |
+| <code>ingress.serversTransport.serverName</code> | string | <code>""</code> | Ingress/Traefik transport; review proxy trust, TLS, and CRDs. |
+| <code>ingress.serversTransport.insecureSkipVerify</code> | boolean | <code>false</code> | Ingress/Traefik transport; review proxy trust, TLS, and CRDs. |
+| <code>persistence.enabled</code> | boolean | <code>true</code> | Plugin PVC/emptyDir; cache-size and storage guards apply. |
+| <code>persistence.existingClaim</code> | string | <code>""</code> | Plugin PVC/emptyDir; cache-size and storage guards apply. |
+| <code>persistence.storageClass</code> | string | <code>""</code> | Plugin PVC/emptyDir; cache-size and storage guards apply. |
+| <code>persistence.accessMode</code> | string | <code>"ReadWriteOnce"</code> | Plugin PVC/emptyDir; cache-size and storage guards apply. |
+| <code>persistence.size</code> | string | <code>"25Gi"</code> | Plugin PVC/emptyDir; cache-size and storage guards apply. |
+| <code>persistence.ephemeralSizeLimit</code> | string | <code>"25Gi"</code> | Plugin PVC/emptyDir; cache-size and storage guards apply. |
+| <code>serviceMonitor.enabled</code> | boolean | <code>false</code> | Prometheus Operator scrape settings; requires its CRD. |
+| <code>serviceMonitor.interval</code> | string | <code>"30s"</code> | Prometheus Operator scrape settings; requires its CRD. |
+| <code>serviceMonitor.scrapeTimeout</code> | string | <code>"10s"</code> | Prometheus Operator scrape settings; requires its CRD. |
+| <code>serviceMonitor.labels</code> | map | <code>&#123;&#125;</code> | Prometheus Operator scrape settings; requires its CRD. |
+| <code>prometheusRule.enabled</code> | boolean | <code>false</code> | Alert generation, thresholds, labels, and runbook URLs. |
+| <code>prometheusRule.labels</code> | map | <code>&#123;&#125;</code> | Alert generation, thresholds, labels, and runbook URLs. |
+| <code>prometheusRule.runbookBaseUrl</code> | string | <code>"https://easyp.tech/docs/api-service/runbooks"</code> | Alert generation, thresholds, labels, and runbook URLs. |
+| <code>prometheusRule.licenceExpiryWarningDays</code> | integer | <code>14</code> | Alert generation, thresholds, labels, and runbook URLs. |
+| <code>prometheusRule.cacheUsageWarningRatio</code> | number | <code>0.95</code> | Alert generation, thresholds, labels, and runbook URLs. |
+| <code>prometheusRule.generationErrorRatio</code> | number | <code>0.05</code> | Alert generation, thresholds, labels, and runbook URLs. |
+| <code>prometheusRule.authFailureRate</code> | number | <code>0.5</code> | Alert generation, thresholds, labels, and runbook URLs. |
+| <code>podDisruptionBudget.enabled</code> | boolean | <code>false</code> | Disruption budget; does not create redundancy. |
+| <code>podDisruptionBudget.minAvailable</code> | integer | <code>1</code> | Disruption budget; does not create redundancy. |
+| <code>networkPolicy.enabled</code> | boolean | <code>true</code> | Network admission; review MCP and non-default egress ports. |
+| <code>networkPolicy.ingressNamespaceSelector</code> | map | <code>&#123;&#125;</code> | Network admission; review MCP and non-default egress ports. |
+| <code>networkPolicy.egressPorts</code> | list | <code>[5432, 443, 4317]</code> | Network admission; review MCP and non-default egress ports. |

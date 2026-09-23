@@ -1,0 +1,84 @@
+---
+title: "Observability"
+---
+
+The binary exposes Prometheus text on <code>http://127.0.0.1:23411/metrics</code> by default. Helm uses the metrics port 8081. Keep this endpoint inside an authorized monitoring network: plugin coordinates, database-derived counts, and error activity are operational information.
+
+## Prometheus reference
+
+Labels below are instrumentation labels. Prometheus/Alloy can add <code>job</code>, <code>instance</code>, <code>tier</code>, or deployment labels; those are not additional application labels on every metric. Histogram families produce <code>&#95;bucket</code>, <code>&#95;sum</code>, and <code>&#95;count</code> series, with <code>le</code> added on buckets. <code>plugin</code> is the resolved group/name:version coordinate.
+
+| Metric | Type | Labels | Interpretation |
+| --- | --- | --- | --- |
+| <code>easyp&#95;generated&#95;plugin&#95;code&#95;total</code> | counter | <code>plugin</code> | Completed Core generations without an execution error; the plugin response may still contain a protocol error. |
+| <code>easyp&#95;generation&#95;duration&#95;seconds</code> | histogram | <code>plugin</code> | Duration of an execution attempt, not end-to-end request latency. |
+| <code>easyp&#95;generation&#95;errors&#95;total</code> | counter | <code>plugin, error&#95;type</code> | Execution-attempt failures; error_type is transient or permanent. Not all rejected RPCs reach this counter. |
+| <code>easyp&#95;generation&#95;retries&#95;total</code> | counter | <code>plugin</code> | Pool execution retries, not SDK/network retries. |
+| <code>easyp&#95;operations&#95;total</code> | counter | <code>operation, status</code> | Core operation outcomes on both tiers; status success/error. Excludes earlier interceptor rejections. |
+| <code>easyp&#95;pool&#95;active&#95;workers</code> | gauge | <code>—</code> | Active lookup/download workers, not child-process count. |
+| <code>easyp&#95;pool&#95;jobs&#95;total</code> | counter | <code>—</code> | Lookup jobs accepted into the pool. |
+| <code>easyp&#95;pool&#95;rejected&#95;total</code> | counter | <code>—</code> | Lookup admission rejected because its queue is full. |
+| <code>easyp&#95;pool&#95;queue&#95;depth</code> | gauge | <code>—</code> | Current lookup-queue depth. |
+| <code>easyp&#95;pool&#95;generations&#95;active</code> | gauge | <code>—</code> | Currently occupied generation slots. |
+| <code>easyp&#95;pool&#95;generations&#95;waiting</code> | gauge | <code>—</code> | Callers waiting for a generation slot. |
+| <code>easyp&#95;pool&#95;generations&#95;rejected&#95;total</code> | counter | <code>—</code> | Generation admission refused because its wait queue is full. |
+| <code>easyp&#95;rate&#95;limit&#95;requests&#95;total</code> | counter | <code>status</code> | Per-IP rate decisions: allowed or denied. |
+| <code>easyp&#95;rate&#95;limit&#95;active&#95;clients</code> | gauge | <code>—</code> | Retained IP limiter entries, not authenticated users. |
+| <code>easyp&#95;concurrency&#95;rejected&#95;total</code> | counter | <code>—</code> | Earlier per-IP concurrent-request limit rejections. |
+| <code>easyp&#95;concurrency&#95;active&#95;clients</code> | gauge | <code>—</code> | IPs with concurrent requests tracked by the limiter. |
+| <code>easyp&#95;auth&#95;failures&#95;total</code> | counter | <code>reason</code> | no_credentials or unknown_token; no token value is a metric label. |
+| <code>easyp&#95;config&#95;service&#95;tier&#95;mismatch</code> | gauge | <code>—</code> | 1 when the configured telemetry tier disagrees with live license claims; 0 when empty or matching. |
+| <code>easyp&#95;license&#95;valid</code> | gauge | <code>—</code> | 1 for Enterprise claims, 0 for Community. |
+| <code>easyp&#95;license&#95;expiry&#95;timestamp&#95;seconds</code> | gauge | <code>—</code> | License expiry Unix timestamp; 0 without a configured expiry. |
+| <code>easyp&#95;license&#95;in&#95;grace</code> | gauge | <code>—</code> | 1 while verified Enterprise claims are in their grace interval. |
+| <code>easyp&#95;license&#95;feature&#95;denied&#95;total</code> | counter | <code>feature</code> | Feature-gate denials; not a count of all skipped Community audit events. |
+| <code>easyp&#95;plugin&#95;cache&#95;bytes</code> | gauge | <code>—</code> | Tracked unpacked S3-cache bytes, not S3 bucket size. |
+| <code>easyp&#95;plugin&#95;cache&#95;evictions&#95;total</code> | counter | <code>—</code> | Cache directories removed by eviction. |
+| <code>easyp&#95;plugin&#95;cache&#95;limit&#95;bytes</code> | gauge | <code>—</code> | Configured soft cache limit; this cache collector is absent when eviction is disabled. |
+| <code>easyp&#95;audit&#95;events&#95;lost&#95;total</code> | counter | <code>reason</code> | enqueue_timeout, save_failed, shutdown_timeout; a lower bound, not a proof that every lost event was accounted for. |
+| <code>easyp&#95;audit&#95;events&#95;skipped&#95;total</code> | counter | <code>—</code> | Core audit events skipped because the feature is unlicensed. |
+| <code>easyp&#95;audit&#95;save&#95;failures&#95;total</code> | counter | <code>—</code> | Failed batch-write attempts, including attempts later recovered by retry. |
+| <code>easyp&#95;audit&#95;batch&#95;size</code> | histogram | <code>—</code> | Audit batch sizes. |
+| <code>easyp&#95;audit&#95;queue&#95;depth</code> | gauge | <code>—</code> | Events waiting in the in-memory audit queue. |
+| <code>easyp&#95;audit&#95;partition&#95;maintenance&#95;runs&#95;total</code> | counter | <code>result</code> | Maintenance outcomes: success, error, skipped. |
+| <code>easyp&#95;audit&#95;partitions&#95;created&#95;total</code> | counter | <code>—</code> | Successful CREATE TABLE IF NOT EXISTS calls; not necessarily newly created physical tables. |
+| <code>easyp&#95;audit&#95;partitions&#95;dropped&#95;total</code> | counter | <code>—</code> | Monthly partitions removed by retention. |
+| <code>easyp&#95;audit&#95;partition&#95;maintenance&#95;last&#95;success&#95;seconds</code> | gauge | <code>—</code> | Last successful maintenance Unix timestamp. |
+| <code>easyp&#95;audit&#95;partitions&#95;current</code> | gauge | <code>—</code> | Monthly partition count sampled in the retention path; it can remain stale when that path is skipped. |
+| <code>easyp&#95;audit&#95;default&#95;partition&#95;used</code> | gauge | <code>—</code> | Boolean occupancy sampled by maintenance, normally every six hours; not an exact row count or a live query on every scrape. |
+| <code>easyp&#95;business&#95;plugins&#95;total</code> | gauge | <code>—</code> | Database registration rows, including separate versions. Despite the suffix, this is a gauge. |
+| <code>easyp&#95;business&#95;plugins&#95;by&#95;group</code> | gauge | <code>group</code> | Registration rows per group. |
+| <code>easyp&#95;business&#95;plugin&#95;versions&#95;count</code> | gauge | <code>group, name</code> | Registered versions per plugin identity. |
+| <code>easyp&#95;business&#95;audit&#95;log&#95;total</code> | gauge | <code>—</code> | Approximate partition row estimates from PostgreSQL statistics; not a lossless audit-event counter. |
+| <code>easyp&#95;db&#95;open&#95;connections</code> | gauge | <code>—</code> | Open database connections, including idle connections. |
+| <code>easyp&#95;db&#95;idle&#95;connections</code> | gauge | <code>—</code> | Idle database connections. |
+| <code>easyp&#95;db&#95;wait&#95;count&#95;total</code> | counter | <code>—</code> | Number of waits for a database connection. |
+| <code>easyp&#95;db&#95;wait&#95;duration&#95;seconds&#95;total</code> | counter | <code>—</code> | Cumulative time waiting for a database connection. |
+| <code>easyp&#95;repo&#95;errors&#95;total</code> | counter | <code>func</code> | Errors recorded by instrumented database operations. |
+| <code>easyp&#95;repo&#95;call&#95;duration&#95;seconds</code> | histogram | <code>func</code> | Duration of instrumented database operations. |
+| <code>easyp&#95;panics&#95;total</code> | counter | <code>—</code> | Recovered gRPC/background panics. No goroutine/name label exists on this counter. |
+| <code>easyp&#95;api&#95;grpc&#95;server&#95;started&#95;total</code> | counter | <code>grpc&#95;type, grpc&#95;service, grpc&#95;method</code> | Started RPCs in the gRPC metrics interceptor. |
+| <code>easyp&#95;api&#95;grpc&#95;server&#95;handled&#95;total</code> | counter | <code>grpc&#95;type, grpc&#95;service, grpc&#95;method, grpc&#95;code</code> | Completed RPCs by final gRPC code. |
+| <code>easyp&#95;api&#95;grpc&#95;server&#95;msg&#95;received&#95;total</code> | counter | <code>grpc&#95;type, grpc&#95;service, grpc&#95;method</code> | Messages received by the gRPC middleware. |
+| <code>easyp&#95;api&#95;grpc&#95;server&#95;msg&#95;sent&#95;total</code> | counter | <code>grpc&#95;type, grpc&#95;service, grpc&#95;method</code> | Messages sent by the gRPC middleware. |
+| <code>easyp&#95;api&#95;grpc&#95;server&#95;handling&#95;seconds</code> | histogram | <code>grpc&#95;type, grpc&#95;service, grpc&#95;method</code> | RPC handling duration, including the inner interceptors. |
+
+The server also registers the pinned Prometheus client's standard Go and process collectors (<code>go&#95;&#42;</code>, <code>process&#95;&#42;</code>). Their exact runtime/OS-dependent family set is not an EasyP configuration contract. Database business collectors perform queries at scrape time; on a query error the affected series can be omitted rather than emitted as zero. Do not interpret a missing series as an empty catalog or an absence of audit events.
+
+## Traces, logs, and profiles
+
+<code>telemetry.otlp&#95;endpoint</code> enables **OTLP/gRPC traces and metrics**. A bare <code>host:port</code> selects an insecure transport in this implementation; use an explicit <code>https://</code> URL when TLS is required and configure the collector accordingly. gRPC server TLS settings do not configure the exporter. Trace resources include <code>service.name=easyp</code>, the build's service version, and an optional configured tier. That tier is not automatically synchronized with license claims. OTLP metrics use a 15-second periodic reader.
+
+Trace wrappers cover Core operations, registry access, plugin generation, and <code>process.exec</code>. W3C trace-context propagation is installed, and structured logs include trace/span IDs when the context has them. The service does not directly export logs using an OTLP log exporter; the supplied observability stack collects container logs separately. The OpenTelemetry histogram <code>plugin.execution.duration</code> has unit seconds and a <code>plugin.name</code> label; do not confuse it with the Prometheus execution-attempt histogram.
+
+<code>telemetry.pyroscope&#95;endpoint</code> enables CPU, allocation, in-use memory, and goroutine profiles of the **Go service process**. A plugin tag attributes service-side work to a plugin; it does not make the child executable's own CPU profile available. Exporter initialization failures are logged and can leave the service running without that telemetry. Neither readiness nor liveness proves exporter delivery.
+
+## Alerting and dashboards
+
+The Helm chart can render a <code>ServiceMonitor</code> and a <code>PrometheusRule</code>; both require the corresponding monitoring CRDs and are disabled by default. The chart defines eleven application alerts. The Compose observability tree contains the same application alerts and six additional host/discovery/certificate alerts. Every alert has a matching [runbook](./runbooks). Host metrics are produced by the supplied Alloy Unix exporter; the certificate metric belongs to Traefik, not to <code>easyp-svc</code>.
+
+The supplied generation-error ratio divides execution-attempt errors by accepted lookup jobs. Retries and failures before execution mean it is **not an exact proportion of failed end-user RPCs**. For an RPC failure SLI, use the handled-RPC counter and explicitly choose which gRPC codes count as failures. Keep transport failures and plugin-protocol <code>CodeGeneratorResponse.error</code> results in your client-side synthetic check as well.
+
+<code>EasypServiceMissing</code> assumes that both Community and Enterprise targets exist with the shipped Alloy job/tier labels. Adapt or disable the absent-tier branch for a one-tier deployment; otherwise it alerts on an intentionally absent service. <code>EasypTargetDown</code> uses <code>up == 0</code> across discovered targets, not only generation endpoints.
+
+The cache alert watches a soft S3-cache budget, not filesystem free space. The audit DEFAULT-partition gauge normally updates only during the six-hour maintenance pass, and a maintenance error can leave it stale. Use a direct, read-only database query during incident response. See [Runbooks](./runbooks), [Architecture](./architecture), and [Backup](./backup).
