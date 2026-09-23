@@ -1,0 +1,96 @@
+---
+title: "Справочник конфигурации"
+---
+
+Таблица ниже сгенерирована из проверенных структур конфигурации и <code>config.Defaults</code>, а не из примеров развёртывания. Она содержит все **55 настроек сервиса** с отображением на переменные окружения. Это **дефолты бинарника**; Helm и Compose могут их переопределять. Длительности задаются в формате Go, например <code>120s</code> или <code>5m</code>; размеры — целыми числами байтов. Пустая строка означает отсутствие значения, а не рабочее подключение к БД.
+
+## Приоритеты и проверка
+
+Непустые переменные окружения приоритетнее явно заданного YAML, YAML — приоритетнее встроенных дефолтов. Явный ноль или false в YAML сохраняется и затем проверяется. Пустые переменные окружения считаются незаданными. Неизвестные ключи YAML и несколько YAML-документов отклоняются; размер конфигурационного файла ограничен 1 MiB. Неизвестные имена переменных с распознаваемыми префиксами сервиса вызывают диагностику, а не становятся настройками молча.
+
+~~~sh
+easyp-svc config validate --cfg service.yaml
+easyp-svc config print --cfg service.yaml --origin
+easyp-svc config print --cfg service.yaml --changed
+~~~
+По умолчанию <code>config print</code> скрывает значения, помеченные как секреты. Не отправляйте вывод <code>--show-secrets</code> в логи CI или заявку поддержки. Валидация проверяет локальную конфигурацию и preflight-требования, но не соединение с БД и не реальную генерацию.
+
+## Все настройки сервиса
+
+| YAML | Environment | Type / Тип | Default / Дефолт | Назначение |
+| --- | --- | --- | --- | --- |
+| <code>server.host</code> | <code>SERVER&#95;HOST</code> | <code>string</code> | <code>0.0.0.0</code> | Адрес привязки listeners. |
+| <code>server.port.grpc</code> | <code>SERVER&#95;PORT&#95;GRPC</code> | <code>string</code> | <code>23410</code> | Порт gRPC listener, задаётся строкой. |
+| <code>server.port.metric</code> | <code>SERVER&#95;PORT&#95;METRIC</code> | <code>string</code> | <code>23411</code> | Порт HTTP listener метрик Prometheus. |
+| <code>server.port.health</code> | <code>SERVER&#95;PORT&#95;HEALTH</code> | <code>string</code> | <code>23412</code> | Порт HTTP liveness и readiness с проверкой БД. |
+| <code>server.port.mcp</code> | <code>SERVER&#95;PORT&#95;MCP</code> | <code>string</code> | <code>23413</code> | Порт MCP HTTP; значение проверяется даже при выключенном MCP. |
+| <code>server.tls.cert&#95;file</code> | <code>SERVER&#95;TLS&#95;CERT&#95;FILE</code> | <code>string</code> | <code>""</code> | PEM-сертификат сервера; задаётся вместе с key_file. |
+| <code>server.tls.key&#95;file</code> | <code>SERVER&#95;TLS&#95;KEY&#95;FILE</code> | <code>string</code> | <code>""</code> | Файл приватного PEM-ключа gRPC TLS. |
+| <code>server.tls.client&#95;ca&#95;file</code> | <code>SERVER&#95;TLS&#95;CLIENT&#95;CA&#95;FILE</code> | <code>string</code> | <code>""</code> | PEM CA bundle; при настройке требует проверенный клиентский сертификат. |
+| <code>server.force&#95;shutdown&#95;after</code> | <code>SERVER&#95;FORCE&#95;SHUTDOWN&#95;AFTER</code> | <code>time.Duration</code> | <code>2m30s</code> | Бюджет до принудительного выхода после сигнала завершения; должен превышать generation_timeout. |
+| <code>server.trusted&#95;proxies</code> | <code>SERVER&#95;TRUSTED&#95;PROXIES</code> | <code>[]string</code> | <code>[]</code> | CIDR доверенных proxy для заголовков IP клиента. Пустой список означает использование TCP peer. |
+| <code>server.max&#95;recv&#95;msg&#95;size</code> | <code>SERVER&#95;MAX&#95;RECV&#95;MSG&#95;SIZE</code> | <code>int</code> | <code>67108864</code> | Максимальный размер входящего gRPC-сообщения в байтах. |
+| <code>server.max&#95;send&#95;msg&#95;size</code> | <code>SERVER&#95;MAX&#95;SEND&#95;MSG&#95;SIZE</code> | <code>int</code> | <code>67108864</code> | Максимальный размер исходящего gRPC-сообщения в байтах; не меньше registry.max_output_size. |
+| <code>server.max&#95;concurrent&#95;streams</code> | <code>SERVER&#95;MAX&#95;CONCURRENT&#95;STREAMS</code> | <code>uint32</code> | <code>256</code> | Одновременные HTTP/2 streams на gRPC-соединение; не глобальное число workers. |
+| <code>db.postgres</code> | <code>DB&#95;POSTGRES&#95;DSN</code> | <code>string</code> | <code>""</code> | Обязательная строка подключения PostgreSQL. Скрывается при печати, если секреты не разрешены явно. |
+| <code>registry.plugins&#95;dir</code> | <code>REGISTRY&#95;PLUGINS&#95;DIR</code> | <code>string</code> | <code>/plugins</code> | Каталог доверенных локальных плагинов; при S3 — локальный кэш артефактов. |
+| <code>registry.max&#95;output&#95;size</code> | <code>REGISTRY&#95;MAX&#95;OUTPUT&#95;SIZE</code> | <code>int64</code> | <code>67108864</code> | Максимальный stdout плагина в байтах; положительное число. Не ограничивает память дочернего процесса. |
+| <code>registry.cache&#95;max&#95;bytes</code> | <code>REGISTRY&#95;CACHE&#95;MAX&#95;BYTES</code> | <code>int64</code> | <code>21474836480</code> | Мягкий бюджет S3-кэша в байтах; 0 отключает вытеснение. Local-only артефакты не вытесняются. |
+| <code>registry.s3.endpoint</code> | <code>REGISTRY&#95;S3&#95;ENDPOINT</code> | <code>string</code> | <code>""</code> | URL совместимого с S3 endpoint; пустое значение использует определение endpoint AWS. |
+| <code>registry.s3.bucket</code> | <code>REGISTRY&#95;S3&#95;BUCKET</code> | <code>string</code> | <code>""</code> | Bucket с архивами плагинов; пустое значение выключает S3. |
+| <code>registry.s3.region</code> | <code>REGISTRY&#95;S3&#95;REGION</code> | <code>string</code> | <code>us-east-1</code> | Регион подписи запросов S3. |
+| <code>registry.s3.prefix</code> | <code>REGISTRY&#95;S3&#95;PREFIX</code> | <code>string</code> | <code>""</code> | Префикс ключа объекта; адаптер при необходимости добавляет завершающий слеш. |
+| <code>registry.s3.access&#95;key&#95;id</code> | <code>REGISTRY&#95;S3&#95;ACCESS&#95;KEY&#95;ID</code> | <code>string</code> | <code>""</code> | ID статического access key; задавайте вместе с secret_access_key либо не задавайте оба. |
+| <code>registry.s3.secret&#95;access&#95;key</code> | <code>REGISTRY&#95;S3&#95;SECRET&#95;ACCESS&#95;KEY</code> | <code>string</code> | <code>""</code> | Статический secret access key; скрывается в config print. |
+| <code>registry.s3.force&#95;path&#95;style</code> | <code>REGISTRY&#95;S3&#95;FORCE&#95;PATH&#95;STYLE</code> | <code>bool</code> | <code>false</code> | Использовать path-style адресацию S3; обычно требуется для MinIO/RustFS. |
+| <code>telemetry.otlp&#95;endpoint</code> | <code>TELEMETRY&#95;OTLP&#95;ENDPOINT</code> | <code>string</code> | <code>""</code> | Endpoint экспортёров OTLP traces и metrics; пустое значение выключает эти экспортёры. Поведение транспорта описано в разделе наблюдаемости. |
+| <code>telemetry.pyroscope&#95;endpoint</code> | <code>TELEMETRY&#95;PYROSCOPE&#95;ENDPOINT</code> | <code>string</code> | <code>""</code> | Endpoint профилирования Pyroscope; пустое значение выключает экспорт профилей. |
+| <code>telemetry.service&#95;tier</code> | <code>TELEMETRY&#95;SERVICE&#95;TIER</code> | <code>string</code> | <code>""</code> | Явная метка tier для телеметрии; не выводится из текущей лицензии. |
+| <code>worker&#95;pool.workers</code> | <code>WORKER&#95;POOL&#95;WORKERS</code> | <code>int</code> | <code>4</code> | Workers поиска и загрузки; положительное число, при старте Community ограничивается четырьмя. |
+| <code>worker&#95;pool.queue&#95;size</code> | <code>WORKER&#95;POOL&#95;QUEUE&#95;SIZE</code> | <code>int</code> | <code>16</code> | Ёмкость каждой из отдельных очередей lookup и ожидания генерации. |
+| <code>worker&#95;pool.max&#95;concurrent&#95;generations</code> | <code>WORKER&#95;POOL&#95;MAX&#95;CONCURRENT&#95;GENERATIONS</code> | <code>int</code> | <code>16</code> | Размер семафора генерации; Community при старте ограничивает его шестнадцатью. |
+| <code>worker&#95;pool.generation&#95;timeout</code> | <code>WORKER&#95;POOL&#95;GENERATION&#95;TIMEOUT</code> | <code>time.Duration</code> | <code>2m0s</code> | Бюджет исполнения после допуска к генерации, включая повторные попытки исполнения. |
+| <code>worker&#95;pool.max&#95;retries</code> | <code>WORKER&#95;POOL&#95;MAX&#95;RETRIES</code> | <code>int</code> | <code>2</code> | Дополнительные попытки при распознанных временных ошибках исполнения; 0 отключает retry. |
+| <code>worker&#95;pool.shutdown&#95;timeout</code> | <code>WORKER&#95;POOL&#95;SHUTDOWN&#95;TIMEOUT</code> | <code>time.Duration</code> | <code>30s</code> | Бюджет остановки и опустошения пула. Отдельный от предельного срока завершения сервера. |
+| <code>license.key</code> | <code>LICENSE&#95;KEY</code> | <code>string</code> | <code>""</code> | PASETO-токен в конфигурации; приоритетнее license.file, скрывается при печати. |
+| <code>license.file</code> | <code>LICENSE&#95;FILE</code> | <code>string</code> | <code>""</code> | Файл PASETO-токена; читается при старте процесса, а не при каждом refresh. |
+| <code>license.public&#95;keys</code> | <code>LICENSE&#95;PUBLIC&#95;KEYS</code> | <code>map[string]string</code> | <code>&#123;&#125;</code> | Map от key ID к публичному ключу Ed25519 из 64 hex-символов; * — fallback ID. |
+| <code>license.cache&#95;ttl</code> | <code>LICENSE&#95;CACHE&#95;TTL</code> | <code>time.Duration</code> | <code>5m0s</code> | Период повторной проверки загруженного токена и обновления claims. |
+| <code>rate&#95;limit.requests&#95;per&#95;second</code> | <code>RATE&#95;LIMIT&#95;REQUESTS&#95;PER&#95;SECOND</code> | <code>float64</code> | <code>10</code> | Скорость пополнения токенов на определённый IP; длительная частота запросов, не месячная квота. |
+| <code>rate&#95;limit.burst</code> | <code>RATE&#95;LIMIT&#95;BURST</code> | <code>int</code> | <code>20</code> | Ёмкость кратковременного всплеска запросов на IP. |
+| <code>rate&#95;limit.cleanup&#95;interval</code> | <code>RATE&#95;LIMIT&#95;CLEANUP&#95;INTERVAL</code> | <code>time.Duration</code> | <code>10m0s</code> | Период очистки неактивных записей per-IP rate limiter. |
+| <code>rate&#95;limit.max&#95;concurrent&#95;per&#95;ip</code> | <code>RATE&#95;LIMIT&#95;MAX&#95;CONCURRENT&#95;PER&#95;IP</code> | <code>int</code> | <code>2</code> | Число одновременно допущенных RPC на определённый IP; 0 отключает этот limiter. |
+| <code>audit.buffer&#95;size</code> | <code>AUDIT&#95;BUFFER&#95;SIZE</code> | <code>int</code> | <code>1000</code> | Ёмкость очереди аудита в памяти; аудит доступен только Enterprise. |
+| <code>audit.batch&#95;size</code> | <code>AUDIT&#95;BATCH&#95;SIZE</code> | <code>int</code> | <code>100</code> | Максимальное число событий в batch записи в БД. |
+| <code>audit.flush&#95;interval</code> | <code>AUDIT&#95;FLUSH&#95;INTERVAL</code> | <code>time.Duration</code> | <code>1s</code> | Периодическая запись неполного batch. |
+| <code>audit.max&#95;save&#95;retries</code> | <code>AUDIT&#95;MAX&#95;SAVE&#95;RETRIES</code> | <code>int</code> | <code>3</code> | Дополнительные попытки записи в БД; 3 означает максимум 4 попытки всего. |
+| <code>audit.enqueue&#95;timeout</code> | <code>AUDIT&#95;ENQUEUE&#95;TIMEOUT</code> | <code>time.Duration</code> | <code>1s</code> | Предельное ожидание места в очереди; 0 выбирает неблокирующий enqueue. |
+| <code>audit.flush&#95;timeout</code> | <code>AUDIT&#95;FLUSH&#95;TIMEOUT</code> | <code>time.Duration</code> | <code>5s</code> | Общий бюджет записи batch в БД, включая повторные попытки. |
+| <code>audit.retention&#95;months</code> | <code>AUDIT&#95;RETENTION&#95;MONTHS</code> | <code>int</code> | <code>12</code> | Удалять месячные партиции строго старше начала месяца cutoff; 0 отключает удаление. Текущий месяц учитывается дополнительно. |
+| <code>audit.pre&#95;create&#95;months</code> | <code>AUDIT&#95;PRE&#95;CREATE&#95;MONTHS</code> | <code>int</code> | <code>3</code> | Будущие месячные партиции для предварительного создания, дополнительно к текущему месяцу. |
+| <code>audit.partition&#95;check&#95;interval</code> | <code>AUDIT&#95;PARTITION&#95;CHECK&#95;INTERVAL</code> | <code>time.Duration</code> | <code>6h0m0s</code> | Период обслуживания партиций; обслуживание также выполняется при старте. |
+| <code>audit.partition&#95;op&#95;timeout</code> | <code>AUDIT&#95;PARTITION&#95;OP&#95;TIMEOUT</code> | <code>time.Duration</code> | <code>30s</code> | Таймаут операции обслуживания партиций. |
+| <code>auth.write&#95;tokens</code> | <code>AUTH&#95;WRITE&#95;TOKENS</code> | <code>config.TokenList</code> | <code>[]</code> | Статические записи имени и SHA-256 токена. Пустой список запрещает все изменения. |
+| <code>auth.require&#95;authentication</code> | <code>AUTH&#95;REQUIRE&#95;AUTHENTICATION</code> | <code>bool</code> | <code>false</code> | Требовать bearer-аутентификацию для генерации, каталога и включённого MCP, а не только изменений. |
+| <code>mcp.enabled</code> | <code>MCP&#95;ENABLED</code> | <code>bool</code> | <code>false</code> | Запускать отдельный HTTP listener /mcp; gRPC TLS его не защищает. |
+| <code>log.level</code> | <code>LOG&#95;LEVEL</code> | <code>string</code> | <code>info</code> | Уровень структурированных логов: debug, info, warn или error; service start --log-level имеет приоритет. |
+
+## Составные значения и дополнительные переменные
+
+<code>auth.write&#95;tokens</code> — YAML-список объектов с ключами <code>name</code> и <code>sha256</code>. У полей исходника есть теги <code>env:"NAME"</code> и <code>env:"SHA256"</code>, но список реализует собственный decoder: поддерживается **<code>AUTH&#95;WRITE&#95;TOKENS=ci=HASH,operator=HASH</code>**, а не независимые переменные <code>NAME</code> и <code>SHA256</code>. Хеш содержит ровно 64 hex-символа, имена должны быть непустыми и уникальными.
+
+<code>license.public&#95;keys</code> — YAML-map. Формат окружения: <code>LICENSE&#95;PUBLIC&#95;KEYS="key-id:HEX,&#42;:FALLBACK&#95;HEX"</code>; каждый публичный ключ содержит 64 hex-символа. <code>server.trusted&#95;proxies</code> задаётся YAML-последовательностью или списком через запятую в <code>SERVER&#95;TRUSTED&#95;PROXIES</code>.
+
+<code>OTEL&#95;EXPORTER&#95;OTLP&#95;ENDPOINT</code> принимается как alias для <code>TELEMETRY&#95;OTLP&#95;ENDPOINT</code>; при наличии обоих приоритет имеет каноническая переменная сервиса. Старые <code>TELEMETRY&#95;OTEL&#95;EXPORTER&#95;OTLP&#95;ENDPOINT</code>, <code>LICENSE&#95;PUBLIC&#95;KEY</code>, <code>license.public&#95;key</code> и <code>db.driver</code> не являются текущими настройками: учитывайте диагностику и мигрируйте, а не копируйте старые примеры. Когда статические credentials S3 не заданы, их поиск делегирован default credential chain закреплённой версии AWS SDK; его переменные, файлы и instance roles — поведение SDK, не дополнительные YAML-ключи EasyP.
+
+**<code>EASYP&#95;CONFIG</code> выбирает файл конфигурации для команд с <code>--cfg</code>.** Контейнерный healthcheck — отдельный процесс: запуск сервера с <code>--cfg /run/service.yaml</code> не передаёт этот аргумент в <code>easyp-svc health</code>. Задайте <code>EASYP&#95;CONFIG=/run/service.yaml</code> для обоих процессов либо передайте <code>--cfg</code> явно в обе команды. <code>health --addr</code> переопределяет определение адреса и проверяет <code>/live</code>, а не readiness.
+
+**<code>EASYP&#95;TOKEN</code> читает только операторский клиент регистрации как fallback для <code>--token</code>.** Эта переменная не задаёт разрешённые серверу токены; проверенный remote executor CLI <code>easyp</code> её не читает.
+
+## Связанные ограничения
+
+Все четыре порта должны быть допустимыми и различаться. Сертификат TLS и ключ задаются вместе; client CA требует TLS. Число workers, размер очереди, бюджеты исполнения и завершения, лимиты сообщений и вывода должны проходить валидацию. В частности, <code>server.force&#95;shutdown&#95;after</code> должен превышать <code>worker&#95;pool.generation&#95;timeout</code>, а предел исходящего сообщения не может быть меньше разрешённого вывода плагина. Ненулевой бюджет кэша не должен быть меньше лимита вывода. Параметры bucket, endpoint и credentials S3 должны быть согласованы.
+
+Wire-ответ оборачивает вывод плагина, поэтому одинаковые пределы байтов для сырого вывода и содержащего его gRPC-сообщения не гарантируют доставку точно на границе размера. Оставляйте запас транспорта и согласуйте лимит приёма клиента.
+
+Лицензионные потолки и форматы токенов описаны в [аутентификации и лицензировании](./authentication-and-licensing), очереди и таймауты — в [архитектуре](./architecture), полный справочник Helm values — в [установке](./installation).

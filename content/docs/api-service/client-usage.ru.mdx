@@ -1,0 +1,146 @@
+---
+title: "CLI и Go SDK"
+---
+
+## Разработческий CLI
+
+Проверенный remote executor <code>easyp</code> использует URL <code>generate.plugins[].remote</code> из <code>easyp.yaml</code>. Он компилирует схемы на клиенте, отправляет дескрипторы через EasyP gRPC API и записывает полученные файлы в <code>out</code>. Исходный модуль в реестр схем не загружается. Пример для локальной разработки:
+
+~~~yaml
+generate:
+  inputs:
+    - directory: proto
+  plugins:
+    - remote: http://localhost:23410/protocolbuffers/go:v1.36.11
+      out: gen
+      opts:
+        paths: source_relative
+~~~
+~~~sh
+easyp generate
+~~~
+Путь URL задаёт <code>group/name:version</code>; без версии выбирается сортируемый сервисом как текст <code>latest</code>, поэтому закрепляйте её. <code>opts</code> превращается в строку параметров плагина. <code>out</code> — путь файловой системы клиента, не каталог вывода сервера. <code>http://</code> явно выбирает plaintext gRPC, <code>https://</code> — TLS; отдельного REST API генерации эти схемы не означают. Для рабочего развёртывания используйте HTTPS с сертификатом, которому доверяет клиент.
+
+## Текущие ограничения CLI
+
+Проверенный executor **не** отправляет bearer-токен, не читает <code>EASYP&#95;TOKEN</code>, не загружает пользовательский CA из конфигурации и не предоставляет клиентский сертификат. Он создаёт прямое gRPC-соединение, а не использует Go SDK. Поэтому сервер с обязательной аутентификацией или mTLS нельзя сделать доступным этому executor одной переменной окружения. Поддерживаемого YAML-ключа токена или клиентского TLS для этой ревизии нет.
+
+Executor использует deadline генерации 30 секунд и не переопределяет дефолтный клиентский лимит приёма gRPC 4 MiB. Сервер, которому разрешён вывод 64 MiB, может вернуть результат, отклоняемый CLI. У SDK ниже отдельные настройки и лимиты; его возможности нельзя приписывать CLI. Для адресов без схемы также действует эвристика plaintext по подстроке localhost; используйте явную схему URL, а не эту эвристику.
+
+Когда production-доступ требует этих мер защиты, используйте аутентифицированный SDK-клиент либо специально спроектированную интеграцию клиента и gateway. Не выключайте аутентификацию опубликованного сервера ради обхода ограничения CLI. Полная конфигурация CLI и миграция зависимостей не входят в этот справочник сервиса.
+
+## Go SDK
+
+Импортируйте <code>github.com/easyp-tech/service/sdk</code> (Apache-2.0). Тег <code>sdk/v1.0.2</code> соответствует следующей версии модуля; требуется Go 1.26.6.
+
+~~~sh
+go get github.com/easyp-tech/service/sdk@v1.0.2
+~~~
+<code>NewClient(address, options...)</code> создаёт соединение лениво; отсутствие ошибки конструктора не является проверкой readiness. Всегда закрывайте клиент. <code>GenerateCode</code> принимает стандартный <code>pluginpb.CodeGeneratorRequest</code> и возвращает <code>CodeGeneratorResponse</code>. Проверяйте и Go error, и поле <code>error</code> ответа. SDK сам не компилирует <code>.proto</code> и не записывает выходные файлы.
+
+<code>ListPlugins</code> проходит все страницы. Используйте <code>WithFilter(PluginFilter&#123;Group, Name, Version, Tags&#125;)</code>; group/name/version сравниваются точно, tags объединяются через AND. Опции размера страницы и курсора у SDK нет: он возвращает собранный список. Таймаут чтения применяется к каждой странице, а более ранний deadline вызывающего ограничивает весь обход.
+
+<code>CreatePlugin</code>, <code>UpdatePlugin</code> и <code>DeletePlugin</code> — операторские возможности. <code>UpdatePlugin</code> принимает необязательные пути mask <code>"config"</code> и <code>"tags"</code>; отсутствие путей заменяет оба поля. Удаление может удалить S3-объект на сервере; не полагайтесь на комментарий SDK о сохранении архива.
+
+## Опции SDK и дефолты
+
+| Опция | Дефолт / поведение |
+| --- | --- |
+| <code>WithInsecure()</code> | Явный plaintext; транспорт по умолчанию — TLS. |
+| <code>WithTransportCredentials(creds)</code> | gRPC credentials для собственных trust roots или mTLS. |
+| <code>WithToken(token)</code> | Добавляет bearer-токен; по умолчанию отсутствует. |
+| <code>WithMaxRecvMsgSize(bytes)</code> | Дефолт 64 MiB; неположительное значение возвращает дефолт. |
+| <code>WithMaxRetries(n)</code> | 3 дополнительные попытки, только для <code>Unavailable</code>. |
+| <code>WithRetryBaseDelay(d)</code>, <code>WithRetryMaxDelay(d)</code> | Exponential backoff от 100 ms до 5 s с jitter. |
+| <code>WithGenerateCodeTimeout(d)</code> | 30 s; более ранний deadline вызывающего приоритетнее. |
+| <code>WithListPluginsTimeout(d)</code> | 10 s на страницу. |
+| <code>WithCreatePluginTimeout(d)</code> | 120 s для create, update и delete. |
+| <code>WithUnaryInterceptor(i)</code> | Дополнительный interceptor, обёрнутый retry-interceptor. |
+| <code>WithLoggingInterceptor(logger)</code> | Необязательные структурированные логи вызовов SDK. |
+| <code>WithMetricsInterceptor(collector)</code> | Необязательная интеграция <code>MetricsCollector</code> SDK. |
+| <code>WithHealthCheck(interval)</code> | По умолчанию выключено; следит за gRPC connectivity, не за health RPC сервера и не за readiness БД. |
+| <code>WithKeepaliveParams(params)</code> | Необязательные параметры gRPC keepalive клиента. |
+
+SDK автоматически не повторяет <code>ResourceExhausted</code>. Повтор изменения после <code>Unavailable</code> может встретить уже применённую операцию: используйте стабильные координаты и согласуйте результат, не предполагая exactly-once. Deadline клиента может закончиться раньше более длинного бюджета исполнения сервера.
+
+## Полный пример SDK
+
+Пример создаёт небольшой запрос дескрипторов, находит закреплённый плагин, генерирует Go-код и печатает имена и размеры файлов без записи недоверенных путей ответа на диск. Флаги <code>-addr</code>, <code>-plaintext</code> и переменная <code>EASYP&#95;SERVICE&#95;TOKEN</code> относятся к **этому примеру**, не к CLI EasyP. Plaintext оставляйте только для локальной разработческой среды.
+
+~~~go
+package main
+
+import (
+	"context"
+	"flag"
+	"fmt"
+	"log"
+	"os"
+	"time"
+
+	sdk "github.com/easyp-tech/service/sdk"
+	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/descriptorpb"
+	"google.golang.org/protobuf/types/pluginpb"
+)
+
+func main() {
+	addr := flag.String("addr", "localhost:23410", "service host:port")
+	plaintext := flag.Bool("plaintext", false, "use plaintext only for isolated local development")
+	flag.Parse()
+	options := []sdk.Option{sdk.WithGenerateCodeTimeout(time.Minute)}
+	if *plaintext {
+		options = append(options, sdk.WithInsecure())
+	}
+	// This environment name belongs to this example, not to the service or easyp CLI.
+	if token := os.Getenv("EASYP_SERVICE_TOKEN"); token != "" {
+		options = append(options, sdk.WithToken(token))
+	}
+	client, err := sdk.NewClient(*addr, options...)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer client.Close()
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
+	plugins, err := client.ListPlugins(ctx, sdk.WithFilter(sdk.PluginFilter{
+		Group: "protocolbuffers", Name: "go", Version: "v1.36.11",
+	}))
+	if err != nil {
+		log.Fatal(err)
+	}
+	if len(plugins) == 0 {
+		log.Fatal("required plugin is not registered")
+	}
+	file := &descriptorpb.FileDescriptorProto{
+		Name: proto.String("hello.proto"), Syntax: proto.String("proto3"),
+		Package: proto.String("demo.v1"),
+		Options: &descriptorpb.FileOptions{GoPackage: proto.String("example.com/demo/gen;demov1")},
+		MessageType: []*descriptorpb.DescriptorProto{{
+			Name: proto.String("Hello"),
+			Field: []*descriptorpb.FieldDescriptorProto{{
+				Name: proto.String("name"), Number: proto.Int32(1),
+				Label: descriptorpb.FieldDescriptorProto_LABEL_OPTIONAL.Enum(),
+				Type:  descriptorpb.FieldDescriptorProto_TYPE_STRING.Enum(),
+			}},
+		}},
+	}
+	response, err := client.GenerateCode(ctx, "protocolbuffers/go:v1.36.11", &pluginpb.CodeGeneratorRequest{
+		ProtoFile:      []*descriptorpb.FileDescriptorProto{file},
+		FileToGenerate: []string{"hello.proto"}, Parameter: proto.String("paths=source_relative"),
+	})
+	if err != nil {
+		log.Fatal(err)
+	}
+	if response == nil {
+		log.Fatal("service returned no CodeGeneratorResponse")
+	}
+	if response.GetError() != "" {
+		log.Fatal(response.GetError())
+	}
+	for _, generated := range response.GetFile() {
+		fmt.Printf("%s: %d bytes\n", generated.GetName(), len(generated.GetContent()))
+	}
+}
+~~~
+Для mTLS создайте <code>credentials.NewTLS</code> с доверенными корнями и клиентским сертификатом и передайте <code>WithTransportCredentials</code>. Контроль connectivity не заменяет HTTP readiness и синтетическую генерацию.

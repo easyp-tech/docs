@@ -1,0 +1,224 @@
+---
+title: "Установка и Helm values"
+---
+
+## Требования к развёртыванию
+
+Каждому развёртыванию нужны PostgreSQL и доступный учётной записи сервиса каталог доверенных исполняемых файлов плагинов. S3-совместимое хранилище необязательно. Новая БД мигрируется при старте; роли БД нужны соответствующие DDL-права. Установка сервера не устанавливает и не регистрирует каталог плагинов. См. [Плагины](./plugins).
+
+Страница следует релизу сервиса/SDK **v1.0.2**, Helm-чарту **1.0.2** (appVersion **v1.0.2**) и Go **1.26.6** из проверенных manifests. Проверенный runtime-код совпадает с релизом; последующие изменения касаются документации и healthcheck development Compose.
+
+## Docker-образ и каналы релизов
+
+Release workflow задаёт имя образа <code>ghcr.io/easyp-tech/service</code>. Каналы имеют разный смысл:
+
+| Тег | Значение | Как выбирать |
+| --- | --- | --- |
+| <code>v1.0.2</code> / <code>vX.Y.Z</code> | Версионный релиз. | Согласуйте конфигурацию и release notes; сохраните разрешённый digest. |
+| <code>latest</code> | Последний опубликованный релиз, не текущий master. | Изменяемый тег; не является гарантией воспроизводимости. |
+| <code>edge</code> | Успешная сборка master. | Подвижный канал разработки, не обещание релизной стабильности. |
+| <code>sha-&lt;семь символов commit&gt;</code> | Edge-сборка определённого commit. | Точнее edge, но неизменяемый идентификатор содержимого — digest. |
+
+Workflows собирают Linux amd64 и arm64. Версионные и commit-теги — соглашение об именовании, не доказательство запрета их замены реестром. Доступность опубликованных образов и чарта в рамках этого аудита не проверялась.
+
+Entrypoint образа — <code>/easyp-svc</code>, **дефолтной команды нет**: передайте <code>service start</code>. Runtime — Debian Bookworm slim с CA-сертификатами и UID/GID 65532; он не включает все языковые runtimes произвольных плагинов. Смонтируйте конфигурацию и задайте <code>EASYP&#95;CONFIG</code>, чтобы отдельный healthcheck образа видел тот же файл:
+
+~~~sh
+docker run --rm --name easyp-service \
+  -e EASYP_CONFIG=/run/easyp/service.yaml \
+  -p 127.0.0.1:23410:23410 \
+  -p 127.0.0.1:23412:23412 \
+  --mount type=bind,src="$PWD/service.yaml",dst=/run/easyp/service.yaml,readonly \
+  --mount type=bind,src="$PWD/plugins",dst=/plugins \
+  ghcr.io/easyp-tech/service:v1.0.2 service start
+~~~
+Подготовьте <code>service.yaml</code> с БД, доступной **из контейнера**. <code>localhost</code> внутри контейнера — не PostgreSQL хоста. Том плагинов должен разрешать UID 65532 чтение и исполнение, а при распаковке S3-кэша — запись. Разработческие опубликованные порты привязывайте к loopback; до внешней публикации настройте TLS и доступ. Healthcheck образа проверяет liveness <code>/live</code>, не readiness БД.
+
+Сборка из исходников без обращения к GHCR:
+
+~~~sh
+git clone --branch v1.0.2 https://github.com/easyp-tech/service.git
+cd service
+docker build --build-arg VERSION=v1.0.2 -t easyp-service:local .
+~~~
+Шаги Dockerfile могут скачивать зависимости и базовые образы. Это не рецепт air-gapped сборки: для отключённой среды заранее подготовьте и проверьте эти артефакты.
+
+## Compose
+
+В репозитории есть development Compose и более крупный deployment/observability stack. Последний содержит специфичные для размещения маршрутизацию, credentials, предположения о tiers и сервисы телеметрии; это не универсальная production-установка одной командой. Для одной БД PostgreSQL, одного сервиса и одного плагина используйте изолированный [быстрый старт](./quickstart). Не копируйте production hostnames и credentials из исторических примеров.
+
+Перед запуском изучите <code>docker compose config</code>. Согласуйте путь конфигурации сервера и healthcheck через <code>EASYP&#95;CONFIG</code> либо явный <code>--cfg</code> healthcheck. Готовность БД и реальная генерация проверяются отдельно.
+
+## Отдельные бинарники
+
+Конфигурация GoReleaser собирает <code>easyp-svc</code> для Linux и macOS, amd64 и arm64, с выключенным CGO. Архивы именуются <code>easyp-svc&#95;1.0.2&#95;&lt;os&gt;&#95;&lt;arch&gt;.tar.gz</code> и содержат LICENSE и README; release workflow также создаёт checksums и software-bill-of-materials. Возьмите нужный архив из [релиза сервиса](https://github.com/easyp-tech/service/releases/tag/v1.0.2), проверьте checksum и сохраните точный артефакт. В этом аудите собирались локальные бинарники, но скачиваемые release assets не проверялись.
+
+~~~sh
+go build -trimpath -ldflags='-X main.version=v1.0.2' \
+  -o ./easyp-svc ./cmd/easyp-svc
+./easyp-svc config validate --cfg ./service.yaml
+./easyp-svc service start --cfg ./service.yaml
+~~~
+Версия Go из go.mod — требование сборки исходников. Linux-executable, извлечённый при сборке плагина, не становится исполняемым на macOS-сервере из-за наличия операторского бинарника для macOS. Согласуйте артефакт и sidecars каждого плагина с ОС, архитектурой и установленным runtime сервера.
+
+## Установка Helm
+
+Адрес чарта — <code>oci://ghcr.io/easyp-tech/charts/easyp-service</code>. Он развёртывает сервис, не PostgreSQL и объектное хранилище. Заранее подготовьте Kubernetes Secret с <code>DB&#95;POSTGRES&#95;DSN</code> и нужными <code>AUTH&#95;WRITE&#95;TOKENS</code>, лицензией или S3 credentials в формате окружения; альтернатива — <code>secrets.create</code> и <code>secrets.data</code> из защищённого источника values. Не коммитьте credentials в values-файл.
+
+При включённом TLS задайте <code>tls.serverSecret</code> либо включите cert-manager с настроенным issuer. Пустой <code>tls.clientCASecret</code> по умолчанию означает, что серверный Secret должен также содержать <code>ca.crt</code>, а сервис требует клиентские сертификаты. Значение <code>"-"</code> выбирайте только при осознанном использовании server-only TLS без mTLS. Прикладная bearer-аутентификация остаётся независимой.
+
+~~~yaml
+secrets:
+  existingSecret: easyp-service-env
+tls:
+  enabled: true
+  serverSecret: easyp-service-tls
+  clientCASecret: "-"
+extraEnv:
+  - name: AUTH_REQUIRE_AUTHENTICATION
+    value: "true"
+~~~
+Пример требует клиента, умеющего передавать bearer-токен, например Go SDK; текущий remote executor <code>easyp</code> этого не умеет. Также нужен способ доставки артефактов: настроенный S3 либо заполненный локальный том плагинов.
+
+~~~sh
+helm template easyp ./deploy/charts/easyp-service --values values.yaml
+helm upgrade --install easyp oci://ghcr.io/easyp-tech/charts/easyp-service \
+  --version 1.0.2 --namespace easyp --create-namespace --values values.yaml
+~~~
+Первая команда рендерит локальный checkout; вторая устанавливает сервис в кластер пользователя и обращается к реестру. Это инструкции, не действия, выполненные аудитом.
+
+## Обязательные и опасные настройки чарта
+
+Дефолтное развёртывание одной реплики использует Recreate и ReadWriteOnce-том. Несколько реплик с RWO чарт отклоняет. Хотя RWX проходит эту проверку, у кэша плагинов нет межпроцессной координации: не превращайте обход валидации в рекомендацию HA с общим кэшем. Планируйте отдельные кэши и проверяйте всю топологию.
+
+Хранилище должно быть строго больше положительного cache budget. При выключенном persistence лимит ephemeral-storage также должен превышать лимит emptyDir; простое выключение persistence с дефолтными 2 GiB лимита ресурса и 25 GiB emptyDir не проходит рендеринг. Проверка памяти вычисляет <code>2 × maxConcurrentGenerations × maxOutputSize</code>; это не предел памяти дочернего процесса и не полная модель ресурсов. Завершение должно удовлетворять <code>terminationGracePeriodSeconds &gt; forceShutdownAfterSeconds &gt; generationTimeoutSeconds</code>.
+
+Ingress требует hostname и CIDR доверенных proxy. Текущая валидация чарта дополнительно требует клиентский сертификат для включённого ServersTransport, даже когда <code>clientCASecret: "-"</code> выбирает server-only TLS: это ограничение чарта, не требование mTLS сервиса. Специфичные для Traefik ресурсы требуют соответствующих CRD и настройки controller.
+
+NetworkPolicy по умолчанию включена. Пустой ingress namespace selector не ограничивает gRPC-клиентов выбранным namespace. Разрешённые egress-порты не являются списком доверенных адресатов. **Шаблон не добавляет ingress-правило для MCP при его включении**; для разрешённого доступа к MCP нужна отдельно проверенная дополнительная политика. Дефолтный egress также не включает все возможные порты S3 и профилирования.
+
+Для ServiceMonitor и PrometheusRule нужны monitoring CRD. Аннотация reloader работает только при установленном совместимом reloader controller; встроенного hot-reload секретов она не создаёт. Учитывайте права и раскрытие метрик и health как эксплуатационных данных.
+
+## Полный справочник values чарта
+
+Таблица сгенерирована из проверенного <code>values.yaml</code>. Пустые maps/lists — точки расширения соответствующих объектов Kubernetes; их произвольные вложенные Kubernetes-ключи не являются YAML-настройками сервиса. Значения <code>config.&#42;</code> отображаются на [конфигурацию сервиса](./configuration); длительности с окончанием <code>Seconds</code> рендерятся как строки длительности.
+
+| values.yaml key | Type / Тип | Default / Дефолт | Назначение |
+| --- | --- | --- | --- |
+| <code>replicaCount</code> | integer | <code>1</code> | Число реплик сервиса; учитывайте ограничения кэша и тома. |
+| <code>image.repository</code> | string | <code>"ghcr.io/easyp-tech/service"</code> | Выбор образа; пустой tag использует appVersion. |
+| <code>image.tag</code> | string | <code>""</code> | Выбор образа; пустой tag использует appVersion. |
+| <code>image.pullPolicy</code> | string | <code>"IfNotPresent"</code> | Выбор образа; пустой tag использует appVersion. |
+| <code>imagePullSecrets</code> | list | <code>[]</code> | Ссылки на Secrets доступа к реестру образов. |
+| <code>nameOverride</code> | string | <code>""</code> | Переопределить имя чарта в именах ресурсов. |
+| <code>fullnameOverride</code> | string | <code>""</code> | Переопределить полный префикс имён ресурсов. |
+| <code>serviceAccount.create</code> | boolean | <code>true</code> | Создание, имя или аннотации ServiceAccount Kubernetes. |
+| <code>serviceAccount.annotations</code> | map | <code>&#123;&#125;</code> | Создание, имя или аннотации ServiceAccount Kubernetes. |
+| <code>serviceAccount.name</code> | string | <code>""</code> | Создание, имя или аннотации ServiceAccount Kubernetes. |
+| <code>podAnnotations</code> | map | <code>&#123;&#125;</code> | Дополнительные аннотации pod. |
+| <code>podLabels</code> | map | <code>&#123;&#125;</code> | Дополнительные labels pod. |
+| <code>nodeSelector</code> | map | <code>&#123;&#125;</code> | Метки выбора узлов Kubernetes. |
+| <code>tolerations</code> | list | <code>[]</code> | Допуски к taints узлов. |
+| <code>affinity</code> | map | <code>&#123;&#125;</code> | Правила affinity pod и узлов Kubernetes. |
+| <code>topologySpreadConstraints</code> | list | <code>[]</code> | Ограничения распределения pod по топологии. |
+| <code>reloader.enabled</code> | boolean | <code>true</code> | Аннотация для внешнего reloader controller; не устанавливает его. |
+| <code>resources.requests.cpu</code> | string | <code>"500m"</code> | Requests и limits pod; учитывайте запас для плагинов и распаковки. |
+| <code>resources.requests.memory</code> | string | <code>"1Gi"</code> | Requests и limits pod; учитывайте запас для плагинов и распаковки. |
+| <code>resources.requests.ephemeral-storage</code> | string | <code>"1Gi"</code> | Requests и limits pod; учитывайте запас для плагинов и распаковки. |
+| <code>resources.limits.cpu</code> | string | <code>"4"</code> | Requests и limits pod; учитывайте запас для плагинов и распаковки. |
+| <code>resources.limits.memory</code> | string | <code>"4Gi"</code> | Requests и limits pod; учитывайте запас для плагинов и распаковки. |
+| <code>resources.limits.ephemeral-storage</code> | string | <code>"2Gi"</code> | Requests и limits pod; учитывайте запас для плагинов и распаковки. |
+| <code>ports.grpc</code> | integer | <code>8080</code> | Порт Helm listener; отличается от дефолта бинарника. |
+| <code>ports.metric</code> | integer | <code>8081</code> | Порт Helm listener; отличается от дефолта бинарника. |
+| <code>ports.health</code> | integer | <code>8082</code> | Порт Helm listener; отличается от дефолта бинарника. |
+| <code>ports.mcp</code> | integer | <code>8083</code> | Порт Helm listener; отличается от дефолта бинарника. |
+| <code>mcp.enabled</code> | boolean | <code>false</code> | Включить отдельный HTTP listener MCP. |
+| <code>service.type</code> | string | <code>"ClusterIP"</code> | Тип и аннотации Kubernetes Service. |
+| <code>service.annotations</code> | map | <code>&#123;&#125;</code> | Тип и аннотации Kubernetes Service. |
+| <code>terminationGracePeriodSeconds</code> | integer | <code>180</code> | Бюджет завершения; больше предельного срока сервера. |
+| <code>config.logLevel</code> | string | <code>"info"</code> | Конфигурация сервиса; полный смысл раскрыт в справочнике конфигурации. |
+| <code>config.server.trustedProxies</code> | list | <code>[]</code> | Конфигурация сервиса; полный смысл раскрыт в справочнике конфигурации. |
+| <code>config.server.maxRecvMsgSize</code> | integer | <code>67108864</code> | Конфигурация сервиса; полный смысл раскрыт в справочнике конфигурации. |
+| <code>config.server.maxSendMsgSize</code> | integer | <code>67108864</code> | Конфигурация сервиса; полный смысл раскрыт в справочнике конфигурации. |
+| <code>config.server.maxConcurrentStreams</code> | integer | <code>256</code> | Конфигурация сервиса; полный смысл раскрыт в справочнике конфигурации. |
+| <code>config.forceShutdownAfterSeconds</code> | integer | <code>150</code> | Конфигурация сервиса; полный смысл раскрыт в справочнике конфигурации. |
+| <code>config.workerPool.workers</code> | integer | <code>4</code> | Конфигурация сервиса; полный смысл раскрыт в справочнике конфигурации. |
+| <code>config.workerPool.queueSize</code> | integer | <code>16</code> | Конфигурация сервиса; полный смысл раскрыт в справочнике конфигурации. |
+| <code>config.workerPool.maxConcurrentGenerations</code> | integer | <code>16</code> | Конфигурация сервиса; полный смысл раскрыт в справочнике конфигурации. |
+| <code>config.workerPool.generationTimeoutSeconds</code> | integer | <code>120</code> | Конфигурация сервиса; полный смысл раскрыт в справочнике конфигурации. |
+| <code>config.workerPool.maxRetries</code> | integer | <code>2</code> | Конфигурация сервиса; полный смысл раскрыт в справочнике конфигурации. |
+| <code>config.workerPool.shutdownTimeout</code> | string | <code>"30s"</code> | Конфигурация сервиса; полный смысл раскрыт в справочнике конфигурации. |
+| <code>config.rateLimit.requestsPerSecond</code> | number | <code>10.0</code> | Конфигурация сервиса; полный смысл раскрыт в справочнике конфигурации. |
+| <code>config.rateLimit.burst</code> | integer | <code>20</code> | Конфигурация сервиса; полный смысл раскрыт в справочнике конфигурации. |
+| <code>config.rateLimit.cleanupInterval</code> | string | <code>"10m"</code> | Конфигурация сервиса; полный смысл раскрыт в справочнике конфигурации. |
+| <code>config.rateLimit.maxConcurrentPerIP</code> | integer | <code>2</code> | Конфигурация сервиса; полный смысл раскрыт в справочнике конфигурации. |
+| <code>config.audit.bufferSize</code> | integer | <code>1000</code> | Конфигурация сервиса; полный смысл раскрыт в справочнике конфигурации. |
+| <code>config.audit.batchSize</code> | integer | <code>100</code> | Конфигурация сервиса; полный смысл раскрыт в справочнике конфигурации. |
+| <code>config.audit.flushInterval</code> | string | <code>"1s"</code> | Конфигурация сервиса; полный смысл раскрыт в справочнике конфигурации. |
+| <code>config.audit.maxSaveRetries</code> | integer | <code>3</code> | Конфигурация сервиса; полный смысл раскрыт в справочнике конфигурации. |
+| <code>config.audit.enqueueTimeout</code> | string | <code>"1s"</code> | Конфигурация сервиса; полный смысл раскрыт в справочнике конфигурации. |
+| <code>config.audit.flushTimeout</code> | string | <code>"5s"</code> | Конфигурация сервиса; полный смысл раскрыт в справочнике конфигурации. |
+| <code>config.audit.retentionMonths</code> | integer | <code>12</code> | Конфигурация сервиса; полный смысл раскрыт в справочнике конфигурации. |
+| <code>config.audit.preCreateMonths</code> | integer | <code>3</code> | Конфигурация сервиса; полный смысл раскрыт в справочнике конфигурации. |
+| <code>config.audit.partitionCheckInterval</code> | string | <code>"6h"</code> | Конфигурация сервиса; полный смысл раскрыт в справочнике конфигурации. |
+| <code>config.audit.partitionOpTimeout</code> | string | <code>"30s"</code> | Конфигурация сервиса; полный смысл раскрыт в справочнике конфигурации. |
+| <code>config.registry.pluginsDir</code> | string | <code>"/plugins"</code> | Конфигурация сервиса; полный смысл раскрыт в справочнике конфигурации. |
+| <code>config.registry.maxOutputSize</code> | integer | <code>67108864</code> | Конфигурация сервиса; полный смысл раскрыт в справочнике конфигурации. |
+| <code>config.registry.cacheMaxBytes</code> | integer | <code>21474836480</code> | Конфигурация сервиса; полный смысл раскрыт в справочнике конфигурации. |
+| <code>config.registry.s3.endpoint</code> | string | <code>""</code> | Конфигурация сервиса; полный смысл раскрыт в справочнике конфигурации. |
+| <code>config.registry.s3.bucket</code> | string | <code>""</code> | Конфигурация сервиса; полный смысл раскрыт в справочнике конфигурации. |
+| <code>config.registry.s3.region</code> | string | <code>"us-east-1"</code> | Конфигурация сервиса; полный смысл раскрыт в справочнике конфигурации. |
+| <code>config.registry.s3.prefix</code> | string | <code>""</code> | Конфигурация сервиса; полный смысл раскрыт в справочнике конфигурации. |
+| <code>config.registry.s3.forcePathStyle</code> | boolean | <code>false</code> | Конфигурация сервиса; полный смысл раскрыт в справочнике конфигурации. |
+| <code>config.telemetry.otlpEndpoint</code> | string | <code>""</code> | Конфигурация сервиса; полный смысл раскрыт в справочнике конфигурации. |
+| <code>config.telemetry.pyroscopeEndpoint</code> | string | <code>""</code> | Конфигурация сервиса; полный смысл раскрыт в справочнике конфигурации. |
+| <code>config.telemetry.serviceTier</code> | string | <code>""</code> | Конфигурация сервиса; полный смысл раскрыт в справочнике конфигурации. |
+| <code>config.license.publicKeys.2026-08</code> | string | <code>"81322461987167d5cfd529e9cb8b96f4797f12fce6be4399a0866e250c9b6bb5"</code> | Конфигурация сервиса; полный смысл раскрыт в справочнике конфигурации. |
+| <code>extraEnv</code> | list | <code>[]</code> | Дополнительные переменные контейнера; используйте канонические имена сервиса. |
+| <code>secrets.existingSecret</code> | string | <code>""</code> | Secret окружения; DB_POSTGRES_DSN обязателен. |
+| <code>secrets.create</code> | boolean | <code>false</code> | Secret окружения; DB_POSTGRES_DSN обязателен. |
+| <code>secrets.data</code> | map | <code>&#123;&#125;</code> | Secret окружения; DB_POSTGRES_DSN обязателен. |
+| <code>tls.enabled</code> | boolean | <code>true</code> | gRPC TLS и client CA; учитывайте sentinel CA. |
+| <code>tls.serverSecret</code> | string | <code>""</code> | gRPC TLS и client CA; учитывайте sentinel CA. |
+| <code>tls.clientCASecret</code> | string | <code>""</code> | gRPC TLS и client CA; учитывайте sentinel CA. |
+| <code>tls.mountPath</code> | string | <code>"/certs"</code> | gRPC TLS и client CA; учитывайте sentinel CA. |
+| <code>certManager.enabled</code> | boolean | <code>false</code> | Сертификаты и issuer; нужны CRD cert-manager. |
+| <code>certManager.issuerRef.name</code> | string | <code>""</code> | Сертификаты и issuer; нужны CRD cert-manager. |
+| <code>certManager.issuerRef.kind</code> | string | <code>"ClusterIssuer"</code> | Сертификаты и issuer; нужны CRD cert-manager. |
+| <code>certManager.issuerRef.group</code> | string | <code>"cert-manager.io"</code> | Сертификаты и issuer; нужны CRD cert-manager. |
+| <code>certManager.duration</code> | string | <code>"2160h"</code> | Сертификаты и issuer; нужны CRD cert-manager. |
+| <code>certManager.renewBefore</code> | string | <code>"360h"</code> | Сертификаты и issuer; нужны CRD cert-manager. |
+| <code>certManager.extraDnsNames</code> | list | <code>[]</code> | Сертификаты и issuer; нужны CRD cert-manager. |
+| <code>certManager.clientCertificate.enabled</code> | boolean | <code>true</code> | Сертификаты и issuer; нужны CRD cert-manager. |
+| <code>certManager.clientCertificate.commonName</code> | string | <code>"easyp-ingress"</code> | Сертификаты и issuer; нужны CRD cert-manager. |
+| <code>ingress.enabled</code> | boolean | <code>false</code> | Ingress/Traefik transport; проверьте доверие proxy, TLS и CRD. |
+| <code>ingress.className</code> | string | <code>"traefik"</code> | Ingress/Traefik transport; проверьте доверие proxy, TLS и CRD. |
+| <code>ingress.host</code> | string | <code>""</code> | Ingress/Traefik transport; проверьте доверие proxy, TLS и CRD. |
+| <code>ingress.annotations</code> | map | <code>&#123;&#125;</code> | Ingress/Traefik transport; проверьте доверие proxy, TLS и CRD. |
+| <code>ingress.tlsSecret</code> | string | <code>""</code> | Ingress/Traefik transport; проверьте доверие proxy, TLS и CRD. |
+| <code>ingress.serversTransport.enabled</code> | boolean | <code>true</code> | Ingress/Traefik transport; проверьте доверие proxy, TLS и CRD. |
+| <code>ingress.serversTransport.clientSecret</code> | string | <code>""</code> | Ingress/Traefik transport; проверьте доверие proxy, TLS и CRD. |
+| <code>ingress.serversTransport.serverName</code> | string | <code>""</code> | Ingress/Traefik transport; проверьте доверие proxy, TLS и CRD. |
+| <code>ingress.serversTransport.insecureSkipVerify</code> | boolean | <code>false</code> | Ingress/Traefik transport; проверьте доверие proxy, TLS и CRD. |
+| <code>persistence.enabled</code> | boolean | <code>true</code> | PVC/emptyDir плагинов; действуют проверки кэша и размеров хранилища. |
+| <code>persistence.existingClaim</code> | string | <code>""</code> | PVC/emptyDir плагинов; действуют проверки кэша и размеров хранилища. |
+| <code>persistence.storageClass</code> | string | <code>""</code> | PVC/emptyDir плагинов; действуют проверки кэша и размеров хранилища. |
+| <code>persistence.accessMode</code> | string | <code>"ReadWriteOnce"</code> | PVC/emptyDir плагинов; действуют проверки кэша и размеров хранилища. |
+| <code>persistence.size</code> | string | <code>"25Gi"</code> | PVC/emptyDir плагинов; действуют проверки кэша и размеров хранилища. |
+| <code>persistence.ephemeralSizeLimit</code> | string | <code>"25Gi"</code> | PVC/emptyDir плагинов; действуют проверки кэша и размеров хранилища. |
+| <code>serviceMonitor.enabled</code> | boolean | <code>false</code> | Настройки scrape Prometheus Operator; нужен его CRD. |
+| <code>serviceMonitor.interval</code> | string | <code>"30s"</code> | Настройки scrape Prometheus Operator; нужен его CRD. |
+| <code>serviceMonitor.scrapeTimeout</code> | string | <code>"10s"</code> | Настройки scrape Prometheus Operator; нужен его CRD. |
+| <code>serviceMonitor.labels</code> | map | <code>&#123;&#125;</code> | Настройки scrape Prometheus Operator; нужен его CRD. |
+| <code>prometheusRule.enabled</code> | boolean | <code>false</code> | Создание алертов, пороги, labels и URL runbooks. |
+| <code>prometheusRule.labels</code> | map | <code>&#123;&#125;</code> | Создание алертов, пороги, labels и URL runbooks. |
+| <code>prometheusRule.runbookBaseUrl</code> | string | <code>"https://easyp.tech/docs/api-service/runbooks"</code> | Создание алертов, пороги, labels и URL runbooks. |
+| <code>prometheusRule.licenceExpiryWarningDays</code> | integer | <code>14</code> | Создание алертов, пороги, labels и URL runbooks. |
+| <code>prometheusRule.cacheUsageWarningRatio</code> | number | <code>0.95</code> | Создание алертов, пороги, labels и URL runbooks. |
+| <code>prometheusRule.generationErrorRatio</code> | number | <code>0.05</code> | Создание алертов, пороги, labels и URL runbooks. |
+| <code>prometheusRule.authFailureRate</code> | number | <code>0.5</code> | Создание алертов, пороги, labels и URL runbooks. |
+| <code>podDisruptionBudget.enabled</code> | boolean | <code>false</code> | Бюджет disruptions; сам по себе не создаёт резервирование. |
+| <code>podDisruptionBudget.minAvailable</code> | integer | <code>1</code> | Бюджет disruptions; сам по себе не создаёт резервирование. |
+| <code>networkPolicy.enabled</code> | boolean | <code>true</code> | Сетевой допуск; проверьте MCP и нестандартные egress-порты. |
+| <code>networkPolicy.ingressNamespaceSelector</code> | map | <code>&#123;&#125;</code> | Сетевой допуск; проверьте MCP и нестандартные egress-порты. |
+| <code>networkPolicy.egressPorts</code> | list | <code>[5432, 443, 4317]</code> | Сетевой допуск; проверьте MCP и нестандартные egress-порты. |

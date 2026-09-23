@@ -1,0 +1,122 @@
+---
+title: "Локальный быстрый старт"
+---
+
+Пример использует один контейнер PostgreSQL, один локально собранный образ сервиса и один Go-плагин. API намеренно привязан к loopback, а генерация анонимна: проверенный remote executor <code>easyp</code> не передаёт bearer-токен. Для регистрации токен всё равно нужен. **Это не production-конфигурация управления доступом.** До публикации сервиса прочитайте [Модель безопасности](./security).
+
+Нужны Docker с работающим Linux container engine, Git, версия Go для сервиса v1.0.2 и установленный CLI <code>easyp</code>, соответствующий разделу [Использование клиентами](./client-usage). Порты 23410 и 23412 должны быть свободны. На Apple Silicon плагин собирается под архитектуру Linux VM, не для нативного запуска на macOS.
+
+## Сборка одного артефакта
+
+~~~sh
+git clone --branch v1.0.2 https://github.com/easyp-tech/service.git
+cd service
+go build -o ./easyp-svc ./cmd/easyp-svc
+docker build --build-arg VERSION=v1.0.2 -t easyp-service:local .
+mkdir -p demo/plugins/.tmp
+./easyp-svc plugins build --filter 'protocolbuffers/go:v1.36.11' \
+  --output demo/plugins --parallel 1 --non-interactive registry
+./easyp-svc auth new-token --name local-registration
+~~~
+Сохраните выведенный токен в <code>EASYP&#95;TOKEN</code> для клиента регистрации, а его выведенный хеш — в <code>DEMO&#95;TOKEN&#95;SHA256</code>. Задайте отдельный случайный **hexadecimal** пароль локальной БД в <code>DEMO&#95;DB&#95;PASSWORD</code>; hex устраняет неоднозначность URL-экранирования DSN примера. Передавайте значения средствами shell или secret tool без коммита и вывода в логи. Общих credentials в примере нет. Сборка и скачивание зависимостей требуют сети; образ GHCR здесь не используется.
+
+## Подготовка Compose
+
+Создайте <code>demo/service.yaml</code>:
+
+~~~yaml
+registry:
+  plugins_dir: /plugins
+  cache_max_bytes: 0
+auth:
+  require_authentication: false
+~~~
+Создайте <code>demo/compose.yaml</code>:
+
+~~~yaml
+name: easyp-local-demo
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: easyp
+      POSTGRES_PASSWORD: ${DEMO_DB_PASSWORD:?Set a local-only database password}
+      POSTGRES_DB: easyp
+    volumes:
+      - demo-db:/var/lib/postgresql/data
+    healthcheck:
+      test: [CMD-SHELL, "pg_isready -U easyp -d easyp"]
+      interval: 2s
+      timeout: 2s
+      retries: 30
+  service:
+    image: easyp-service:local
+    pull_policy: never
+    command: [service, start]
+    environment:
+      EASYP_CONFIG: /run/easyp/service.yaml
+      DB_POSTGRES_DSN: postgres://easyp:${DEMO_DB_PASSWORD}@postgres:5432/easyp?sslmode=disable
+      AUTH_WRITE_TOKENS: local-registration=${DEMO_TOKEN_SHA256:?Set the generated token digest}
+    ports:
+      - "127.0.0.1:23410:23410"
+      - "127.0.0.1:23412:23412"
+    volumes:
+      - ./service.yaml:/run/easyp/service.yaml:ro
+      - ./plugins:/plugins:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+volumes:
+  demo-db:
+~~~
+PostgreSQL не публикуется на хост. Credentials окружения переопределяют дефолты конфигурации. <code>EASYP&#95;CONFIG</code> позволяет отдельному healthcheck образа найти тот же файл. Том плагинов read-only, поскольку используются подготовленные локальные артефакты, не распаковка S3.
+
+Заранее создайте пустой каталог <code>plugins/.tmp</code>: конструктор registry создаёт staging-каталог даже без S3. При read-only mount отсутствие этого каталога останавливает запуск.
+
+## Запуск и регистрация
+
+~~~sh
+cd demo
+docker compose config --quiet
+docker compose up -d
+curl --fail http://127.0.0.1:23412/live
+curl --fail http://127.0.0.1:23412/
+../easyp-svc plugins register --addr localhost:23410 --insecure \
+  --plugins-prefix /plugins --filter 'protocolbuffers/go:v1.36.11' \
+  --parallel 1 plugins
+~~~
+Если readiness сначала недоступен, изучите <code>docker compose logs service postgres</code> и повторите проверку после миграций. <code>--plugins-prefix</code> — путь **сервера**, а позиционный <code>plugins</code> — локальное дерево артефактов оператора. <code>EASYP&#95;TOKEN</code> читает <code>plugins register</code>, не <code>easyp generate</code>. Повторная регистрация пропускает существующую версию, а не изменяет её.
+
+## Генерация файла
+
+Создайте <code>demo/proto/hello.proto</code>, предварительно создав каталог <code>proto</code>:
+
+~~~protobuf
+syntax = "proto3";
+package demo.v1;
+option go_package = "example.com/easyp-demo/gen;demov1";
+message Hello {
+  string name = 1;
+}
+~~~
+Создайте <code>demo/easyp.yaml</code>:
+
+~~~yaml
+generate:
+  inputs:
+    - directory: proto
+  plugins:
+    - remote: http://localhost:23410/protocolbuffers/go:v1.36.11
+      out: gen
+      opts:
+        paths: source_relative
+~~~
+~~~sh
+easyp generate
+test -s gen/proto/hello.pb.go
+~~~
+Запускайте команды из <code>demo</code>. Текущий CLI сохраняет <code>proto/</code> в имени входного дескриптора, поэтому <code>paths=source&#95;relative</code> создаёт <code>gen/proto/hello.pb.go</code>. Проверяйте наличие файла, а не только код завершения команды.
+
+## Остановка примера
+
+<code>docker compose down</code> останавливает только этот Compose project и сохраняет именованный том БД. Оставьте том для проверки и повторного запуска; удаляйте его осознанно, только когда данные примера больше не нужны. Для production выберите TLS и клиента с поддержкой bearer, подготовьте долговечное хранилище и следуйте разделам [Установка](./installation), [Аутентификация](./authentication-and-licensing) и [Резервное копирование](./backup).

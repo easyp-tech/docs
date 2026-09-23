@@ -1,0 +1,65 @@
+---
+title: "Переход с BSR и обратно"
+---
+
+**Сведения о Buf актуальны на 2026-09-23.** Руководство переносит **удалённую генерацию**, не всю платформу схем. У сервиса EasyP нет прямой замены BSR modules, registries готовых SDK, организационных ролей и политик схем. Инвентаризируйте эти зависимости до замены генератора. Управление модулями обсуждается отдельно в [сравнении пакетных менеджеров](../cli/package-manager/easyp-vs-buf). [SDK BSR](https://buf.build/docs/bsr/generated-sdks/) · [Политики](https://buf.build/docs/bsr/checks/policies/).
+
+## 1. Фиксация исходного результата
+
+Запишите owner/name, upstream-версию, BSR revision, параметры, вход компилятора, изменения managed mode, транзитивные зависимости схем и результат каждого remote plugin. Закрепите commits входа и версии runtime-библиотек. BSR может пересобрать ту же upstream-версию с новой revision; одна совпадающая строка версии EasyP не сохраняет идентичность артефакта. [Remote generation](https://buf.build/docs/bsr/remote-plugins/usage/) · [Версии и revisions](https://github.com/bufbuild/plugins/blob/392d085396a7b53cf130aed7bd3ee83f22927aa3/CONTRIBUTING.md).
+
+Сохраните прежний CI job и snapshot результата для отката. Сначала выберите небольшую схему без зависимостей, затем репрезентативный граф с imports, options, comments и services. Пример ниже выделяет один генератор Go-сообщений; автоматическое преобразование всех managed-mode rules не обещается.
+
+## 2. Подготовка проверенных артефактов EasyP
+
+Следуйте [быстрому старту](./quickstart) или production-разделу [Установка](./installation). Соберите выбранную версию под ОС и архитектуру сервера и проверьте реальную генерацию. В S3-режиме загрузите архив до регистрации; в локальном — сначала заполните полное дерево артефактов. Укажите явную версию, не <code>latest</code>.
+
+Идентификатор примера <code>protocolbuffers/go:v1.36.11</code> есть в проверенном рецепте EasyP и используется актуальной документацией Buf. Это кандидат на сопоставление, не доказательство одинаковых скомпилированных байтов. Остальные плагины сопоставляйте индивидуально по каталогу и сборке; у текущих рецептов EasyP <code>bufbuild/es</code> есть дефекты, описанные в [Плагинах](./plugins). [Пример Buf](https://buf.build/docs/bsr/remote-plugins/).
+
+## 3. Перевод конфигурации генерации
+
+Исходный <code>buf.gen.yaml</code>:
+
+~~~yaml
+version: v2
+plugins:
+  - remote: buf.build/protocolbuffers/go:v1.36.11
+    out: gen
+    opt:
+      - paths=source_relative
+~~~
+Соответствующий **локальный разработческий** <code>easyp.yaml</code> для каталога схем <code>proto</code>:
+
+~~~yaml
+generate:
+  inputs:
+    - directory: proto
+  plugins:
+    - remote: http://localhost:23410/protocolbuffers/go:v1.36.11
+      out: gen
+      opts:
+        paths: source_relative
+~~~
+Ключи намеренно различаются: Buf использует верхнеуровневые version и plugins и поле <code>opt</code>; EasyP — <code>generate.inputs</code>, <code>generate.plugins</code> и map <code>opts</code>. Закрепление BSR revision не является ключом EasyP. Сопоставляйте выбранную revision с контролируемым артефактом и версией собственной процедуры релизов. Не переносите блок <code>managed</code> Buf без изменений и не считайте дефолты imports/options одинаковыми. [Конфигурация Buf v2](https://buf.build/docs/configuration/v2/buf-gen-yaml/).
+
+<code>http://localhost:23410</code> — только loopback endpoint разработки. Для production сверьте TLS и аутентификацию с разделом [Использование клиентами](./client-usage). Проверенный remote executor <code>easyp</code> не передаёт bearer и mTLS-сертификаты; используйте подходящую SDK-интеграцию, а не ослабляйте доступ ради завершения миграции.
+
+## 4. Переключение CI и сравнение результатов
+
+После подготовки сервиса и артефактов замените генерацию <code>buf generate</code> на <code>easyp generate</code> с соответствующим конфигом. Явно сохраните очистку output, formatter/runtime steps, включение и исключение файлов, рабочий каталог и обработку ошибок. Успешного RPC недостаточно, когда ответ плагина содержит ошибку.
+
+Запустите оба пути на одинаковом входе в разные выходные каталоги. Сравните набор файлов и байты, затем выполните компиляцию и тесты потребляющего проекта. Разберите каждое отличие package paths, import mappings, comments, source-retention options, editions, insertion points и версий генератора и runtime. Проверьте холодную и тёплую загрузку, вывод больше 4 MiB, таймауты, аутентификацию и throttling. Не убирайте прежний путь до прохождения проверок.
+
+Клиенты используют разные сервисные протоколы. Замена hostname в <code>buf.gen.yaml remote</code> на EasyP или URL текущего EasyP на BSR **не** делает их совместимыми. Protocol adapter потребовал бы отдельной разработки; проверенный клиент его не содержит. [Поведение BSR CodeGeneration API](https://buf.build/docs/bsr/rate-limits/) · [Конфигурация remote generation](https://buf.build/docs/bsr/remote-plugins/usage/).
+
+## 5. Обратная миграция: EasyP → BSR
+
+Подберите BSR remote plugin и поддерживаемую upstream-версию/revision для каждого артефакта EasyP. Если плагина нет, оцените локальное исполнение или custom plugin private Pro/Enterprise instance. Генератору с произвольным внешним состоянием файловой системы или сети нужна адаптация под ограничения BSR либо сохранение локального запуска. Custom-образ BSR должен быть Linux/amd64; не загружайте ARM-only артефакт EasyP в расчёте на автоматическое преобразование. [Custom plugins](https://buf.build/docs/bsr/remote-plugins/custom-plugins/).
+
+Для простого Go-примера создайте <code>buf.yaml</code> с <code>version: v2</code> и <code>modules: [&#123;path: proto&#125;]</code>, восстановите показанный выше <code>buf.gen.yaml</code> и выполните <code>buf generate</code>. Для публичной remote generation не требуется сначала публиковать локальные схемы как модуль; вход всё равно передаётся executor BSR. Настройте <code>buf registry login</code> или <code>BUF&#95;TOKEN</code>, в частности чтобы не упереться в низкий лимит анонимной public generation. [Использование](https://buf.build/docs/bsr/remote-plugins/usage/) · [Аутентификация](https://buf.build/docs/bsr/authentication/) · [Rate limits](https://buf.build/docs/bsr/rate-limits/).
+
+Повторите те же проверки результата и потребителей. Сохраните EasyP endpoint на согласованное окно отката, затем прекратите генерационный трафик до удаления credentials, регистраций и артефактов. Переход на BSR generated SDKs — дополнительное архитектурное изменение с публикацией модулей и сменой dependency coordinates клиентов, не только обратное редактирование YAML. [Workflow generated SDK](https://buf.build/docs/bsr/generated-sdks/quickstart/).
+
+## Критерии завершения
+
+Миграция завершена, когда поддерживаемые клиенты корректно аутентифицируются, критичная матрица плагинов и входов проверена, код компилируется, назначена эксплуатационная ответственность и отработан откат. Документация предоставляет соответствия и проверки; production-аккаунт BSR и полный двусторонний переход в ходе аудита не проверялись.
