@@ -36,6 +36,9 @@ easyp breaking --path proto --against main
 | `breaking` | `--path` (`-p`), `--root` (`-r`), `--against` |
 | `init` | `--dir` (`-d`), `--module` |
 | `validate-config` | `--config` (alias of `--cfg`), `--format` |
+| `mod vendor` | No command-specific flags |
+| `ls-files` | `--include-imports` (default `true`), `--format` (`json` or `text`) |
+| `schema-gen` | `--out-dir` (default `schemas`) |
 
 The global flags are `--cfg` (alias `--config`, default `easyp.yaml`), `--debug` (`-d`), and `--format` (`-f`, `text` or `json`). `EASYP_CFG`, `EASYP_DEBUG`, and `EASYP_FORMAT` set their respective defaults. The module cache uses `EASYPPATH` or `$HOME/.easyp`.
 
@@ -47,7 +50,11 @@ The global flags are `--cfg` (alias `--config`, default `easyp.yaml`), `--debug`
 
 `validate-config --cfg <file> --format json` accepts `easyp.yaml`, `easyp.gen.yaml`, `protobuf.mod`, and `protobuf.lock`. Invalid lock versions, incomplete entries, and malformed hashes are reported as validation errors.
 
-The v1 pilot has no `mod vendor` or `ls-files` command.
+`mod vendor` verifies the locked Git dependencies and copies their `.proto` files into `easyp_vendor` using their import paths. It replaces a previous vendor tree only after all files have been copied successfully. Duplicate import paths are errors. Run `mod tidy` first; local `replace` directives cannot be vendored.
+
+`ls-files` lists local `.proto` files from `protobuf.mod` roots. By default it also includes reachable imports from dependencies and bundled well-known protos, resolving dependencies through the v1 lock or local replacements. Use `--include-imports=false` to list only local files without resolving dependencies. JSON output contains `files`, `roots`, and any import `errors`.
+
+`schema-gen --out-dir schemas` writes separate JSON Schemas for `easyp.yaml`, `easyp.gen.yaml`, and `protobuf.lock`, each with a `-v1.schema.json` filename and an unversioned alias. `protobuf.mod` is a text manifest, so validate it with `validate-config` instead. CLI validation also checks semantic rules beyond the JSON Schemas.
 
 ## Minimal files
 
