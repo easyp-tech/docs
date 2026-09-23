@@ -48,7 +48,13 @@ The global flags are `--cfg` (alias `--config`, default `easyp.yaml`), `--debug`
 
 `breaking` applies the nearest `breaking` section to each reported file. When nested policies select different Git baselines, it compares against each baseline and reports an issue only under the policy that selected it.
 
-`validate-config --cfg <file> --format json` accepts `easyp.yaml`, `easyp.gen.yaml`, `protobuf.mod`, and `protobuf.lock`. Invalid lock versions, incomplete entries, and malformed hashes are reported as validation errors.
+`validate-config` recursively checks every `easyp.yaml`, `easyp.gen.yaml`, `protobuf.mod`, and `protobuf.lock` below the current directory. Pass `--cfg <file>` to check one file or `--cfg <directory>` to scan another directory. JSON errors identify the file; YAML structure errors also include line and column. Invalid lock versions, incomplete entries, and malformed hashes are reported as validation errors.
+
+```bash
+easyp validate-config
+easyp validate-config --cfg ./services --format json
+easyp validate-config --cfg ./services/api/easyp.gen.yaml
+```
 
 `mod vendor` verifies the locked Git dependencies and copies their `.proto` files into `easyp_vendor` using their import paths. It replaces a previous vendor tree only after all files have been copied successfully. Duplicate import paths are errors. Run `mod tidy` first; local `replace` directives cannot be vendored.
 
