@@ -1,0 +1,84 @@
+---
+title: "Наблюдаемость"
+---
+
+По умолчанию бинарник публикует Prometheus text на <code>http://127.0.0.1:23411/metrics</code>. Helm использует metrics-порт 8081. Оставляйте endpoint в разрешённой сети мониторинга: координаты плагинов, показатели БД и активность ошибок являются эксплуатационной информацией.
+
+## Справочник Prometheus
+
+Ниже перечислены labels инструментации. Prometheus/Alloy может добавлять <code>job</code>, <code>instance</code>, <code>tier</code> и метки развёртывания; это не дополнительные прикладные labels каждой метрики. Histogram families создают серии <code>&#95;bucket</code>, <code>&#95;sum</code> и <code>&#95;count</code>, причём у buckets появляется <code>le</code>. <code>plugin</code> — разрешённые координаты group/name:version.
+
+| Metric | Type | Labels | Интерпретация |
+| --- | --- | --- | --- |
+| <code>easyp&#95;generated&#95;plugin&#95;code&#95;total</code> | counter | <code>plugin</code> | Завершённые генерации Core без ошибки исполнения; ответ плагина всё ещё может содержать ошибку протокола. |
+| <code>easyp&#95;generation&#95;duration&#95;seconds</code> | histogram | <code>plugin</code> | Длительность попытки исполнения, не полная задержка запроса. |
+| <code>easyp&#95;generation&#95;errors&#95;total</code> | counter | <code>plugin, error&#95;type</code> | Ошибки попыток исполнения; error_type — transient или permanent. Не все отклонённые RPC доходят до этого счётчика. |
+| <code>easyp&#95;generation&#95;retries&#95;total</code> | counter | <code>plugin</code> | Повторные исполнения в пуле, не retry SDK или сети. |
+| <code>easyp&#95;operations&#95;total</code> | counter | <code>operation, status</code> | Результаты операций Core в обоих tiers; status success/error. Не включает отказы более ранних интерсепторов. |
+| <code>easyp&#95;pool&#95;active&#95;workers</code> | gauge | <code>—</code> | Активные workers поиска/загрузки, не число дочерних процессов. |
+| <code>easyp&#95;pool&#95;jobs&#95;total</code> | counter | <code>—</code> | Принятые пулом lookup jobs. |
+| <code>easyp&#95;pool&#95;rejected&#95;total</code> | counter | <code>—</code> | Отказы допуска lookup из-за заполнения его очереди. |
+| <code>easyp&#95;pool&#95;queue&#95;depth</code> | gauge | <code>—</code> | Текущая длина очереди lookup. |
+| <code>easyp&#95;pool&#95;generations&#95;active</code> | gauge | <code>—</code> | Занятые слоты генерации. |
+| <code>easyp&#95;pool&#95;generations&#95;waiting</code> | gauge | <code>—</code> | Запросы, ожидающие слот генерации. |
+| <code>easyp&#95;pool&#95;generations&#95;rejected&#95;total</code> | counter | <code>—</code> | Отказы допуска генерации из-за заполнения очереди ожидания. |
+| <code>easyp&#95;rate&#95;limit&#95;requests&#95;total</code> | counter | <code>status</code> | Решения per-IP rate limiter: allowed или denied. |
+| <code>easyp&#95;rate&#95;limit&#95;active&#95;clients</code> | gauge | <code>—</code> | Сохранённые записи IP limiter, не аутентифицированные пользователи. |
+| <code>easyp&#95;concurrency&#95;rejected&#95;total</code> | counter | <code>—</code> | Отказы более раннего per-IP ограничения параллельных запросов. |
+| <code>easyp&#95;concurrency&#95;active&#95;clients</code> | gauge | <code>—</code> | IP, для которых limiter отслеживает выполняющиеся запросы. |
+| <code>easyp&#95;auth&#95;failures&#95;total</code> | counter | <code>reason</code> | no_credentials или unknown_token; значение токена не используется как label. |
+| <code>easyp&#95;config&#95;service&#95;tier&#95;mismatch</code> | gauge | <code>—</code> | 1 при расхождении настроенного telemetry tier с текущими claims лицензии; 0 при пустой или совпадающей метке. |
+| <code>easyp&#95;license&#95;valid</code> | gauge | <code>—</code> | 1 для Enterprise claims, 0 для Community. |
+| <code>easyp&#95;license&#95;expiry&#95;timestamp&#95;seconds</code> | gauge | <code>—</code> | Unix timestamp истечения лицензии; 0 при отсутствии настроенного срока. |
+| <code>easyp&#95;license&#95;in&#95;grace</code> | gauge | <code>—</code> | 1 в grace-интервале проверенных Enterprise claims. |
+| <code>easyp&#95;license&#95;feature&#95;denied&#95;total</code> | counter | <code>feature</code> | Отказы feature gate; не счётчик всех пропущенных событий аудита Community. |
+| <code>easyp&#95;plugin&#95;cache&#95;bytes</code> | gauge | <code>—</code> | Учтённые распакованные байты S3-кэша, не размер S3 bucket. |
+| <code>easyp&#95;plugin&#95;cache&#95;evictions&#95;total</code> | counter | <code>—</code> | Каталоги кэша, удалённые вытеснением. |
+| <code>easyp&#95;plugin&#95;cache&#95;limit&#95;bytes</code> | gauge | <code>—</code> | Настроенный мягкий предел кэша; этот cache collector отсутствует при выключенном вытеснении. |
+| <code>easyp&#95;audit&#95;events&#95;lost&#95;total</code> | counter | <code>reason</code> | enqueue_timeout, save_failed, shutdown_timeout; нижняя оценка, не доказательство учёта каждого потерянного события. |
+| <code>easyp&#95;audit&#95;events&#95;skipped&#95;total</code> | counter | <code>—</code> | События аудита Core, пропущенные из-за отсутствия лицензированной функции. |
+| <code>easyp&#95;audit&#95;save&#95;failures&#95;total</code> | counter | <code>—</code> | Неудачные попытки записи batch, включая восстановленные последующим retry. |
+| <code>easyp&#95;audit&#95;batch&#95;size</code> | histogram | <code>—</code> | Размеры batch аудита. |
+| <code>easyp&#95;audit&#95;queue&#95;depth</code> | gauge | <code>—</code> | События в очереди аудита в памяти. |
+| <code>easyp&#95;audit&#95;partition&#95;maintenance&#95;runs&#95;total</code> | counter | <code>result</code> | Результаты обслуживания: success, error, skipped. |
+| <code>easyp&#95;audit&#95;partitions&#95;created&#95;total</code> | counter | <code>—</code> | Успешные вызовы CREATE TABLE IF NOT EXISTS; не обязательно новые физические таблицы. |
+| <code>easyp&#95;audit&#95;partitions&#95;dropped&#95;total</code> | counter | <code>—</code> | Месячные партиции, удалённые по retention. |
+| <code>easyp&#95;audit&#95;partition&#95;maintenance&#95;last&#95;success&#95;seconds</code> | gauge | <code>—</code> | Unix timestamp последнего успешного обслуживания. |
+| <code>easyp&#95;audit&#95;partitions&#95;current</code> | gauge | <code>—</code> | Число месячных партиций, полученное в пути retention; при пропуске этого пути значение может устареть. |
+| <code>easyp&#95;audit&#95;default&#95;partition&#95;used</code> | gauge | <code>—</code> | Признак наличия строк, проверяемый обслуживанием, обычно раз в шесть часов; не точное число строк и не запрос при каждом scrape. |
+| <code>easyp&#95;business&#95;plugins&#95;total</code> | gauge | <code>—</code> | Строки регистраций БД, включая отдельные версии. Несмотря на суффикс, это gauge. |
+| <code>easyp&#95;business&#95;plugins&#95;by&#95;group</code> | gauge | <code>group</code> | Строки регистраций по group. |
+| <code>easyp&#95;business&#95;plugin&#95;versions&#95;count</code> | gauge | <code>group, name</code> | Зарегистрированные версии каждого плагина. |
+| <code>easyp&#95;business&#95;audit&#95;log&#95;total</code> | gauge | <code>—</code> | Приблизительное число строк партиций по статистике PostgreSQL; не счётчик без потерь событий аудита. |
+| <code>easyp&#95;db&#95;open&#95;connections</code> | gauge | <code>—</code> | Открытые соединения БД, включая idle. |
+| <code>easyp&#95;db&#95;idle&#95;connections</code> | gauge | <code>—</code> | Idle-соединения БД. |
+| <code>easyp&#95;db&#95;wait&#95;count&#95;total</code> | counter | <code>—</code> | Число ожиданий соединения БД. |
+| <code>easyp&#95;db&#95;wait&#95;duration&#95;seconds&#95;total</code> | counter | <code>—</code> | Суммарное время ожидания соединения БД. |
+| <code>easyp&#95;repo&#95;errors&#95;total</code> | counter | <code>func</code> | Ошибки инструментированных операций БД. |
+| <code>easyp&#95;repo&#95;call&#95;duration&#95;seconds</code> | histogram | <code>func</code> | Длительность инструментированных операций БД. |
+| <code>easyp&#95;panics&#95;total</code> | counter | <code>—</code> | Перехваченные паники gRPC и фоновых задач. У счётчика нет label goroutine или name. |
+| <code>easyp&#95;api&#95;grpc&#95;server&#95;started&#95;total</code> | counter | <code>grpc&#95;type, grpc&#95;service, grpc&#95;method</code> | Начатые RPC в gRPC metrics interceptor. |
+| <code>easyp&#95;api&#95;grpc&#95;server&#95;handled&#95;total</code> | counter | <code>grpc&#95;type, grpc&#95;service, grpc&#95;method, grpc&#95;code</code> | Завершённые RPC по итоговому gRPC-коду. |
+| <code>easyp&#95;api&#95;grpc&#95;server&#95;msg&#95;received&#95;total</code> | counter | <code>grpc&#95;type, grpc&#95;service, grpc&#95;method</code> | Сообщения, принятые gRPC middleware. |
+| <code>easyp&#95;api&#95;grpc&#95;server&#95;msg&#95;sent&#95;total</code> | counter | <code>grpc&#95;type, grpc&#95;service, grpc&#95;method</code> | Сообщения, отправленные gRPC middleware. |
+| <code>easyp&#95;api&#95;grpc&#95;server&#95;handling&#95;seconds</code> | histogram | <code>grpc&#95;type, grpc&#95;service, grpc&#95;method</code> | Время обработки RPC, включая внутренние интерсепторы. |
+
+Сервер также регистрирует стандартные Go- и process-collectors закреплённой версии Prometheus client (<code>go&#95;&#42;</code>, <code>process&#95;&#42;</code>). Их точный набор зависит от runtime и ОС и не является контрактом конфигурации EasyP. Business collectors обращаются к БД при scrape; при ошибке запроса соответствующая серия может отсутствовать, а не содержать ноль. Отсутствие серии не означает пустой каталог или отсутствие событий аудита.
+
+## Трейсы, логи и профили
+
+<code>telemetry.otlp&#95;endpoint</code> включает **OTLP/gRPC traces и metrics**. В этой реализации адрес <code>host:port</code> без схемы выбирает незащищённый транспорт; когда нужен TLS, задавайте явный URL <code>https://</code> и соответствующим образом настраивайте collector. Настройки TLS gRPC-сервера не конфигурируют экспортёр. В trace resources входят <code>service.name=easyp</code>, версия сборки и необязательный настроенный tier. Эта метка не синхронизируется автоматически с claims лицензии. OTLP metrics используют periodic reader с интервалом 15 секунд.
+
+Trace wrappers охватывают операции Core, доступ к registry, генерацию и <code>process.exec</code>. Настроен W3C trace-context propagation; структурированные логи содержат trace/span IDs при их наличии в context. Сервис не экспортирует логи напрямую через OTLP log exporter; поставляемый observability stack собирает логи контейнеров отдельно. Histogram OpenTelemetry <code>plugin.execution.duration</code> измеряется в секундах и имеет label <code>plugin.name</code>; не смешивайте его с Prometheus histogram попыток исполнения.
+
+<code>telemetry.pyroscope&#95;endpoint</code> включает профили CPU, allocations, in-use memory и goroutines **Go-процесса сервиса**. Plugin tag связывает работу на стороне сервиса с плагином, но не делает доступным CPU-профиль самого дочернего executable. Ошибки инициализации экспортёров записываются в лог; сервис может продолжить работу без этой телеметрии. Ни readiness, ни liveness не подтверждают доставку экспортёру.
+
+## Алерты и дашборды
+
+Helm-чарт может создавать <code>ServiceMonitor</code> и <code>PrometheusRule</code>; нужны соответствующие monitoring CRD, а обе функции по умолчанию выключены. Чарт определяет одиннадцать прикладных алертов. В Compose observability tree есть те же прикладные алерты и ещё шесть алертов хоста, discovery и сертификатов. Для каждого предусмотрен [runbook](./runbooks). Метрики хоста создаёт поставляемый Alloy Unix exporter; метрика сертификата относится к Traefik, не к <code>easyp-svc</code>.
+
+Поставляемый generation-error ratio делит ошибки попыток исполнения на принятые lookup jobs. Из-за retry и ошибок до исполнения это **не точная доля неудачных RPC конечных пользователей**. Для RPC failure SLI используйте handled-RPC counter и явно определите, какие gRPC-коды считать ошибками. В клиентской синтетической проверке также учитывайте сбои транспорта и результаты с <code>CodeGeneratorResponse.error</code>.
+
+<code>EasypServiceMissing</code> предполагает наличие обоих targets — Community и Enterprise — с поставляемыми Alloy job/tier labels. Для развёртывания одного tier измените или выключите ветку отсутствующего tier, иначе алерт будет срабатывать на его намеренное отсутствие. <code>EasypTargetDown</code> использует <code>up == 0</code> для обнаруженных targets, не только для endpoint генерации.
+
+Cache alert отслеживает мягкий бюджет S3-кэша, не свободное место файловой системы. Gauge DEFAULT-партиции аудита обычно обновляется только во время обслуживания раз в шесть часов; ошибка обслуживания может оставить старое значение. Во время инцидента проверяйте БД прямым read-only запросом. См. [Runbooks](./runbooks), [Архитектура](./architecture) и [Резервное копирование](./backup).
