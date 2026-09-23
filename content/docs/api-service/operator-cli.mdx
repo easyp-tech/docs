@@ -1,0 +1,146 @@
+---
+title: "Operator CLI reference"
+---
+
+<code>easyp-svc</code> is the server and operator binary, not the developer <code>easyp</code> CLI. The command inventory below was obtained from the built source with <code>--help</code>. Global flags are <code>--help</code> (<code>-h</code>) and <code>--version</code> (<code>-v</code>); command groups are <code>service</code>, <code>plugins</code>, <code>auth</code>, <code>api</code>, and <code>config</code>, plus <code>health</code> and <code>help</code> (<code>h</code>). A source build without release linker flags reports <code>dev</code>.
+
+## service start
+
+Loads configuration, performs preflight/migrations, starts listeners and workers. --cfg also accepts EASYP_CONFIG. --log-level wins over YAML/environment; --log_level is an alias.
+
+~~~text
+easyp-svc service start [options]
+
+--cfg string                            path to config file [$EASYP_CONFIG]
+   --log-level string, --log_level string  log level (debug, info, warn, error); overrides log.level from the configuration
+   --help, -h                              show help
+~~~
+## plugins build
+
+The registry path is required. Defaults: output=plugins, parallel=4, keep-going=true. --force rebuilds cached entrypoints; --dry-run needs no Docker daemon. Dockerfiles run only during the build, not during generation.
+
+~~~text
+easyp-svc plugins build [options] <registry-path>
+
+--output string, -o string  output directory for built plugin binaries (default: "plugins")
+   --filter string             glob filter pattern for plugins (e.g. 'protocolbuffers/*' or 'grpc/go:v1.5.1')
+   --parallel int, -p int      number of concurrent docker builds (default: 4)
+   --force                     rebuild even if the binary already exists
+   --dry-run                   list what would be built without building
+   --non-interactive           disable interactive UI and dynamic progress bars
+   --keep-going                continue building remaining plugins after a failure
+   --help, -h                  show help
+~~~
+## plugins pack
+
+The input path defaults to plugins. --out is required. Produces group/name/version/plugin.tgz with all sidecars. --force replaces an existing archive; it does not update a server registration.
+
+~~~text
+easyp-svc plugins pack [options] [path]
+
+--out string       directory to write archives to
+   --filter string    glob filter pattern for plugins (e.g. 'protocolbuffers/*' or 'grpc/go:v1.6.2')
+   --force            re-pack even if the archive already exists
+   --dry-run          print the pack plan without writing archives
+   --non-interactive  disable interactive UI and dynamic progress bars
+   --help, -h         show help
+~~~
+## plugins push
+
+The input path defaults to plugins; parallel=8. --packed accepts a tree from plugins pack. --cfg loads and validates a complete service configuration, including its database setting; omit it and pass S3 flags to upload without a server config. There are no access-key CLI flags: use configured credentials or the AWS credential chain. --force can invalidate the checksum of an already registered version.
+
+~~~text
+easyp-svc plugins push [options] [path]
+
+--cfg string            path to service config YAML; registry.s3 is used for settings not passed as flags [$EASYP_CONFIG]
+   --bucket string         S3 bucket name (overrides registry.s3.bucket from --cfg)
+   --endpoint string       S3 endpoint URL, e.g. http://localhost:9000 for MinIO/RustFS
+   --region string         S3 region
+   --prefix string         S3 key prefix
+   --force-path-style      use path-style addressing (required by MinIO/RustFS)
+   --filter string         glob filter pattern for plugins (e.g. 'protocolbuffers/*' or 'grpc/go:v1.6.2')
+   --packed plugins pack   the path is a tree of archives written by plugins pack, not built plugin directories
+   --parallel int, -p int  archives to upload at once; storage usually caps a single connection, so more streams means more throughput (default: 8)
+   --force                 re-upload even if the archive already exists in storage
+   --dry-run               print the upload plan without contacting storage
+   --non-interactive       disable interactive UI and dynamic progress bars
+   --help, -h              show help
+~~~
+## plugins register
+
+The input path defaults to plugins, parallel=8, fail-on-error=true. --cfg here reads registry.plugins_dir directly from YAML; it does not perform the full environment/config merge used by service start or plugins push. Explicit --plugins-prefix wins. EASYP_TOKEN supplies the token when --token is empty. Default transport is TLS; --insecure is plaintext. Existing registrations are skipped, not updated: rerunning this command does not repair a changed archive checksum. The default parallelism exceeds the binary default per-IP concurrency of 2, and the SDK does not retry ResourceExhausted; start with --parallel 1 and handle throttling explicitly.
+
+~~~text
+easyp-svc plugins register [options] [path]
+
+--addr string            gRPC server address (the chart publishes gRPC on 8080) (default: "localhost:23410")
+   --cfg string             path to service config YAML; registry.plugins_dir is used as --plugins-prefix when that flag is not set [$EASYP_CONFIG]
+   --filter string          glob filter pattern for plugins (e.g. 'connectrpc/*')
+   --packed plugins pack    the path is a tree of archives written by plugins pack, not built plugin directories
+   --parallel int, -p int   plugins to register at once; the server reads each archive from storage to checksum it, so this is worth raising, up to the server's rate_limit.max_concurrent_per_ip (default: 8)
+   --non-interactive        disable interactive UI and dynamic progress bars
+   --dry-run                scan and print planned CreatePlugin commands without contacting the server
+   --fail-on-error          exit with error if any plugin failed registration
+   --plugins-prefix string  prefix directory for plugins on the server (overrides registry.plugins_dir from --cfg) (default: "/plugins")
+   --tls-ca string          PEM bundle of the CA that signed the server certificate (default: system trust store)
+   --tls-cert string        client certificate presented to the server; required when the server enforces mTLS
+   --tls-key string         private key for --tls-cert
+   --insecure               connect over plaintext, disabling transport security entirely (local development only)
+   --token string           write token authorising CreatePlugin (falls back to EASYP_TOKEN)
+   --help, -h               show help
+~~~
+## auth new-token
+
+Default name=unnamed. Generates and prints a bearer token and its configuration digest. It does not update the server configuration, store the token, or issue an Enterprise license.
+
+~~~text
+easyp-svc auth new-token [options]
+
+--name string  label identifying this token in logs and the audit trail (default: "unnamed")
+   --help, -h     show help
+~~~
+## api descriptor
+
+Writes the embedded API FileDescriptorSet. Default output=- is binary stdout; use --output for a file. The running server does not enable gRPC reflection.
+
+~~~text
+easyp-svc api descriptor [options]
+
+--output string, -o string  file to write to; "-" writes to stdout (default: "-")
+   --help, -h                  show help
+~~~
+## config validate
+
+Validates the resolved config and applicable local preflight checks without starting the service or applying database migrations.
+
+~~~text
+easyp-svc config validate [options]
+
+--cfg string  path to config file; omit to check the environment alone [$EASYP_CONFIG]
+   --help, -h    show help
+~~~
+## config print
+
+Prints resolved YAML, redacting secret-tagged values. --origin annotates source layers; --changed keeps differences from defaults. --show-secrets deliberately reveals credentials: do not capture it in reports.
+
+~~~text
+easyp-svc config print [options]
+
+--cfg string    path to config file; omit to resolve from the environment alone [$EASYP_CONFIG]
+   --origin        annotate each setting with the layer it came from
+   --changed       print only the settings that differ from the built-in defaults, which is what a config file needs to state and no more
+   --show-secrets  print credentials instead of a placeholder; the output then belongs nowhere but a terminal
+   --help, -h      show help
+~~~
+## health
+
+GET /live with a three-second timeout. Explicit --addr wins; otherwise --cfg/EASYP_CONFIG supplies the health port, with loopback as the target. Exit 0 means liveness, not successful database access or generation.
+
+~~~text
+easyp-svc health [options]
+
+--addr string  host:port of the health listener; derived from --cfg or the default port when empty
+   --cfg string   path to config file, used only to learn the health port [$EASYP_CONFIG]
+   --help, -h     show help
+~~~
+The option spellings and literal help text above are preserved for comparison with the binary. The operational notes resolve current misleading help/comments about re-registration and retries. See [Plugins](./plugins), [Configuration](./configuration), and [Client usage](./client-usage).

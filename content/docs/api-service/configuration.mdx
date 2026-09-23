@@ -1,0 +1,96 @@
+---
+title: "Configuration reference"
+---
+
+The table below is generated from the checked service configuration structs and <code>config.Defaults</code>, not from deployment examples. It contains all **55 service settings** with an environment mapping. These are **binary defaults**; Helm and Compose can override them. Durations use Go duration notation such as <code>120s</code> or <code>5m</code>; byte limits are integer bytes. Empty strings mean no configured value, not a usable database connection.
+
+## Resolution and inspection
+
+Non-empty environment values override explicit YAML values, which override built-in defaults. An explicit YAML zero or false is preserved, then validated. Empty environment values are treated as unset. Unknown YAML keys and multiple YAML documents are rejected; configuration files are limited to 1 MiB. Unknown environment names under recognized service prefixes produce diagnostics rather than silently becoming settings.
+
+~~~sh
+easyp-svc config validate --cfg service.yaml
+easyp-svc config print --cfg service.yaml --origin
+easyp-svc config print --cfg service.yaml --changed
+~~~
+<code>config print</code> masks secret-tagged values by default. Do not send <code>--show-secrets</code> output to CI logs or a support ticket. Validation checks local configuration/preflight requirements but is not a database connection test or a real generation.
+
+## All service settings
+
+| YAML | Environment | Type / Тип | Default / Дефолт | Meaning |
+| --- | --- | --- | --- | --- |
+| <code>server.host</code> | <code>SERVER&#95;HOST</code> | <code>string</code> | <code>0.0.0.0</code> | Listener bind address. |
+| <code>server.port.grpc</code> | <code>SERVER&#95;PORT&#95;GRPC</code> | <code>string</code> | <code>23410</code> | gRPC listener port, represented as a string. |
+| <code>server.port.metric</code> | <code>SERVER&#95;PORT&#95;METRIC</code> | <code>string</code> | <code>23411</code> | HTTP Prometheus listener port. |
+| <code>server.port.health</code> | <code>SERVER&#95;PORT&#95;HEALTH</code> | <code>string</code> | <code>23412</code> | HTTP liveness and database-aware readiness listener port. |
+| <code>server.port.mcp</code> | <code>SERVER&#95;PORT&#95;MCP</code> | <code>string</code> | <code>23413</code> | MCP HTTP port; its value is validated even when MCP is disabled. |
+| <code>server.tls.cert&#95;file</code> | <code>SERVER&#95;TLS&#95;CERT&#95;FILE</code> | <code>string</code> | <code>""</code> | PEM server certificate; configure together with key_file. |
+| <code>server.tls.key&#95;file</code> | <code>SERVER&#95;TLS&#95;KEY&#95;FILE</code> | <code>string</code> | <code>""</code> | PEM private-key file for gRPC TLS. |
+| <code>server.tls.client&#95;ca&#95;file</code> | <code>SERVER&#95;TLS&#95;CLIENT&#95;CA&#95;FILE</code> | <code>string</code> | <code>""</code> | PEM CA bundle; requires a verified client certificate when configured. |
+| <code>server.force&#95;shutdown&#95;after</code> | <code>SERVER&#95;FORCE&#95;SHUTDOWN&#95;AFTER</code> | <code>time.Duration</code> | <code>2m30s</code> | Hard process-exit budget after a termination signal; must exceed generation_timeout. |
+| <code>server.trusted&#95;proxies</code> | <code>SERVER&#95;TRUSTED&#95;PROXIES</code> | <code>[]string</code> | <code>[]</code> | Trusted proxy CIDRs for client-IP headers. Empty means use the TCP peer. |
+| <code>server.max&#95;recv&#95;msg&#95;size</code> | <code>SERVER&#95;MAX&#95;RECV&#95;MSG&#95;SIZE</code> | <code>int</code> | <code>67108864</code> | Maximum received gRPC message size in bytes. |
+| <code>server.max&#95;send&#95;msg&#95;size</code> | <code>SERVER&#95;MAX&#95;SEND&#95;MSG&#95;SIZE</code> | <code>int</code> | <code>67108864</code> | Maximum sent gRPC message size in bytes; at least registry.max_output_size. |
+| <code>server.max&#95;concurrent&#95;streams</code> | <code>SERVER&#95;MAX&#95;CONCURRENT&#95;STREAMS</code> | <code>uint32</code> | <code>256</code> | Concurrent HTTP/2 streams per gRPC connection; not a global worker limit. |
+| <code>db.postgres</code> | <code>DB&#95;POSTGRES&#95;DSN</code> | <code>string</code> | <code>""</code> | Required PostgreSQL connection string. Printed as a secret unless explicitly revealed. |
+| <code>registry.plugins&#95;dir</code> | <code>REGISTRY&#95;PLUGINS&#95;DIR</code> | <code>string</code> | <code>/plugins</code> | Directory of trusted local plugins; with S3 it is the local artifact cache. |
+| <code>registry.max&#95;output&#95;size</code> | <code>REGISTRY&#95;MAX&#95;OUTPUT&#95;SIZE</code> | <code>int64</code> | <code>67108864</code> | Maximum plugin stdout bytes; positive. This is not a child-process memory limit. |
+| <code>registry.cache&#95;max&#95;bytes</code> | <code>REGISTRY&#95;CACHE&#95;MAX&#95;BYTES</code> | <code>int64</code> | <code>21474836480</code> | Soft S3 cache budget in bytes; 0 disables eviction. Does not evict local-only artifacts. |
+| <code>registry.s3.endpoint</code> | <code>REGISTRY&#95;S3&#95;ENDPOINT</code> | <code>string</code> | <code>""</code> | Custom S3-compatible endpoint URL; empty uses AWS endpoint resolution. |
+| <code>registry.s3.bucket</code> | <code>REGISTRY&#95;S3&#95;BUCKET</code> | <code>string</code> | <code>""</code> | Bucket holding plugin archives; empty disables S3. |
+| <code>registry.s3.region</code> | <code>REGISTRY&#95;S3&#95;REGION</code> | <code>string</code> | <code>us-east-1</code> | S3 signing region. |
+| <code>registry.s3.prefix</code> | <code>REGISTRY&#95;S3&#95;PREFIX</code> | <code>string</code> | <code>""</code> | Object-key prefix; the adapter appends a slash when necessary. |
+| <code>registry.s3.access&#95;key&#95;id</code> | <code>REGISTRY&#95;S3&#95;ACCESS&#95;KEY&#95;ID</code> | <code>string</code> | <code>""</code> | Static access-key ID; configure together with secret_access_key, or omit both. |
+| <code>registry.s3.secret&#95;access&#95;key</code> | <code>REGISTRY&#95;S3&#95;SECRET&#95;ACCESS&#95;KEY</code> | <code>string</code> | <code>""</code> | Static secret access key; redacted by config print. |
+| <code>registry.s3.force&#95;path&#95;style</code> | <code>REGISTRY&#95;S3&#95;FORCE&#95;PATH&#95;STYLE</code> | <code>bool</code> | <code>false</code> | Use path-style S3 addressing, normally needed for MinIO/RustFS. |
+| <code>telemetry.otlp&#95;endpoint</code> | <code>TELEMETRY&#95;OTLP&#95;ENDPOINT</code> | <code>string</code> | <code>""</code> | OTLP trace and metric exporter endpoint; empty disables these exporters. See Observability for transport behavior. |
+| <code>telemetry.pyroscope&#95;endpoint</code> | <code>TELEMETRY&#95;PYROSCOPE&#95;ENDPOINT</code> | <code>string</code> | <code>""</code> | Pyroscope profiling endpoint; empty disables profile export. |
+| <code>telemetry.service&#95;tier</code> | <code>TELEMETRY&#95;SERVICE&#95;TIER</code> | <code>string</code> | <code>""</code> | Explicit telemetry tier label; it is not inferred from the current license. |
+| <code>worker&#95;pool.workers</code> | <code>WORKER&#95;POOL&#95;WORKERS</code> | <code>int</code> | <code>4</code> | Lookup/download workers; positive, clamped to 4 for Community at startup. |
+| <code>worker&#95;pool.queue&#95;size</code> | <code>WORKER&#95;POOL&#95;QUEUE&#95;SIZE</code> | <code>int</code> | <code>16</code> | Capacity of each of the separate lookup and generation-wait queues. |
+| <code>worker&#95;pool.max&#95;concurrent&#95;generations</code> | <code>WORKER&#95;POOL&#95;MAX&#95;CONCURRENT&#95;GENERATIONS</code> | <code>int</code> | <code>16</code> | Generation semaphore size; Community clamps it to 16 at startup. |
+| <code>worker&#95;pool.generation&#95;timeout</code> | <code>WORKER&#95;POOL&#95;GENERATION&#95;TIMEOUT</code> | <code>time.Duration</code> | <code>2m0s</code> | Execution budget after generation admission, including execution retries. |
+| <code>worker&#95;pool.max&#95;retries</code> | <code>WORKER&#95;POOL&#95;MAX&#95;RETRIES</code> | <code>int</code> | <code>2</code> | Additional attempts for recognized transient execution failures; 0 disables retries. |
+| <code>worker&#95;pool.shutdown&#95;timeout</code> | <code>WORKER&#95;POOL&#95;SHUTDOWN&#95;TIMEOUT</code> | <code>time.Duration</code> | <code>30s</code> | Pool shutdown/drain budget. Separate from the hard server shutdown deadline. |
+| <code>license.key</code> | <code>LICENSE&#95;KEY</code> | <code>string</code> | <code>""</code> | Inline PASETO token; wins over license.file and is redacted. |
+| <code>license.file</code> | <code>LICENSE&#95;FILE</code> | <code>string</code> | <code>""</code> | File containing a PASETO token; read at process startup, not reloaded on each refresh. |
+| <code>license.public&#95;keys</code> | <code>LICENSE&#95;PUBLIC&#95;KEYS</code> | <code>map[string]string</code> | <code>&#123;&#125;</code> | Map from key ID to a 64-hex-character Ed25519 public key; * is the fallback ID. |
+| <code>license.cache&#95;ttl</code> | <code>LICENSE&#95;CACHE&#95;TTL</code> | <code>time.Duration</code> | <code>5m0s</code> | Interval for revalidating the loaded token and refreshing claims. |
+| <code>rate&#95;limit.requests&#95;per&#95;second</code> | <code>RATE&#95;LIMIT&#95;REQUESTS&#95;PER&#95;SECOND</code> | <code>float64</code> | <code>10</code> | Per-resolved-IP token refill rate; sustained request rate, not monthly quota. |
+| <code>rate&#95;limit.burst</code> | <code>RATE&#95;LIMIT&#95;BURST</code> | <code>int</code> | <code>20</code> | Per-IP burst capacity. |
+| <code>rate&#95;limit.cleanup&#95;interval</code> | <code>RATE&#95;LIMIT&#95;CLEANUP&#95;INTERVAL</code> | <code>time.Duration</code> | <code>10m0s</code> | Interval for cleaning idle per-IP rate-limiter entries. |
+| <code>rate&#95;limit.max&#95;concurrent&#95;per&#95;ip</code> | <code>RATE&#95;LIMIT&#95;MAX&#95;CONCURRENT&#95;PER&#95;IP</code> | <code>int</code> | <code>2</code> | Concurrent admitted RPCs per resolved IP; 0 disables this limiter. |
+| <code>audit.buffer&#95;size</code> | <code>AUDIT&#95;BUFFER&#95;SIZE</code> | <code>int</code> | <code>1000</code> | In-memory audit queue capacity; audit is Enterprise-only. |
+| <code>audit.batch&#95;size</code> | <code>AUDIT&#95;BATCH&#95;SIZE</code> | <code>int</code> | <code>100</code> | Maximum number of events in a database write batch. |
+| <code>audit.flush&#95;interval</code> | <code>AUDIT&#95;FLUSH&#95;INTERVAL</code> | <code>time.Duration</code> | <code>1s</code> | Periodic flush interval for a partial batch. |
+| <code>audit.max&#95;save&#95;retries</code> | <code>AUDIT&#95;MAX&#95;SAVE&#95;RETRIES</code> | <code>int</code> | <code>3</code> | Additional database save attempts; 3 means at most 4 total attempts. |
+| <code>audit.enqueue&#95;timeout</code> | <code>AUDIT&#95;ENQUEUE&#95;TIMEOUT</code> | <code>time.Duration</code> | <code>1s</code> | Maximum wait for queue room; 0 selects non-blocking enqueue. |
+| <code>audit.flush&#95;timeout</code> | <code>AUDIT&#95;FLUSH&#95;TIMEOUT</code> | <code>time.Duration</code> | <code>5s</code> | Total database save budget for a batch including retries. |
+| <code>audit.retention&#95;months</code> | <code>AUDIT&#95;RETENTION&#95;MONTHS</code> | <code>int</code> | <code>12</code> | Drop monthly partitions strictly older than the month-start cutoff; 0 disables deletion. The current month is additional. |
+| <code>audit.pre&#95;create&#95;months</code> | <code>AUDIT&#95;PRE&#95;CREATE&#95;MONTHS</code> | <code>int</code> | <code>3</code> | Future monthly partitions to pre-create, in addition to the current month. |
+| <code>audit.partition&#95;check&#95;interval</code> | <code>AUDIT&#95;PARTITION&#95;CHECK&#95;INTERVAL</code> | <code>time.Duration</code> | <code>6h0m0s</code> | Partition-maintenance interval; maintenance also runs at startup. |
+| <code>audit.partition&#95;op&#95;timeout</code> | <code>AUDIT&#95;PARTITION&#95;OP&#95;TIMEOUT</code> | <code>time.Duration</code> | <code>30s</code> | Timeout budget for a partition maintenance operation. |
+| <code>auth.write&#95;tokens</code> | <code>AUTH&#95;WRITE&#95;TOKENS</code> | <code>config.TokenList</code> | <code>[]</code> | Static token name/SHA-256 entries. Empty denies all mutations. |
+| <code>auth.require&#95;authentication</code> | <code>AUTH&#95;REQUIRE&#95;AUTHENTICATION</code> | <code>bool</code> | <code>false</code> | Require bearer authentication for generation/listing and enabled MCP as well as mutations. |
+| <code>mcp.enabled</code> | <code>MCP&#95;ENABLED</code> | <code>bool</code> | <code>false</code> | Start the separate /mcp HTTP listener; gRPC TLS does not protect it. |
+| <code>log.level</code> | <code>LOG&#95;LEVEL</code> | <code>string</code> | <code>info</code> | Structured logging level: debug, info, warn, or error; service start --log-level overrides it. |
+
+## Compound values and additional environment inputs
+
+<code>auth.write&#95;tokens</code> is a YAML list of objects with <code>name</code> and <code>sha256</code> keys. The source fields have <code>env:"NAME"</code> and <code>env:"SHA256"</code> tags, but the list implements its own decoder: the supported environment input is **<code>AUTH&#95;WRITE&#95;TOKENS=ci=HASH,operator=HASH</code>**, not independent <code>NAME</code> or <code>SHA256</code> variables. A hash is exactly 64 hexadecimal characters and names must be unique and non-empty.
+
+<code>license.public&#95;keys</code> is a YAML map. Its environment encoding is <code>LICENSE&#95;PUBLIC&#95;KEYS="key-id:HEX,&#42;:FALLBACK&#95;HEX"</code>; each public key has 64 hexadecimal characters. <code>server.trusted&#95;proxies</code> uses a YAML sequence or a comma-separated <code>SERVER&#95;TRUSTED&#95;PROXIES</code> value.
+
+<code>OTEL&#95;EXPORTER&#95;OTLP&#95;ENDPOINT</code> is an accepted alias of <code>TELEMETRY&#95;OTLP&#95;ENDPOINT</code>; the canonical service variable wins when both are set. The old <code>TELEMETRY&#95;OTEL&#95;EXPORTER&#95;OTLP&#95;ENDPOINT</code>, <code>LICENSE&#95;PUBLIC&#95;KEY</code>, <code>license.public&#95;key</code>, and <code>db.driver</code> are not current settings: heed diagnostics and migrate rather than copying old examples. When static S3 credentials are omitted, credential discovery is delegated to the pinned AWS SDK default credential chain; its environment/files/instance-role inputs are SDK behavior, not additional YAML keys in EasyP.
+
+**<code>EASYP&#95;CONFIG</code> selects the configuration file for commands with <code>--cfg</code>.** A container healthcheck is a separate process: starting the server with <code>--cfg /run/service.yaml</code> does not pass that argument to <code>easyp-svc health</code>. Set <code>EASYP&#95;CONFIG=/run/service.yaml</code> for both, or pass <code>--cfg</code> explicitly in both commands. <code>health --addr</code> overrides address discovery and probes <code>/live</code>, not readiness.
+
+**<code>EASYP&#95;TOKEN</code> is read only by the operator registration client as a fallback for <code>--token</code>.** It does not configure accepted server tokens and the checked <code>easyp</code> CLI remote executor does not read it.
+
+## Cross-field constraints
+
+All four ports must be valid and distinct. TLS certificate and key must be configured together; a client CA requires TLS. Worker counts, queue size, execution and shutdown budgets, and message/output limits must satisfy validation. In particular, <code>server.force&#95;shutdown&#95;after</code> must exceed <code>worker&#95;pool.generation&#95;timeout</code>, and the send-message limit cannot be lower than the permitted plugin output. A nonzero cache budget must not be lower than the output bound. S3 settings must form a coherent bucket/endpoint/credential configuration.
+
+The wire response wraps plugin output, so allowing exactly the same maximum byte count for raw output and the surrounding gRPC message does not guarantee delivery of a response at the exact boundary. Leave transport headroom and align the client's receive limit as well.
+
+See [Authentication and licensing](./authentication-and-licensing) for license ceilings and token formats, [Architecture](./architecture) for queues and timeouts, and [Installation](./installation) for the complete Helm values reference.
