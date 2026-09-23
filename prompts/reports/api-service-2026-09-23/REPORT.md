@@ -133,3 +133,24 @@ b84da08 docs(api-service): compare with Buf BSR remote plugins, migration in bot
   ссылки в разделе 212, битых 0; `/docs/api-service/plugin-catalog` и `/ru/...` → 200.
 - Ограничение поиска: ищется по целым токенам — `stephenh-ts-proto`, `vtprotobuf`, `connect-kotlin` находятся,
   `ts-proto` — нет.
+
+## Дополнение: перенос из ветки другой модели, Helm values, схемы (2026-09-23)
+
+Ветка `origin/docs/api-service-full-and-bsr` (GPT-6 Astra Pro) не мержилась; из неё проверены и перенесены факты:
+
+- **Каталог:** 13 рецептов не читают `VERSION` в Dockerfile и собирают то, что закреплено в `package.json` /
+  `requirements.txt` (`stephenh-ts-proto`: 65 версий в `plugin.yaml`, собирается только 2.6.1). Генератор определяет
+  это сам; страница показывает только закреплённую версию и предупреждение. Собираемых версий 1522, не 1743.
+  [команда: `npm run sync:plugins -- --ref v1.0.2`] **Для команды сервиса:** это дефект рецептов — регистрация такой
+  «версии» подписывает бинарник чужим номером.
+- **Повторная регистрация** после `push --force` ничего не делает (`ALREADY_EXISTS` → skipped; `register.go:406`),
+  `UpdatePlugin` не чистит распакованный кеш (`registry.go:634-735`), тёплый кеш продолжает старый бинарник.
+  Исправлено в plugins, operator-cli, architecture, upgrading (EN/RU).
+- **`cmd/mcp-smoke` на v1.0.2** требует `easyp_config_describe` (фикс `d5e0e43` только в master). Отмечено на `mcp`.
+- **Бэкап:** «бакет свежее базы» небезопасен при перезаписанных архивах. Дополнено.
+- **Helm values:** новая генерируемая страница `helm-values` — все 117 значений, описания = комментарии чарта.
+  `npm run sync:helm-values`; `npm run sync:service` запускает оба генератора на последнем теге.
+
+Схемы: ASCII заменены Mermaid (клиентский рендер, dark), дерево — `<Files>`. Добавлена зависимость `mermaid@12.0.0`
+(116 пакетов, грузится лениво только на страницах со схемами). Заодно начали рисоваться Mermaid-блоки в двух
+блог-постах. Проверено headless Chrome: все SVG отрисованы, `Syntax error` нет; исходник схем остаётся в `llms.txt`.
