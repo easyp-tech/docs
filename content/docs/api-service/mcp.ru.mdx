@@ -60,6 +60,15 @@ gRPC, и без него отвечает 401.
 go run ./cmd/mcp-smoke --endpoint http://localhost:23413/mcp
 ```
 
+<Callout type="warn">
+В теге v1.0.2 этот клиент всё ещё требует инструмент `easyp_config_describe`,
+который сервис перестал отдавать в v0.14.0, поэтому на исправном v1.0.2 он
+падает с `missing required tool "easyp_config_describe"; got: plugins_list`.
+Исправление (коммит `d5e0e43`) есть в `master`, но не в релизе; запускайте клиент
+из `master` или проверьте любым MCP-клиентом, что `tools/list` возвращает
+`plugins_list`.
+</Callout>
+
 У реестра Buf тоже есть MCP-сервер, но с другим охватом: он отдаёт Registry API
 BSR (модули, коммиты, метки), включая запись. См.
 [EasyP и Buf BSR](/ru/docs/api-service/vs-buf-bsr).

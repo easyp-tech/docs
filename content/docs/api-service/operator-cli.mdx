@@ -68,8 +68,9 @@ the tree can be uploaded later with `push --packed`.
 
 Packs each version directory and uploads it to
 `{prefix}{group}/{name}/{version}/plugin.tgz`. Run before `register`. Re-pushing
-an already registered version with `--force` invalidates its recorded checksum:
-register it again.
+an already registered version with `--force` invalidates its recorded checksum,
+and `register` will not fix that — it skips versions that exist. Publish a new
+version, or delete the old one first (see [Plugins](/docs/api-service/plugins#push-force-after-register)).
 
 | Flag | Default | Meaning |
 |---|---|---|
