@@ -1,0 +1,68 @@
+---
+title: "Authentication and licensing"
+---
+
+## Bearer tokens
+
+The service uses a static allowlist of SHA-256 digests. Generate a token locally with the operator CLI:
+
+~~~sh
+easyp-svc auth new-token --name ci-registration
+~~~
+Save the printed token in a secret manager; configure only its printed digest under <code>auth.write&#95;tokens</code>, with a unique non-empty name. The command generates 32 random bytes and hex-encodes them. The server compares the hash of the bearer value with configured hashes. The name is an audit label, not an authorization scope.
+
+The environment representation is <code>AUTH&#95;WRITE&#95;TOKENS=name=sha256,name2=sha256</code>. Each digest must contain exactly 64 hexadecimal characters. An empty token list denies every mutation. With required authentication and no tokens, generation and listing are denied too.
+
+| Operation | Default | With <code>auth.require&#95;authentication: true</code> |
+| --- | --- | --- |
+| <code>GenerateCode</code>, <code>Plugins</code> | Anonymous; a supplied token is not used to establish an actor on these bypassed methods. | Bearer required. |
+| <code>CreatePlugin</code>, <code>UpdatePlugin</code>, <code>DeletePlugin</code> | Bearer required. | Bearer required. |
+| MCP <code>plugins&#95;list</code> | Anonymous if MCP is enabled. | Bearer required by the HTTP wrapper. |
+| Health | No application token required. | No application token required. |
+
+Missing, malformed, or unknown credentials return <code>Unauthenticated</code>; failure reasons are not exposed as token-validity hints. This mechanism has no OAuth/OIDC login, SSO, organization roles, token expiry, or per-plugin scopes. All accepted tokens confer the same application access. Replace/revoke a digest in configuration and restart to rotate it.
+
+<code>EASYP&#95;TOKEN</code> is a client-side fallback for **<code>easyp-svc plugins register</code>**. It is not a server authentication setting and is not read by the checked <code>easyp</code> remote executor. See [Client usage](./client-usage).
+
+## TLS and mTLS
+
+~~~yaml
+server:
+  tls:
+    cert_file: /run/tls/tls.crt
+    key_file: /run/tls/tls.key
+    client_ca_file: /run/tls/ca.crt
+~~~
+A certificate/key pair enables gRPC TLS, with server minimum TLS 1.3. Adding <code>client&#95;ca&#95;file</code> requires a verified client certificate. Omit that key for server-authenticated TLS only. Certificates must be readable at startup and rotated through your deployment mechanism; static application tokens and license material are also loaded at startup.
+
+mTLS verifies transport identity against the CA but does not grant an application role or replace bearer checks. The operator registration client accepts <code>--tls-ca</code>, <code>--tls-cert</code>, and <code>--tls-key</code>. <code>--insecure</code> means **plaintext**, not “TLS without certificate verification”; reserve it for isolated development.
+
+Helm defaults differ from the bare binary: TLS is enabled and an empty <code>tls.clientCASecret</code> uses <code>ca.crt</code> from the server Secret, effectively requesting mTLS. <code>tls.clientCASecret: "-"</code> selects server-only TLS. Consult [Installation](./installation). MCP is a separate HTTP listener and does not inherit these TLS settings.
+
+## Community / Enterprise
+
+| Capability or ceiling | Community | Enterprise |
+| --- | --- | --- |
+| Generation, catalog listing, plugin CRUD, MCP, rate limiting | Available, subject to authentication/configuration. | Available. |
+| Lookup workers | Up to 4. | No license ceiling; configured workers still apply. |
+| Registered plugin versions | Up to 10 rows, not ten plugin families. | No license ceiling. |
+| Concurrent generations | Up to 16. | No license ceiling; configured semaphore still applies. |
+| Core audit recording | Skipped. | Enabled. |
+
+The implementation represents unlimited license ceilings as <code>-1</code>; do not copy that value into configuration fields that require positive integers. At startup, worker and generation counts are clamped against positive license ceilings and the effective values are logged. New registrations check the current plugin-count ceiling and return <code>ResourceExhausted</code> when it is reached; existing rows are not pruned automatically.
+
+License refresh does not resize an already constructed pool. After an Enterprise license becomes Community, audit gating and the new-registration limit change, while startup-selected worker/generation capacities remain until restart. Conversely, installing a license without restarting does not enlarge a Community pool. No custom per-license resource numbers are read from the token in this implementation.
+
+## License verification and expiration
+
+Enterprise uses offline verification of a **PASETO v4.public** token with Ed25519 public keys. Configure the token through <code>license.key</code> or a file path in <code>license.file</code>; the key value takes precedence. Configure trusted issuer keys in <code>license.public&#95;keys</code>, a map from key ID to a 32-byte hexadecimal public key. A <code>"&#42;"</code> entry is the fallback when an appropriate named key is not selected. Obtain license material and trusted public keys through the licensor's authorized process; this service does not contain a customer license-issuance command.
+
+The verifier checks issuer <code>easyp.tech</code>, audience <code>easyp-service</code>, Enterprise tier, validity times, and the optional <code>grace&#95;days</code> claim. It allows one minute of clock skew. Grace defaults to zero. A valid token in its permitted grace interval retains Enterprise claims; after grace, or for an invalid/unverifiable token, validation yields Community claims. Malformed configured public keys are a startup error. An unreadable configured license file is also a configuration/preflight error, not a successful Community startup.
+
+Claims are refreshed on the <code>license.cache&#95;ttl</code> schedule, five minutes by default. The license token is read once: refresh revalidates the cached token against the clock, not new file contents. A file replacement alone does not reload it. The manager retains previous claims on an unexpected verifier error, while normal invalid/expired-token handling returns Community without such an error. Monitor expiry/grace metrics and restart deliberately after rotating license material.
+
+## Code licenses
+
+The service is **source-available under Elastic License 2.0**, except the separately licensed <code>api/</code> and <code>sdk/</code> modules, which use **Apache-2.0**. The service's license grants use and modification subject to its restrictions, including restrictions on providing substantial functionality to third parties as a hosted/managed service, bypassing license-key functionality, or removing notices. It is not an unrestricted open-source server license.
+
+The permissively licensed wire contract and Go SDK let clients integrate without importing the Elastic-licensed server implementation. Plugin executables and third-party components retain their own licenses: neither an Enterprise token nor the service license replaces those obligations. Review the [repository license](https://github.com/easyp-tech/service/blob/4b01518b42c6f448d21216e3c0e8c35ef66d5c2d/LICENSE) and the API/SDK license files before redistribution or offering a hosted product. These operational notes are not a substitute for legal review of a particular deployment.

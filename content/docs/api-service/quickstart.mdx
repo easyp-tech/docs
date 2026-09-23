@@ -1,0 +1,120 @@
+---
+title: "Local quickstart"
+---
+
+This walkthrough uses one PostgreSQL container, one locally built service image, and a single Go plugin. It deliberately binds the API to loopback and permits anonymous generation because the checked <code>easyp</code> remote executor cannot send a bearer token. Registration still requires a token. **This is not a production access-control configuration.** Read [Security](./security) before exposing the service.
+
+Requirements: Docker with a running Linux container engine, Git, the Go toolchain required by service v1.0.2, and an installed <code>easyp</code> CLI matching [Client usage](./client-usage). Ports 23410 and 23412 must be free. On Apple Silicon the plugin is built for the Linux VM architecture, not for native macOS execution.
+
+## Build one artifact
+
+~~~sh
+git clone --branch v1.0.2 https://github.com/easyp-tech/service.git
+cd service
+go build -o ./easyp-svc ./cmd/easyp-svc
+docker build --build-arg VERSION=v1.0.2 -t easyp-service:local .
+mkdir -p demo/plugins/.tmp
+./easyp-svc plugins build --filter 'protocolbuffers/go:v1.36.11' \
+  --output demo/plugins --parallel 1 --non-interactive registry
+./easyp-svc auth new-token --name local-registration
+~~~
+Save the printed token in <code>EASYP&#95;TOKEN</code> for the registration client and its printed digest in <code>DEMO&#95;TOKEN&#95;SHA256</code>. Supply a separate random **hexadecimal** local database password as <code>DEMO&#95;DB&#95;PASSWORD</code>; using hex avoids URL-escaping ambiguity in the example DSN. Set these through your shell/secret tool without committing or logging them. The example does not embed shared credentials. Building/pulling dependencies needs a network connection; no GHCR image is used here.
+
+## Prepare Compose
+
+Create <code>demo/service.yaml</code>:
+
+~~~yaml
+registry:
+  plugins_dir: /plugins
+  cache_max_bytes: 0
+auth:
+  require_authentication: false
+~~~
+Create <code>demo/compose.yaml</code>:
+
+~~~yaml
+name: easyp-local-demo
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: easyp
+      POSTGRES_PASSWORD: ${DEMO_DB_PASSWORD:?Set a local-only database password}
+      POSTGRES_DB: easyp
+    volumes:
+      - demo-db:/var/lib/postgresql/data
+    healthcheck:
+      test: [CMD-SHELL, "pg_isready -U easyp -d easyp"]
+      interval: 2s
+      timeout: 2s
+      retries: 30
+  service:
+    image: easyp-service:local
+    pull_policy: never
+    command: [service, start]
+    environment:
+      EASYP_CONFIG: /run/easyp/service.yaml
+      DB_POSTGRES_DSN: postgres://easyp:${DEMO_DB_PASSWORD}@postgres:5432/easyp?sslmode=disable
+      AUTH_WRITE_TOKENS: local-registration=${DEMO_TOKEN_SHA256:?Set the generated token digest}
+    ports:
+      - "127.0.0.1:23410:23410"
+      - "127.0.0.1:23412:23412"
+    volumes:
+      - ./service.yaml:/run/easyp/service.yaml:ro
+      - ./plugins:/plugins:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+volumes:
+  demo-db:
+~~~
+The PostgreSQL service is not published to the host. Environment credentials override configuration defaults. <code>EASYP&#95;CONFIG</code> lets the image’s separate healthcheck discover the same file. Create the empty <code>plugins/.tmp</code> directory before mounting it: registry construction creates this staging directory even when S3 is disabled. The plugin mount is read-only because this example uses pre-provisioned local artifacts, not S3 extraction.
+
+## Start and register
+
+~~~sh
+cd demo
+docker compose config --quiet
+docker compose up -d
+curl --fail http://127.0.0.1:23412/live
+curl --fail http://127.0.0.1:23412/
+../easyp-svc plugins register --addr localhost:23410 --insecure \
+  --plugins-prefix /plugins --filter 'protocolbuffers/go:v1.36.11' \
+  --parallel 1 plugins
+~~~
+If readiness is initially unavailable, inspect <code>docker compose logs service postgres</code> and retry after migrations complete. The <code>--plugins-prefix</code> is the **server** path, while positional <code>plugins</code> is the operator’s local artifact tree. <code>EASYP&#95;TOKEN</code> is consumed by <code>plugins register</code>, not by <code>easyp generate</code>. Repeating registration skips an existing version instead of changing it.
+
+## Generate a file
+
+Create <code>demo/proto/hello.proto</code> (make the <code>proto</code> directory first):
+
+~~~protobuf
+syntax = "proto3";
+package demo.v1;
+option go_package = "example.com/easyp-demo/gen;demov1";
+message Hello {
+  string name = 1;
+}
+~~~
+Create <code>demo/easyp.yaml</code>:
+
+~~~yaml
+generate:
+  inputs:
+    - directory: proto
+  plugins:
+    - remote: http://localhost:23410/protocolbuffers/go:v1.36.11
+      out: gen
+      opts:
+        paths: source_relative
+~~~
+~~~sh
+easyp generate
+test -s gen/proto/hello.pb.go
+~~~
+Run those commands from <code>demo</code>. The current CLI preserves <code>proto/</code> in the input descriptor filename, so <code>paths=source&#95;relative</code> produces <code>gen/proto/hello.pb.go</code>. Check the file, not only the command exit status.
+
+## Stop the example
+
+<code>docker compose down</code> stops only this Compose project and preserves its named database volume. Keep the volume while inspecting/retrying the example; remove it deliberately only after deciding the demo data is disposable. For production, choose TLS and a bearer-capable client, provision durable storage, and follow [Installation](./installation), [Authentication](./authentication-and-licensing), and [Backup](./backup).

@@ -1,0 +1,99 @@
+---
+title: "Architecture and request lifecycle"
+---
+
+## Request lifecycle
+
+<code>easyp.generator.v1.GeneratorAPI/GenerateCode</code> accepts a plugin coordinate and the standard Protobuf plugin request. The application-level gRPC chain, from outermost to innermost, is:
+
+~~~text
+trace_logging
+  -> realip
+  -> caller-IP context propagation
+  -> Prometheus
+  -> structured_logging
+  -> panic_recovery
+  -> validation middleware
+  -> rate_limit
+  -> concurrency_limit
+  -> auth
+  -> license
+  -> error_code_conversion
+  -> GenerateCode handler -> Core -> WorkerPool -> registry -> child process
+~~~
+TLS is a transport setting, not an interceptor. OpenTelemetry uses a gRPC stats handler as well as Core/registry/plugin wrappers. Crucially, error conversion wraps the handler **inside** the authentication and limiter interceptors. It therefore does not attach <code>ErrorInfo</code> to every rejected RPC.
+
+The registered validation middleware looks for generated validation methods. The checked API messages have no <code>Validate</code>/<code>ValidateAll</code> implementation; declaring constraints in <code>generator.proto</code> is not proof that this middleware enforces them. Runtime checks in the handler and Core remain authoritative.
+
+Core parses <code>group/name:version</code>, obtains a plugin through the lookup pool, acquires generation capacity, marshals the request, executes the child, and unmarshals stdout as <code>CodeGeneratorResponse</code>. An error in that response's <code>error</code> field is a plugin-protocol result, not automatically a gRPC error. Clients must check both layers.
+
+## Identity and version selection
+
+A registration has group, name, and version plus a configuration object and tags. Use an explicit version such as <code>protocolbuffers/go:v1.36.11</code>. The wire request must include a version component. The <code>easyp</code> URL parser supplies <code>latest</code> when its URL omits one.
+
+<code>latest</code> is resolved using PostgreSQL <code>ORDER BY version DESC LIMIT 1</code>: this is **text ordering**, not SemVer comparison and not registration time. For example, textual ordering can put <code>v1.36.9</code> ahead of <code>v1.36.11</code>. Avoid <code>latest</code> in reproducible builds. The service does not impose an immutable-artifact policy on an existing version.
+
+Listing uses exact group/name/version filters and an AND across requested tags. Default page size is 100, capped at 1000. Pagination is keyset-based, ordered by group/name/version; keep filters unchanged across pages. The cursor encodes those coordinates, not an authenticated snapshot of the whole catalog.
+
+## Lookup and generation are separate queues
+
+<code>worker&#95;pool.workers</code> controls plugin **lookup/download workers**, not the number of running child processes. <code>Get()</code> makes a non-blocking attempt to enqueue a lookup; a full queue returns <code>ErrServerOverloaded</code>. An accepted caller then waits for its result or cancellation. There is also a separate generation semaphore and a bounded queue for callers waiting for a generation slot.
+
+| Setting | Binary default | Meaning |
+| --- | --- | --- |
+| <code>worker&#95;pool.workers</code> | 4 | Concurrent lookup workers; Community ceiling 4. |
+| <code>worker&#95;pool.queue&#95;size</code> | 16 | Capacity used for the lookup queue and, separately, the generation wait queue. |
+| <code>worker&#95;pool.max&#95;concurrent&#95;generations</code> | 16 | Active generations; Community ceiling 16. |
+| <code>rate&#95;limit.max&#95;concurrent&#95;per&#95;ip</code> | 2 | Earlier admission limit per resolved caller IP; 0 disables this particular limit. |
+| <code>worker&#95;pool.generation&#95;timeout</code> | 120s | Execution budget after generation admission, not a budget for the entire lookup/queue path. |
+| <code>worker&#95;pool.max&#95;retries</code> | 2 | Up to two additional attempts for the pool's recognized transient generation errors. |
+
+The pool recognizes transient errors by specific error-text matches, not by an exhaustive classification of plugin failures. It does not add exponential backoff between its own execution retries. Earlier client deadlines still win. Do not multiply these defaults into a throughput claim: plugin cost, storage, descriptors, and queueing dominate different workloads.
+
+## Process execution
+
+The registry invokes <code>exec.CommandContext</code> with the registered command. stdin is the serialized request; stdout is the serialized response. The configured environment is supplied explicitly. The working directory is inherited from the service, so a wrapper that needs files beside itself should locate its own directory rather than assuming the current directory is the plugin directory.
+
+The default stdout limit is 64 MiB; stderr capture is limited to 1 MiB. The configured plugin timeout and the pool context can both terminate execution. Cancellation targets the process group on the supported Unix platforms. Output limits do not constitute a memory limit for the child or a sandbox. A writer that fills a pipe after the reader reaches its cap can still wait until cancellation; do not interpret the cap as a guaranteed immediate process termination.
+
+The executable path is checked against the plugin directory, but allowed executables retain the service account's filesystem and network privileges. Read [Security](./security).
+
+## Local and S3 storage
+
+PostgreSQL metadata is required in both modes. Without an S3 bucket, <code>plugins&#95;dir</code> is the authoritative local artifact tree: provision it yourself and back it up. Registration does not upload or distribute those files.
+
+With S3, the object layout is <code>prefix/group/name/version/plugin.tgz</code>. Upload before registration. <code>CreatePlugin</code> and configuration updates read the archive and store its SHA-256. A cold lookup downloads it, checks a recorded hash when present, extracts to a temporary directory, removes an existing destination, and renames the temporary directory into place. The remove/rename sequence is not an atomic replacement of an existing directory.
+
+Concurrent cold loads of the same version share a process-local singleflight operation. That operation uses the initiating request's context; it is not a cross-replica lock. Extraction rejects unsafe entry paths and escaping symlink targets and skips unsupported special entries. There is no separate configured bound on decompressed archive size.
+
+A warm hit checks the local executable's presence; it does **not** recompute the archive hash before every execution. Older records without a hash remain unchecked on download until an explicit configuration update records one. Updating metadata does not invalidate a warm local copy. Replacing an S3 object under the same version can consequently leave warm replicas on old bytes and cold replicas failing checksum verification.
+
+The S3 cache has a 20 GiB default soft LRU budget. Zero disables eviction. Recent entries are protected for at least five minutes or twice the generation timeout, whichever is larger; the budget can be exceeded when entries are protected. There is no cross-process cache coordinator or execution reference count. Keep replicas' cache directories separate. Deleting a registration attempts S3/local-cache deletion after the database operation; cleanup failures are not a transaction across all three stores.
+
+## PostgreSQL and health
+
+Embedded Goose migrations run before readiness. PostgreSQL stores plugin registrations and partitioned audit data; it does not store generated output files. The initial audit migration creates a flat table; migration 2 copies it into monthly UTC partitions and replaces the old table. Plan for locks and extra disk during that migration rather than assuming a metadata-only change.
+
+HTTP <code>/live</code> reports process liveness independently of PostgreSQL. HTTP <code>/</code> returns not-ready during startup and later checks PostgreSQL. Neither path verifies every plugin, S3 object, license, or exporter. The gRPC health service advertises serving status but is not the database-aware readiness check. Use HTTP readiness for database reachability and a separate synthetic generation for end-to-end availability.
+
+## Audit delivery
+
+Core emits operation outcomes after the operation itself. Enterprise enables enqueueing; Community records skipped-audit metrics instead. Rejections in earlier authentication or admission interceptors are not Core audit events.
+
+Defaults are a 1000-event queue, 100-event batches, a one-second flush interval, a one-second enqueue wait, and a five-second batch-save budget. The enqueue wait deliberately outlives request cancellation and can add latency. An enqueue timeout drops that event; failed save attempts ultimately drop the batch. Three configured retries mean up to four save attempts within the budget. There is no durable queue, replay API, or exactly-once guarantee.
+
+Partition maintenance runs on startup and every six hours. It pre-creates the current month and three future months. Retention 12 drops partitions strictly older than the month-start cutoff twelve months ago: the current month is additional. Zero disables retention deletion. The DEFAULT partition is not automatically emptied or dropped. Inspect [Observability](./observability) and the audit [runbooks](./runbooks) before relying on retention or maintenance gauges.
+
+## Error contract in this revision
+
+| Condition reaching handler conversion | gRPC code / reason |
+| --- | --- |
+| Missing registration | <code>NotFound</code> / <code>NOT&#95;FOUND</code> |
+| Full lookup/generation admission queue | <code>ResourceExhausted</code> / <code>SERVER&#95;OVERLOADED</code> |
+| Community registration ceiling | <code>ResourceExhausted</code> / <code>MAX&#95;PLUGINS&#95;EXCEEDED</code> |
+| Archive absent during S3 registration | <code>FailedPrecondition</code> / <code>BINARY&#95;NOT&#95;UPLOADED</code> |
+| Object-store failure on cold lookup | <code>Unavailable</code> / <code>STORAGE&#95;UNAVAILABLE</code> |
+| Duplicate registration | <code>AlreadyExists</code> / <code>ALREADY&#95;EXISTS</code> |
+| Plugin execution/protocol failure wrapped as generation failure | <code>Internal</code> / <code>GENERATION&#95;FAILED</code> |
+
+Converted errors use <code>google.rpc.ErrorInfo</code> with domain <code>easyp.tech</code>. There are important current defects: a handler-produced <code>InvalidArgument</code> status, such as an invalid page token or update mask, is converted to <code>Internal</code>; a plugin timeout wrapped in <code>ErrGenerationFailed</code> is also classified as <code>Internal</code>, because that match precedes deadline matching. A caller's own elapsed deadline can still appear as <code>DeadlineExceeded</code>. Do not implement retries on the assumption that all timeout or input errors have their intended status.
