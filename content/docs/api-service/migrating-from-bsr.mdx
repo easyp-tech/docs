@@ -1,0 +1,65 @@
+---
+title: "Migration from and to BSR"
+---
+
+**Buf information checked on 2026-09-23.** This guide moves **remote code generation**, not a whole schema platform. EasyP’s service has no direct replacement for BSR modules, generated SDK registries, organizational roles, or schema policies. Inventory those dependencies before changing the generator. For module management see the separate [package-manager comparison](../cli/package-manager/easyp-vs-buf). [BSR SDKs](https://buf.build/docs/bsr/generated-sdks/) · [Policies](https://buf.build/docs/bsr/checks/policies/).
+
+## 1. Capture the baseline
+
+Record each remote plugin’s owner/name, upstream version, BSR revision, options, compiler input, managed-mode changes, transitive schema dependencies, and generated output. Pin input commits and runtime library versions. BSR can rebuild a plugin at the same upstream version under a new revision; the matching EasyP version string alone does not preserve that artifact identity. [Remote generation](https://buf.build/docs/bsr/remote-plugins/usage/) · [Plugin versions and revisions](https://github.com/bufbuild/plugins/blob/392d085396a7b53cf130aed7bd3ee83f22927aa3/CONTRIBUTING.md).
+
+Keep the old CI job and output snapshot available for rollback. Choose a small dependency-free schema first, then a representative graph with imports, options, comments and service definitions. The example below isolates a single Go message generator; it does not claim automated conversion of every managed-mode rule.
+
+## 2. Provision validated EasyP artifacts
+
+Follow [Quickstart](./quickstart) or the production [Installation](./installation). Build the selected version for the server’s OS/architecture and verify a real generation. In S3 mode upload before registration; in local mode populate the full artifact tree before registration. Pin an explicit version rather than <code>latest</code>.
+
+The example identity <code>protocolbuffers/go:v1.36.11</code> exists in the checked EasyP recipe and is also used by Buf’s current documentation. This is a candidate mapping, not proof of identical compiled bytes. For other plugins, compare catalogs and build instructions individually; existing EasyP <code>bufbuild/es</code> recipes have known defects documented in [Plugins](./plugins). [Buf remote plugin example](https://buf.build/docs/bsr/remote-plugins/).
+
+## 3. Translate generation configuration
+
+Original <code>buf.gen.yaml</code>:
+
+~~~yaml
+version: v2
+plugins:
+  - remote: buf.build/protocolbuffers/go:v1.36.11
+    out: gen
+    opt:
+      - paths=source_relative
+~~~
+Equivalent **local-development** <code>easyp.yaml</code> for a schema directory named <code>proto</code>:
+
+~~~yaml
+generate:
+  inputs:
+    - directory: proto
+  plugins:
+    - remote: http://localhost:23410/protocolbuffers/go:v1.36.11
+      out: gen
+      opts:
+        paths: source_relative
+~~~
+The keys are intentionally different: Buf has a top-level version and plugin list plus <code>opt</code>; EasyP uses <code>generate.inputs</code>, <code>generate.plugins</code>, and an <code>opts</code> map. BSR revision pinning is not an EasyP configuration key. Map a chosen revision to a controlled artifact/version under your own release procedure. Do not copy Buf’s <code>managed</code> block into EasyP unchanged or assume the same default imports/options. [Buf v2 configuration](https://buf.build/docs/configuration/v2/buf-gen-yaml/).
+
+<code>http://localhost:23410</code> is only the loopback development endpoint. For production, validate your TLS/authentication design against [Client usage](./client-usage). The checked <code>easyp</code> remote executor cannot send bearer credentials or present mTLS certificates; use a suitable SDK integration rather than weakening access control to complete a migration.
+
+## 4. Change CI and compare results
+
+After provisioning the service and artifacts, change the generation job from <code>buf generate</code> to <code>easyp generate</code> with the corresponding configuration. Preserve output cleaning, formatter/runtime steps, generated file inclusion/exclusion, working directory, and error handling explicitly. A successful RPC is insufficient when the plugin response carries an error.
+
+Run both paths on identical inputs into separate output directories. Compare file sets and bytes, then compile and run the consuming project’s tests. Investigate every difference in package paths, import mappings, comments, source-retention options, editions support, insertion-point behavior, and generator/runtime versions. Exercise cold and warm artifact loading, output above 4 MiB, timeouts, authentication and throttling. Do not remove the old path until these checks pass.
+
+These clients speak different service protocols. Pointing <code>buf.gen.yaml remote</code> at an EasyP hostname or pointing the current EasyP remote URL at BSR does **not** make them interoperate. A protocol adapter would be separate engineering work; no such adapter is implemented by the checked client. [BSR code-generation API behavior](https://buf.build/docs/bsr/rate-limits/) · [Remote generation configuration](https://buf.build/docs/bsr/remote-plugins/usage/).
+
+## 5. Reverse migration: EasyP to BSR
+
+Choose a BSR remote plugin and supported upstream version/revision for every EasyP artifact. If a plugin is missing, evaluate local execution or a custom plugin on a private Pro/Enterprise instance. A generator needing arbitrary filesystem/network state must be adapted to BSR’s documented constraints or remain local. Custom BSR images must target Linux/amd64; do not upload an ARM-only EasyP artifact expecting automatic translation. [Custom plugins](https://buf.build/docs/bsr/remote-plugins/custom-plugins/).
+
+For the simple Go example, create <code>buf.yaml</code> with <code>version: v2</code> and <code>modules: [&#123;path: proto&#125;]</code>, restore the <code>buf.gen.yaml</code> shown above, and run <code>buf generate</code>. Public remote generation does not require publishing your local schemas as a module first; input still travels to the BSR executor. Authenticate with <code>buf registry login</code> or <code>BUF&#95;TOKEN</code> as appropriate, especially to avoid the low anonymous public-generation limit. [Usage](https://buf.build/docs/bsr/remote-plugins/usage/) · [Authentication](https://buf.build/docs/bsr/authentication/) · [Rate limits](https://buf.build/docs/bsr/rate-limits/).
+
+Re-run the same output and consumer tests. Keep the EasyP endpoint available through an agreed rollback window, then stop sending it generation traffic before retiring credentials, registrations, or artifacts. Switching to BSR generated SDKs is a further architectural change involving module publication and consumer dependency coordinates; it is not merely the reverse YAML edit. [Generated SDK workflow](https://buf.build/docs/bsr/generated-sdks/quickstart/).
+
+## Exit criteria
+
+A migration is complete only when the supported clients authenticate correctly, the critical plugin/input matrix passes, generated code compiles, operational ownership is assigned, and rollback has been exercised. This documentation provides the mapping and checks; no production BSR account or end-to-end bidirectional migration was exercised in its audit.
