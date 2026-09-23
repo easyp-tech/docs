@@ -17,9 +17,9 @@ require (
 )
 ```
 
-`roots` defaults to `.` when omitted. Requirements use semantic versions or full 40- or 64-character Git commit hashes. `replace module => ../local-copy` points generation and linting at a local checkout. Remove local replacements before writing a reproducible lock with `mod tidy` or `mod update`.
+`roots` defaults to `.` when omitted. A requirement may omit its version: `mod tidy` resolves the Git repository's current HEAD and locks its exact commit. Repeating `tidy` keeps that commit; `mod update` refreshes versionless requirements to HEAD. You may instead give a SemVer tag or a full 40- or 64-character Git commit hash. `replace module => ../local-copy` points generation and linting at a local checkout. Remove local replacements before writing a reproducible lock with `mod tidy` or `mod update`.
 
-For a Git repository with multiple `protobuf.mod` files, require each nested module separately by the identity declared in its manifest. A module in `foo/` can use a tag such as `foo/v1.2.3` or a full Git commit hash when no tag exists. Another module in `bar/` can use a different tag or commit. EasyP locks and resolves their source roots independently. `mod update` preserves commit-pinned requirements.
+For a Git repository with multiple `protobuf.mod` files, require each nested module separately by the identity declared in its manifest. For untagged modules, write `require repo/foo` and `require repo/bar`; EasyP finds both manifests and locks the resolved commits without module-specific tags. Explicit commit hashes stay pinned during `mod update`. Tagged releases remain optional: a module in `foo/` uses a tag such as `foo/v1.2.3`. EasyP resolves each module's source roots independently.
 
 ## Commands
 

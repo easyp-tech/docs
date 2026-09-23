@@ -66,7 +66,7 @@ The consuming project still declares a Git source with `require`. The dependency
 - Buf v1beta1 `buf.yaml`: reads `build.roots`, defaulting to `.`.
 - Older EasyP: reads `direct` dependencies from the old `protobuf.mod` and local `generate.inputs[].directory.root` plus Git inputs from `easyp.yaml`.
 
-For an old EasyP dependency without a version on one of its Git requirements, `mod tidy` selects its latest stable SemVer tag and pins the selected commit in the v1 lock. If that repository has no tags, declare an explicit full Git commit hash in its requirement instead; the old EasyP `source@<commit>` form is also read transitively. Buf Registry `deps` are not Git sources, so declare an appropriate Git module in the consuming `protobuf.mod` when those imports are needed. Buf `includes`/`excludes` filters are not yet supported for Git dependency import roots and produce an explicit error.
+For an old EasyP dependency without a version on one of its Git requirements, `mod tidy` resolves the Git repository's HEAD and pins its commit in the v1 lock. No tag is required. The old EasyP `source@<commit>` form is also read transitively. Buf Registry `deps` are not Git sources, so declare an appropriate Git module in the consuming `protobuf.mod` when those imports are needed. Buf `includes`/`excludes` filters are not yet supported for Git dependency import roots and produce an explicit error.
 
 Updated `protobuf.mod`:
 
