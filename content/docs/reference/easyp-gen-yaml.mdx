@@ -23,7 +23,7 @@ In accordance with EasyP's zero-duplication principles, `easyp.gen.yaml` **never
       type: "object"
     },
     "generate.modules": {
-      description: "List of module identities or repository-relative local module paths to generate. Dependency identities must be present in the consumer module's protobuf.lock. If omitted, the nearest protobuf.mod is selected.",
+      description: "Module identities or repository-relative local module paths to generate. Dependency identities use protobuf.mod and its lock beside this config; when no sibling manifest exists, they use the repository-root module and lock. If omitted, that local module is selected.",
       type: "string[]"
     },
     "generate.packages": {

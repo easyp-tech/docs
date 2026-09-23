@@ -35,7 +35,7 @@ easyp mod tidy
 easyp generate
 ```
 
-If `generate.modules` is omitted, the generator selects the nearest `protobuf.mod`. A module entry may also be a repository-relative local module path or a locked dependency identity. `generate.packages` is reserved for future package filtering and currently returns an error when nonempty.
+If `generate.modules` is omitted, the generator uses `protobuf.mod` beside this `easyp.gen.yaml`, or the repository-root `protobuf.mod` when there is no sibling manifest. A locked dependency identity in `generate.modules` is resolved through that same selected manifest and its lock. A module entry may also be a repository-relative local module path. `generate.packages` is reserved for future package filtering and currently returns an error when nonempty.
 
 ## Select a project and output descriptors
 

@@ -88,6 +88,8 @@ Unlike workspace-wide resolvers, EasyP resolves dependencies on a **per-module b
 
 Because each proto module maintains its own `protobuf.mod` and `protobuf.lock`, teams can update shared dependencies at their own pace without breaking neighboring services in a monorepo.
 
+The maximum-version rule applies to SemVer requirements. A full Git commit hash pins an exact revision without a tag. If the same module is required by two different commits, or by both a commit and a SemVer tag, resolution reports a conflict because those requirements have no common version ordering.
+
 ---
 
 ## 3. `protobuf.mod` DSL Directives
@@ -115,11 +117,11 @@ replace github.com/acme/weather => ../weather-fork
 
 ### Directive Reference
 
-- **`module`**: Declares the canonical module identity (URL/path). Optional when the Git URL matches repository layout.
+- **`module`**: Declares the required canonical module identity (URL/path).
 - **`roots`**: Defines the inner directory root containing `.proto` schema files (defaults to `.`). This ensures imports resolve cleanly without requiring prefix manipulation.
-- **`require`**: Declares direct and indirect module dependencies with explicit Semantic Version tags.
+- **`require`**: Declares direct and indirect module dependencies with explicit Semantic Version tags or full Git commit hashes.
   - **`// indirect`**: Appended automatically by `easyp mod tidy` for transitive dependencies not directly imported by the root module's `.proto` files.
-- **`replace`**: Overrides a module dependency with a local file path (`../weather-fork`) or an alternative Git repository/version. Useful for local development and debugging.
+- **`replace`**: Overrides a module dependency with a local file path (`../weather-fork`) for development.
 
 <Callout type="warn">
 Active `replace` directives are strictly intended for local development. EasyP CI workflows will flag and reject any commit containing an active `replace` directive.

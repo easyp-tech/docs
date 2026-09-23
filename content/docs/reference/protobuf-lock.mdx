@@ -25,7 +25,7 @@ The `protobuf.lock` file is an auto-generated artifact created by EasyP dependen
       type: "string"
     },
     "modules[].version": {
-      description: "Resolved Semantic Version tag (e.g. v1.2.3).",
+      description: "Resolved Semantic Version tag (for example v1.2.3) or the full Git commit hash requested without a tag.",
       type: "string"
     },
     "modules[].commit": {
@@ -66,7 +66,7 @@ modules:
 ## Lifecycle Commands
 
 - `easyp mod tidy`: Resolves required imports, updates indirect dependencies, and regenerates `protobuf.lock`.
-- `easyp mod update`: Upgrades dependencies to latest semver-compatible versions and updates `protobuf.lock`.
+- `easyp mod update`: Upgrades tagged dependencies to latest semver-compatible versions, preserves commit-pinned requirements, and updates `protobuf.lock`.
 - `easyp mod download`: Populates local cache strictly using `protobuf.lock` without reaching out to remote registries or modifying locked versions.
 
 The `hash` is computed with Go's `dirhash.Hash1` over every regular file tracked by Git at `commit`, using repository-relative paths. EasyP verifies the same digest for a newly downloaded module and for an existing cache entry. A missing cached commit still requires access to its Git repository.
