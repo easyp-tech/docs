@@ -44,11 +44,12 @@ registered versions in total.
 
 ## One plugin directory
 
-```
-registry/grpc/go/
-├── Dockerfile      # takes ARG VERSION, produces /plugin
-└── plugin.yaml     # the versions to build
-```
+<Files>
+  <Folder name="registry/grpc/go" defaultOpen>
+    <File name="Dockerfile — takes ARG VERSION, produces /plugin" />
+    <File name="plugin.yaml — the versions to build" />
+  </Folder>
+</Files>
 
 ```yaml
 # registry/protocolbuffers/go/plugin.yaml
@@ -82,17 +83,24 @@ directory as an ordinary process.
 
 ## From recipe to runnable plugin
 
-```
- build machine / CI                                   service
- ──────────────────                                   ───────
- easyp-svc plugins build registry
-   → plugins/{group}/{name}/{version}/plugin (+ sidecars)
- easyp-svc plugins push plugins
-   → s3://bucket/{prefix}{group}/{name}/{version}/plugin.tgz
- easyp-svc plugins register plugins  ── CreatePlugin ──▶ reads the archive from S3,
-                                                           records its sha256
-                                        GenerateCode  ──▶ on cache miss: download,
-                                                           verify sha256, unpack, run
+```mermaid
+sequenceDiagram
+  participant B as Build machine / CI
+  participant S3 as S3
+  participant Svc as EasyP service
+  participant C as Client
+  B->>B: plugins build → plugins/group/name/version/
+  B->>S3: plugins push → plugin.tgz
+  B->>Svc: plugins register (CreatePlugin)
+  Svc->>S3: read archive, record sha256
+  Svc-->>B: registered
+  C->>Svc: GenerateCode
+  opt cache miss
+    Svc->>S3: download archive
+    Svc->>Svc: verify sha256, unpack
+  end
+  Svc->>Svc: run plugin
+  Svc-->>C: CodeGeneratorResponse
 ```
 
 1. **build** — `easyp-svc plugins build <registry-path>` runs a Docker build

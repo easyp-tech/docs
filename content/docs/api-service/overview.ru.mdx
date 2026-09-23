@@ -29,19 +29,25 @@ EasyP API Service запускает плагины генерации кода 
 
 ## Как это работает
 
-```
- разработчик / CI                    EasyP API Service                         хранилища
-┌──────────────┐  GenerateCode   ┌──────────────────────────────┐        ┌──────────────────┐
-│  easyp CLI   │ ───────────────▶│ gRPC listener (TLS / mTLS)   │        │ PostgreSQL       │
-│  или Go SDK  │  имя плагина +  │  rate limit · параллельность │◀──────▶│  реестр плагинов │
-│              │  CodeGenerator- │  аутентификация · лицензия   │        │  аудит (Ent.)    │
-│              │  Request        │            │                 │        └──────────────────┘
-│              │                 │  пул воркеров ─ поиск плагина│        ┌──────────────────┐
-│              │                 │            │  (промах кеша) ─┼───────▶│ S3-совместимое   │
-│              │                 │  дочерний процесс: плагин    │        │  архивы плагинов │
-│              │◀─────────────── │  stdin → stdout              │        └──────────────────┘
-└──────────────┘ CodeGenerator-  └──────────────────────────────┘
-                 Response
+```mermaid
+sequenceDiagram
+  participant C as easyp CLI / Go SDK
+  participant S as EasyP API Service
+  participant DB as PostgreSQL
+  participant O as Хранилище S3
+  participant P as Процесс плагина
+  C->>S: GenerateCode(плагин, CodeGeneratorRequest)
+  Note over S: rate limit · параллельность · аутентификация · лицензия
+  S->>DB: найти group/name:version
+  DB-->>S: command, env, sha256
+  opt нет в локальном кеше
+    S->>O: скачать plugin.tgz
+    Note over S: сверить sha256, распаковать
+  end
+  S->>P: запуск, запрос в stdin
+  Note over P: таймаут · лимит вывода · чистое окружение
+  P-->>S: CodeGeneratorResponse из stdout
+  S-->>C: CodeGeneratorResponse
 ```
 
 1. Клиент локально разбирает `.proto`-файлы и собирает по одному

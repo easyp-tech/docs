@@ -44,11 +44,12 @@ description: "Каталог плагинов, путь версии плаги�
 
 ## Каталог одного плагина
 
-```
-registry/grpc/go/
-├── Dockerfile      # принимает ARG VERSION, собирает /plugin
-└── plugin.yaml     # какие версии собирать
-```
+<Files>
+  <Folder name="registry/grpc/go" defaultOpen>
+    <File name="Dockerfile — принимает ARG VERSION, собирает /plugin" />
+    <File name="plugin.yaml — какие версии собирать" />
+  </Folder>
+</Files>
 
 ```yaml
 # registry/protocolbuffers/go/plugin.yaml
@@ -81,17 +82,24 @@ versions:
 
 ## От рецепта до работающего плагина
 
-```
- сборочная машина / CI                                сервис
- ─────────────────────                                ──────
- easyp-svc plugins build registry
-   → plugins/{group}/{name}/{version}/plugin (+ сопутствующие файлы)
- easyp-svc plugins push plugins
-   → s3://bucket/{prefix}{group}/{name}/{version}/plugin.tgz
- easyp-svc plugins register plugins  ── CreatePlugin ──▶ читает архив из S3,
-                                                           записывает его sha256
-                                        GenerateCode  ──▶ при промахе кеша: скачать,
-                                                           сверить sha256, распаковать, запустить
+```mermaid
+sequenceDiagram
+  participant B as Сборочная машина / CI
+  participant S3 as S3
+  participant Svc as Сервис EasyP
+  participant C as Клиент
+  B->>B: plugins build → plugins/group/name/version/
+  B->>S3: plugins push → plugin.tgz
+  B->>Svc: plugins register (CreatePlugin)
+  Svc->>S3: читает архив, записывает sha256
+  Svc-->>B: зарегистрирован
+  C->>Svc: GenerateCode
+  opt cache miss
+    Svc->>S3: скачать архив
+    Svc->>Svc: сверить sha256, распаковать
+  end
+  Svc->>Svc: запустить плагин
+  Svc-->>C: CodeGeneratorResponse
 ```
 
 1. **build** — `easyp-svc plugins build <registry-path>` запускает Docker-сборку
