@@ -1,0 +1,182 @@
+---
+title: "EasyP API Service vs Buf BSR"
+description: "Remote code generation compared: where the Buf Schema Registry is the better choice, where the EasyP API Service is, and what each costs to run."
+---
+
+<Callout type="info">
+Information about Buf is current as of **23 September 2026** and taken from the
+linked pages of buf.build and github.com/bufbuild. Buf's plans, prices and
+limits change; check the linked page before deciding. Information about EasyP
+refers to API Service v1.0.2.
+</Callout>
+
+This page compares **remote code generation**: running protobuf plugins on a
+server instead of on every developer machine. The Buf Schema Registry (BSR) is a
+broader product — a schema registry with remote plugins, generated SDKs and
+more. For the dependency-management side (modules versus Git), see
+[EasyP vs Buf](/docs/cli/package-manager/easyp-vs-buf).
+
+## In one paragraph
+
+The BSR is a hosted product: remote plugins work the moment you run
+`buf generate`, plugins run in Buf's sandbox, and generated code can be
+consumed as ordinary packages from npm, Go, Maven, PyPI and others. It is the
+better choice unless you need to run generation inside your own network without
+an Enterprise contract. The EasyP API Service is software you operate yourself:
+free Community tier, source available, your `.proto` files never leave your
+infrastructure — and in exchange you run PostgreSQL, storage and monitoring,
+and accept that plugins are not sandboxed.
+
+## Summary table
+
+| | Buf BSR | EasyP API Service |
+|---|---|---|
+| Deployment | Public SaaS (`buf.build`); Pro: private instance on `<org>.buf.dev`; Enterprise: single-tenant or on-prem [¹](#sources) | Self-hosted only |
+| Where your `.proto` go during generation | To the BSR's plugin executor (buf.build, private instance, or your on-prem cluster) [²](#sources) | To your own service |
+| Plugin isolation | Sandbox with filesystem and network constraints [²](#sources) | None: child process on the host |
+| Public catalogue | bufbuild/plugins: 85 plugins, 1886 versions [³](#sources) | 80 plugins, 1738 versions (recipes; you build what you register) |
+| Private/custom plugins | Pro and above, on a private instance [⁴](#sources) | Any tier; Community allows 10 registered versions in total |
+| Generated SDKs via package managers | Yes: Go, npm, Maven/Gradle, PyPI, Cargo, Swift, NuGet, CMake, archives [⁵](#sources) | No |
+| Schema/module registry | Yes, same product | No (easyp CLI uses Git) |
+| Rate limits | Public BSR: 10 generation req/hour unauthenticated, 960/hour authenticated; none on Pro dedicated and Enterprise [⁶](#sources) | Configured by you |
+| Users, roles, SSO, SCIM | Organisations, roles; SSO and SCIM on Pro [⁷](#sources) | Static write tokens; no users or roles |
+| Audit log | Private instances [⁸](#sources) | Enterprise licence |
+| Operations | Buf's, with uptime SLA on Pro (99%) and Enterprise (99.5%) [⁹](#sources) | Yours |
+| Price | Free Community; Teams $0.50/type/month; Pro $5/type/month, $3000/month minimum; Enterprise by quote [⁹](#sources) | Community free; Enterprise by licence; plus your infrastructure |
+| Server source | Not published; on-prem is licensed [¹⁰](#sources) | Elastic License 2.0 (source-available); client API and SDK Apache-2.0 |
+
+## Where the BSR is stronger
+
+- **Nothing to operate.** Remote plugins on `buf.build` need no server,
+  database, storage, certificates, alerts or upgrades. With EasyP all of that is
+  your work, and the quality of the service is the quality of your operations.
+- **Plugins run in a sandbox.** Buf states that remote plugins run under the
+  sandbox's filesystem and network constraints [²](#sources). The EasyP service
+  runs plugins as ordinary processes; isolating the host is left to you (see
+  [Security](/docs/api-service/security)). For a registry shared by teams that do
+  not fully trust each other, this is a significant difference.
+- **Generated SDKs.** Consumers can `go get`, `npm install` or `pip install`
+  generated code for a schema without running any generator [⁵](#sources). EasyP
+  has no equivalent.
+- **One product for schemas and generation.** Modules, dependencies,
+  documentation, Studio (a browser client for live APIs), the Reflection API and
+  push-time policy checks (Enterprise) live alongside remote plugins
+  [¹¹](#sources). EasyP's generation service knows nothing about schemas.
+- **Identity and access.** Organisations with Member/Writer/Admin/Owner roles,
+  per-resource roles, bot users, SSO and SCIM on private instances
+  [⁷](#sources). EasyP has static tokens, and any write token can change any
+  plugin.
+- **Client authentication works end to end.** `buf registry login` or
+  `BUF_TOKEN` authenticates `buf generate` [¹²](#sources). The easyp CLI cannot
+  send a token or a client certificate, so a private EasyP service must rely on
+  network-level access control.
+- **Catalogue maintenance.** bufbuild/plugins is updated continuously (commits
+  on 22 September 2026 at the time of writing) [³](#sources) and every published
+  version is ready to use. EasyP's catalogue is a set of recipes: each deployment
+  builds and registers the versions it wants.
+- **Availability and scale.** A SaaS with published uptime SLAs on paid plans
+  [⁹](#sources). The EasyP service runs as one replica per cache and scales
+  vertically only.
+- **Semantics of "latest".** An unpinned BSR plugin resolves to the latest
+  version [²](#sources). EasyP's `latest` is the version that sorts last as a
+  string (`v1.36.9` before `v1.36.10`) — pin versions.
+
+## Where the EasyP API Service is stronger
+
+- **Self-hosting without a sales contract.** The Community tier is free, needs no
+  licence key and has no per-type billing. Self-hosting the BSR is an Enterprise
+  offering [⁹](#sources).
+- **Source is available.** You can read, audit and patch the service; the client
+  API and Go SDK are Apache-2.0.
+- **Data stays in your network by default.** Generation requests go only to your
+  service. With the public BSR they go to Buf's service; the BSR keeps them in
+  your network only on an on-prem deployment [¹⁰](#sources).
+- **Any plugin, including internal ones, on any tier.** Registering your own
+  plugin does not require a paid plan. Plugins that the BSR does not support —
+  those that read files or use the network [⁴](#sources) — also run, which is a
+  consequence of having no sandbox rather than a feature to rely on.
+- **No vendor rate limits.** The public BSR limits unauthenticated generation to
+  10 requests per hour per IP and authenticated to 960 per hour per user, with at
+  most 20 plugins per request [⁶](#sources). A self-hosted service has only the
+  limits you configure — and only the capacity you provision.
+- **Architecture of the host.** The service image is published for amd64 and
+  arm64. Buf's custom-plugin executor is linux/amd64 [⁴](#sources).
+- **Operator-facing observability ships with it.** Prometheus metrics, an alert
+  rule set and a runbook per alert. The BSR on-prem has its own observability
+  documentation [¹⁰](#sources); on SaaS this is Buf's concern, not yours.
+
+Both have an MCP endpoint, with different scope: EasyP's lists plugins
+(read-only); Buf's exposes the BSR Registry API, including writes
+[¹¹](#sources).
+
+## Compatibility
+
+- `buf generate` with `remote:` talks to a BSR instance. The EasyP service does
+  not implement the BSR API, so `buf` cannot use it as a remote.
+- `easyp generate` with `remote:` speaks EasyP's `easyp.generator.v1` API.
+  `remote: buf.build/...` in `easyp.yaml` does not reach Buf's remote plugins.
+- Both run standard `protoc` plugins over `CodeGeneratorRequest`, so the same
+  plugin version produces the same output on either; the plugin names are
+  largely the same (`protocolbuffers/go`, `grpc/go`, `connectrpc/go`, …).
+
+Moving between them is a configuration change on the client, described in
+[Migrating from BSR](/docs/api-service/migrating-from-bsr).
+
+## Performance
+
+No benchmark comparing the two has been published by either project, and none is
+claimed here. What can be said structurally: the EasyP service adds one network
+round trip per plugin and, on a cache miss, one archive download; latency to the
+BSR depends on your distance to Buf's service. Measure with your own schemas.
+
+## Cost of ownership
+
+The BSR is priced per protobuf type per month [⁹](#sources); the public BSR's
+Community plan is free, and remote plugins and generated SDKs are available on
+every plan [¹³](#sources). The EasyP Community tier is free, and Enterprise is a
+licence — but the real cost is operating it: a PostgreSQL database, S3-compatible
+storage, a pod or VM sized for your plugins (the chart defaults to 4 CPU and
+4 GiB), monitoring, upgrades and the security isolation described in
+[Security](/docs/api-service/security). For a small team on the public BSR's
+free plan, that operational cost is almost certainly higher than what Buf
+charges.
+
+## When to choose the BSR
+
+- You want remote generation without running anything.
+- You also want a schema registry, generated SDKs through package managers,
+  Studio or push-time policy checks.
+- You need SSO, SCIM, organisations and roles.
+- Plugin users are not all mutually trusted, and you cannot isolate a
+  generation host yourself.
+- The free or Teams plan covers your schema size and the public rate limits are
+  acceptable.
+
+## When to choose the EasyP API Service
+
+- Generation must run inside your network and you do not want (or cannot buy)
+  a BSR Enterprise on-prem deployment.
+- You already operate PostgreSQL, object storage and Prometheus.
+- You need private or unusual plugins without a paid plan, or on arm64 hosts.
+- You use the easyp CLI and Git-based dependencies and do not need a schema
+  registry.
+- The people who can register plugins trust each other, and you can isolate the
+  service host.
+
+## Sources
+
+All accessed 23 September 2026.
+
+1. Pricing — https://buf.build/pricing ; Billing FAQ — https://buf.build/docs/subscription/faq/
+2. Remote plugins — https://buf.build/docs/bsr/remote-plugins/ ; usage — https://buf.build/docs/bsr/remote-plugins/usage/
+3. bufbuild/plugins — https://github.com/bufbuild/plugins (counted from the repository tree: directories `plugins/<owner>/<name>/<version>/` with a `buf.plugin.yaml`)
+4. Custom plugins — https://buf.build/docs/bsr/remote-plugins/custom-plugins/
+5. Generated SDKs — https://buf.build/docs/bsr/generated-sdks/
+6. Rate limits — https://buf.build/docs/bsr/rate-limits/
+7. Roles — https://buf.build/docs/bsr/admin/roles/ ; authentication (bot users) — https://buf.build/docs/bsr/authentication/ ; SSO/SCIM on Pro — https://buf.build/pricing
+8. Audit logs — https://buf.build/docs/bsr/admin/instance/audit-logs/
+9. Pricing — https://buf.build/pricing
+10. On-prem architecture — https://buf.build/docs/bsr/admin/on-prem/architecture/ ; installation — https://buf.build/docs/bsr/admin/on-prem/installation/
+11. Studio — https://buf.build/docs/bsr/studio/ ; Reflection API — https://buf.build/docs/bsr/reflection/ ; policies — https://buf.build/docs/bsr/checks/policies/ ; MCP server — https://buf.build/docs/bsr/apis/mcp/
+12. Authentication — https://buf.build/docs/bsr/authentication/
+13. Billing FAQ — https://buf.build/docs/subscription/faq/
