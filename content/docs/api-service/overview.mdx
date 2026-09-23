@@ -1,304 +1,50 @@
 ---
-title: "API Service Overview"
+title: "API Service"
 ---
 
-**A service that runs protobuf code-generation plugins so that developers and CI do not have to install them**
+EasyP API Service runs registered Protocol Buffers code generators on a server selected by the operator. A client sends a <code>CodeGeneratorRequest</code> containing file descriptors and plugin parameters. The service returns a <code>CodeGeneratorResponse</code>; the client writes the generated files.
 
-The EasyP API Service accepts a `CodeGeneratorRequest` over gRPC, executes the named plugin as a child process on the server — bounded in time, concurrency and output size — and returns the `CodeGeneratorResponse`. One registry of plugin versions, built from reviewed Dockerfiles and verified by checksum, replaces one installation per developer machine.
+This section describes service **v1.0.2**, source revision <code>4b01518b42c6f448d21216e3c0e8c35ef66d5c2d</code>, checked on **2026-09-23**. The service, its wire API, its Go SDK, and the <code>easyp</code> CLI are different components. A server capability is not necessarily available through every client.
 
-## Why EasyP API Service?
+## What is centralized
 
-### The Challenge
+A deployment centralizes plugin registration, executable distribution, generation capacity, and operational monitoring. Developers do not need the same generator executables installed on every workstation. Pinning an explicit plugin version avoids the service's text-sorted <code>latest</code> lookup; it does not, by itself, make a mutable executable or a non-deterministic plugin reproducible.
 
-Managing protobuf/gRPC code generation across development teams creates significant operational complexity:
+~~~text
+.proto files -> client compilation -> CodeGeneratorRequest
+                                      |
+                                      | gRPC, optionally TLS/mTLS
+                                      v
+                               EasyP API Service
+                                |           |
+                                |           +-> PostgreSQL: registrations, audit
+                                +-> local plugin directory
+                                     ^           |
+                                     |           v
+                                optional S3   child process
+                                                 |
+client output files <- CodeGeneratorResponse <----+
+~~~
+Docker is used to package the service and can build plugin artifacts. **A generation runs a local child process, not a new Docker container. There is no per-plugin sandbox.** Read [Security](./security) before accepting plugin registrations or exposing the service.
 
-#### Version Inconsistencies
-- Developers use different plugin versions locally, causing build failures and inconsistent generated code
-- "Works on my machine" syndrome when generated code differs between environments
-- Manual coordination required to keep entire teams synchronized on plugin versions
+## Product boundaries
 
-#### Operational Overhead
-- DevOps teams spend significant time managing plugin installations across developer machines
-- Each new team member requires manual setup of correct plugin versions
-- Plugin updates require coordinating with every developer individually
-- No centralized control over which plugin versions are approved for use
+The five gRPC operations are <code>GenerateCode</code>, <code>Plugins</code>, <code>CreatePlugin</code>, <code>UpdatePlugin</code>, and <code>DeletePlugin</code>. The optional MCP endpoint provides plugin discovery. PostgreSQL stores plugin metadata and, when licensed, audit records; it is required even when all executables are local. Object storage is optional.
 
-#### Security & Compliance Risks
-- Developers install plugins from various sources without security validation
-- No audit trail of which plugins were used for which builds
-- Difficult to enforce security policies on code generation tools
+The service does not provide a schema/module repository, a Go/npm/Maven package server for generated SDKs, an API documentation portal for uploaded schemas, or registry-side breaking-change policy checks. Its Go SDK is a client of this generation service, not a generated-SDK distribution product. For module dependency management, see the separate [package-manager comparison](../cli/package-manager/easyp-vs-buf).
 
-### The Solution: Centralized Plugin Execution
+## When it fits
 
-| Challenge | Solution |
-|-----------|----------|
-| **Version Control** | A plugin version is registered once, on the server, and every client gets the same binary |
-| **Operations** | Operators build, push and register plugins; developer machines are never touched |
-| **Provenance** | Plugins are built from Dockerfiles in a public registry, stored as archives and sha256-verified before every execution |
-| **Consistency** | The same binary on the same host for every caller |
-| **Developer Experience** | No local plugin installation or maintenance required |
-| **Accountability** | An audit log of every mutating call, with the credential that made it (Enterprise) |
+Use this service when you need to operate a generation endpoint in your own environment, control which trusted executables it runs, and accept responsibility for PostgreSQL, plugin artifacts, credentials, capacity, and upgrades. A disconnected installation is possible only after provisioning all required binaries, libraries, schema dependencies, images, and configuration, and excluding plugins that themselves need the network.
 
-## Architecture Overview
+Local generation is usually simpler when a team does not need a shared execution service. A managed schema platform may be a better fit when generated package distribution, schema governance, organizational access controls, or reduced operator workload matter more than operating the execution environment. See [EasyP and Buf BSR](./vs-buf-bsr) for the different trade-offs.
 
-```mermaid
-graph TB
-    subgraph "Clients"
-        CLI[easyp CLI]
-        SDK[Go SDK]
-    end
+## Capacity and access
 
-    subgraph "EasyP API Service"
-        GRPC[gRPC listener<br/>TLS / mTLS, rate limit, auth, licence]
-        CORE[Core]
-        POOL[Worker pool]
-        PLUGIN[Plugin process<br/>stdin → stdout]
-        MCP[MCP endpoint<br/>optional, read-only]
-    end
+Community permits up to four lookup workers, ten registered plugin versions, and sixteen simultaneous generations. Enterprise removes these license ceilings and enables audit recording; configured operational limits still apply. The two execution-related ceilings are applied when the process starts. A later license transition does not resize an existing pool.
 
-    subgraph "Storage"
-        DB[(PostgreSQL<br/>plugin registry, audit log)]
-        S3[(Object storage<br/>plugin archives)]
-        CACHE[Local cache<br/>unpacked plugins]
-    end
+Writes always require a configured bearer token. Reads and generation are anonymous by default; <code>auth.require&#95;authentication</code> changes that. The current <code>easyp</code> remote executor does not send bearer tokens or support client certificates. Use the [Go SDK or an appropriate client](./client-usage) when those are required rather than inventing CLI configuration keys.
 
-    subgraph "Observability"
-        PROM[Prometheus]
-        OTLP[OTLP: traces, logs]
-        PYRO[Pyroscope]
-    end
+## Reading paths
 
-    CLI -->|CodeGeneratorRequest| GRPC
-    SDK -->|CodeGeneratorRequest| GRPC
-    GRPC --> CORE
-    CORE -->|Resolve plugin| DB
-    CORE --> POOL
-    POOL --> PLUGIN
-    PLUGIN -.->|miss: download, verify sha256, unpack| S3
-    S3 -.-> CACHE
-    CACHE --> PLUGIN
-    CORE --> PROM
-    CORE --> OTLP
-    CORE --> PYRO
-    MCP -->|plugins_list| DB
-```
-
-## Key Components
-
-### API Layer
-- **gRPC server** — the contract is `easyp.generator.v1.GeneratorAPI`: `GenerateCode`, `Plugins`, and the three mutating methods `CreatePlugin`, `UpdatePlugin`, `DeletePlugin`
-- One `CodeGeneratorRequest` per plugin invocation
-- An interceptor chain in front of every call: TLS or mutual TLS, rate limit and concurrency cap per caller, write-token authentication, licence check
-
-### Execution Engine
-- **Worker pool** — a bounded number of concurrent plugin processes; a request that finds no room is refused with `SERVER_OVERLOADED` rather than queued indefinitely
-- **Plugin process** — a child process of the service, fed the request on stdin and read on stdout, with a clean environment, a timeout and an output-size limit
-- **Local cache** — plugin archives are downloaded on first use, sha256-verified against what the registry recorded, and unpacked; concurrent misses collapse into one download
-
-### Storage Layer
-- **PostgreSQL** — the plugin registry (name, version, command, environment, tags) and, in Enterprise mode, the audit log in monthly partitions
-- **Object storage** — plugin archives, one `tar.gz` per plugin version, pushed by the operator's CLI and read by the service
-
-### Monitoring
-- **Prometheus** metrics for the worker pool, plugin durations, the cache, the licence and the audit pipeline, each with an alert rule in the Helm chart
-- **OpenTelemetry** traces and **Pyroscope** profiles when an endpoint is configured
-
-## How It Works
-
-### Local Execution (EasyP CLI)
-When running locally, the EasyP CLI supports:
-- **Installed plugins**: System-installed protoc plugins
-- **WASM plugins**: Fast, lightweight WebAssembly plugins
-
-### Remote Execution (API Service)
-When using the API Service:
-- **Remote plugins**: a `remote:` entry in `easyp.yaml` names the service and the plugin; the CLI sends the request there instead of executing anything
-- **Centralized control**: operators decide which plugins and versions exist
-- **Consistent environment**: the same binary on the same host for every caller
-
-## Plugin Execution Flow
-
-```mermaid
-sequenceDiagram
-    participant CLI as easyp CLI
-    participant API as gRPC server
-    participant DB as PostgreSQL
-    participant S3 as Object storage
-    participant Plugin as Plugin process
-
-    Note over CLI: Parse protobuf files
-    CLI->>API: CodeGeneratorRequest (per plugin)
-
-    API->>API: rate limit, auth, licence
-    API->>DB: Resolve plugin (or "latest")
-    DB-->>API: command, environment, sha256
-
-    alt not in the local cache
-        API->>S3: Download archive
-        S3-->>API: plugin.tgz
-        Note over API: verify sha256, unpack
-    end
-
-    API->>Plugin: Start; request on stdin
-    Note over Plugin: bounded by timeout,<br/>output size, worker pool
-    Plugin-->>API: CodeGeneratorResponse on stdout
-
-    Note over API: metrics, trace, audit
-    API-->>CLI: CodeGeneratorResponse
-```
-
-### Execution Steps
-
-1. **CLI parsing**: the CLI parses protobuf files locally
-2. **Request**: the CLI sends a `CodeGeneratorRequest` per plugin
-3. **Admission**: rate limit, concurrency cap, authentication and licence checks run before anything is spent on the request
-4. **Resolution**: the service looks the plugin up in PostgreSQL; `latest` resolves to the newest registered version
-5. **Fetch on miss**: if the plugin is not in the local cache, its archive is downloaded from object storage, sha256-verified and unpacked
-6. **Execution**: the plugin runs as a child process under the worker pool's limits
-7. **Response**: the generated code is returned to the CLI; metrics, a trace and (Enterprise) an audit entry are recorded
-
-## Key Features
-
-| Feature | Description |
-|---------|-------------|
-| **📦 Versioned registry** | Every plugin version is a reviewed Dockerfile, a checksummed archive and a database row |
-| **⚙️ Bounded execution** | Timeout, output-size limit and a worker pool cap every plugin run |
-| **📊 Metrics & Monitoring** | Prometheus metrics with an alert rule and a runbook for each |
-| **🔐 Authenticated writes** | Mutating calls need a token; reads are anonymous by default and can be locked down |
-| **⚡ Simple Protocol** | Standard `CodeGeneratorRequest/Response` protocol |
-| **📝 Audit log** | Who changed what, with the credential that did it (Enterprise) |
-
-## Configuration
-
-The service reads its settings from a YAML file, the environment, or both. The
-environment overrides the file; a `default=` in the binary fills whatever neither
-supplied.
-
-### Server
-
-```bash
-SERVER_HOST=0.0.0.0
-SERVER_PORT_GRPC=8080
-SERVER_PORT_METRIC=8081
-SERVER_PORT_HEALTH=8082
-SERVER_PORT_MCP=8083
-```
-
-### Database
-
-One connection string, not a set of parts:
-
-```bash
-DB_POSTGRES_DSN="postgres://easyp:password@localhost:5432/easyp_service?sslmode=disable"
-```
-
-### Checking what applies
-
-Every setting has exactly one name in each layer, and the binary will list them:
-
-```bash
-# Would the service start on this file?
-easyp-svc config validate --cfg /etc/easyp/config.yml
-
-# What applies, and which layer supplied each value?
-easyp-svc config print --cfg /etc/easyp/config.yml --origin
-```
-
-An unrecognised key in the file is an error, not a warning: the service refuses
-to start rather than coming up on defaults you did not ask for.
-
-## Plugin Parameters Storage
-
-PostgreSQL holds one row per registered plugin version: its name, the command
-the service runs, and what registration recorded about the archive.
-
-```json
-{
-  "command": ["plugins/protocolbuffers/go/v1.36.10/plugin"],
-  "env": {},
-  "timeout": "60s",
-  "sha256": "9f2c…"
-}
-```
-
-`command` must point inside `registry.plugins_dir`. `env` is the entire
-environment the plugin sees — nothing of the service's is inherited. `sha256`
-is computed by the service from the archive in object storage at registration
-and verified after every download, so a client cannot register a hash of its
-own choosing.
-
-## Performance Characteristics
-
-| Metric | Typical Value | Notes |
-|--------|---------------|-------|
-| **First call for a plugin version** | seconds | Downloading the archive from object storage, verifying it, unpacking |
-| **Subsequent calls** | the plugin's own run time | Executed from the local cache; the service adds milliseconds |
-| **Concurrency** | `worker_pool.max_concurrent_generations`, 16 by default | Community tier caps it at 16; Enterprise has no ceiling |
-| **Memory** | the plugin's | Not bounded by the service; see *Security* |
-
-## Security
-
-### Plugin execution
-
-A plugin is a child process of the service — not a container. The service
-bounds its **time** (`worker_pool.generation_timeout`), its **concurrency**
-(`worker_pool.max_concurrent_generations`), the **size of its output**
-(`registry.max_output_size`), its **environment** (only what the plugin's own
-configuration declares; the service's credentials are not inherited) and
-**where its executable may live** (inside `registry.plugins_dir`).
-
-It does not bound memory, CPU, filesystem access beyond the service account's
-own, or network access: a plugin reaches whatever the pod reaches. Registering
-a plugin is therefore as privileged as running code on the host. Treat the
-write token accordingly, and treat a shared registry as a set of people who all
-trust each other. The repository README's *Known limitations* section is the
-complete list.
-
-### API security
-
-- TLS on the gRPC listener, and mutual TLS once `server.tls.client_ca_file`
-  names a CA. The CA is the whole check — there is no subject allow-list, so
-  name a CA that exists for this service rather than a corporate root.
-- The three mutating RPCs require a write token; the configuration holds only
-  its sha256 digest. Reads are anonymous by default, and
-  `auth.require_authentication` makes them require a token too.
-- Every request is validated before it reaches a plugin.
-- Audit log in PostgreSQL, in Enterprise mode.
-
-## Production Considerations
-
-### Scaling
-
-**One replica.** The plugin cache on disk is not safe to share between
-processes, so the chart defaults to one replica, a `ReadWriteOnce` volume and
-the `Recreate` strategy, and more than one replica on a shared volume is not
-supported — it appears to work and corrupts the cache under concurrent misses.
-Scale by making the single pod bigger: `worker_pool.max_concurrent_generations`
-and CPU.
-
-The database side is safe for several processes — migrations take a Postgres
-session lock and audit partition maintenance an advisory lock — which is what
-makes a restart into a new version safe.
-
-### Monitoring
-
-- **Prometheus metrics** for the worker pool, plugin durations, the cache, the
-  licence and the audit pipeline, with an alert rule for each in the chart.
-- **A runbook per alert** on this site.
-- **Structured logs** with the resolved configuration printed at every start.
-
-### Planned
-
-- Caching generation results for repeated requests.
-- Usage accounting per caller.
-- Policy over which plugins and versions a deployment permits.
-
-## Community and Support
-
-- **💬 [Telegram Chat](https://t.me/easyptech)** - Community discussion
-- **🐛 [GitHub Issues](https://github.com/easyp-tech/service/issues)** - Bug reports and features
-- **📖 [Documentation](https://easyp.tech)** - Complete documentation
-
----
-
-*Simplify your protobuf workflows with centralized plugin execution*
+Start with [Quickstart](./quickstart), then review [Installation](./installation), [Configuration](./configuration), and [Authentication and licensing](./authentication-and-licensing). Operators should also read [Architecture](./architecture), [Plugins](./plugins), [Observability](./observability), [Runbooks](./runbooks), [Backup](./backup), and [Upgrading](./upgrading). The [operator CLI reference](./operator-cli) describes <code>easyp-svc</code>, not <code>easyp</code>.

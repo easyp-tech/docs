@@ -1,0 +1,26 @@
+---
+title: "MCP endpoint"
+---
+
+The optional Model Context Protocol (MCP) endpoint lets an agent discover registered plugins without generating code. Enable it explicitly:
+
+~~~yaml
+mcp:
+  enabled: true
+server:
+  port:
+    mcp: "23413"
+~~~
+The equivalent switch is <code>MCP&#95;ENABLED=true</code>. The streamable HTTP endpoint is <code>/mcp</code>; with binary defaults it is <code>http://127.0.0.1:23413/mcp</code>. Helm uses port 8083 instead. The advertised MCP implementation name is <code>easyp-service-mcp</code>; its implementation-version string is hard-coded to <code>v1.0.0</code> in service v1.0.2 and is not a reliable server release identifier.
+
+## Tools
+
+Exactly one generated tool is registered: **<code>plugins&#95;list</code>**. It accepts the <code>PluginsRequest</code> fields: group, name, version, tags, page size, and page token. It returns plugin metadata and a continuation token, using the same listing implementation as gRPC. Group/name/version filters are exact; every supplied tag must match. Use the continuation token with the same filters.
+
+There is no generation tool, write tool, or <code>easyp.yaml</code> schema tool in this version. The endpoint does not provide shell or filesystem access. The listing exposes plugin identities, tags, and registration timestamps, not command configuration. Decide whether exposing even that catalog metadata is appropriate.
+
+## Authentication and exposure
+
+By default MCP is disabled. When enabled, it is an HTTP listener separate from the gRPC transport. <code>auth.require&#95;authentication: true</code> requires a bearer token at its HTTP wrapper. The service does not implement an OAuth flow for this endpoint. gRPC TLS/mTLS settings do not add TLS to MCP, and gRPC rate/concurrency interceptors do not protect its HTTP requests.
+
+Place MCP behind an appropriate TLS/authentication gateway or keep it on a trusted network with explicit access restrictions. Listing still reaches Core, so Enterprise audit can record it; the absence of gRPC interceptors does not mean the absence of Core audit. See [Security](./security) and [Client usage](./client-usage).

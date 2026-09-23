@@ -1,0 +1,41 @@
+---
+title: "Security model"
+---
+
+## Trust boundary
+
+A registered plugin is executable code trusted with the operating-system identity of the service. A registration selects a command and its arguments, environment, and optional timeout. Registration and configuration updates must be restricted to administrators who are permitted to deploy code, not merely developers who may generate a client library.
+
+The executable path is constrained to <code>registry.plugins&#95;dir</code>, including a resolved-symlink check at execution. This is path containment, **not a sandbox**: a permitted interpreter, wrapper, or plugin can still access whatever the service account can access. SHA-256 verification checks an archive against stored metadata; it is not a publisher signature and does not establish that a plugin is safe.
+
+## What a plugin can do
+
+Plugins execute as local child processes. The service supplies the configured environment rather than inheriting its environment wholesale, but the child inherits the service's working directory. A clean environment does not protect readable configuration files, mounted credentials, network-accessible databases, the plugin volume, or other resources available to that operating-system account.
+
+The service bounds stdout, stderr, execution duration, and admitted work. It does not implement per-plugin filesystem namespaces, a network sandbox, per-plugin CPU or memory quotas, or a dedicated user per request. A plugin can attempt network access, write accessible files, consume memory, or spawn descendants. Process-group cancellation helps terminate normal process trees; it is not containment of hostile code that deliberately escapes that group.
+
+A containerized service still runs plugins inside the **same container**. The Helm chart drops capabilities, uses UID/GID 65532 and <code>RuntimeDefault</code> seccomp, and disables privilege escalation. These controls protect the pod boundary; they do not isolate one plugin from service files or another plugin. The chart's root filesystem is writable.
+
+## Access controls
+
+Create, update, and delete operations require bearer authentication. The configured token set has no per-plugin scopes, organization roles, or separate read-only identities. With <code>auth.require&#95;authentication: true</code>, the same credential mechanism also protects generation and listing. A token that authorizes generation is therefore not a restricted generation-only credential.
+
+TLS protects the gRPC transport. mTLS additionally requires a client certificate trusted by the configured CA; it does not replace write-token checks or map certificate subjects to application roles. The optional MCP HTTP listener is separate from gRPC TLS and its rate-limit interceptors. Protect it independently, even when gRPC uses mTLS.
+
+Do not expose anonymous generation or listing to an untrusted network by accident. In particular, the current <code>easyp</code> CLI cannot supply the service bearer token or a client certificate. Do not solve that client limitation by publishing an unauthenticated production endpoint.
+
+## Deployment recommendations
+
+Run only reviewed, pinned plugin artifacts on dedicated, unprivileged execution nodes or pods. Apply network policy and host/container restrictions to the entire service, and keep production credentials off those nodes unless the service genuinely needs them. A network policy that allows outbound TCP 443 is not an allowlist of trusted destinations.
+
+Separate administration from generation at an authenticated gateway when distinct caller privileges are required, and ensure callers cannot bypass that gateway. Restrict proxy trust to actual ingress addresses: a trusted proxy can assert the client IP used for rate limiting and audit attribution. Protect PostgreSQL and object storage as part of the same trust boundary.
+
+Keep cache volumes private to each replica. The cache has no cross-process lock or per-execution filesystem isolation. Do not treat a shared ReadWriteMany volume as a security or consistency mechanism. Do not rely on automatic cleanup for an authoritative local-only plugin directory: local-only execution does not use the S3 cache eviction path in this version.
+
+Limit access to metrics, profiling, tracing, health, and database endpoints. Plugin stderr and errors can contain paths or sensitive data; there is no blanket guarantee of redaction. Review telemetry retention and access before enabling exporters. A request's descriptors may include comments and transitive schema dependencies, not only the files explicitly selected for output.
+
+## Incident response
+
+On a suspicious registration or artifact replacement, first isolate the endpoint from clients and restrict outbound access. Preserve database rows, artifact hashes, relevant logs, and audit records before deleting anything. Rotate affected credentials through their issuing systems and restart the service to load changed static configuration. Rebuild trusted artifacts under new versions and compare generated output before reopening access.
+
+Enterprise audit is buffered and can lose events during overload, write failures, or abrupt termination. It is not a complete record of authentication failures, because those can be rejected before Core emits an event. Correlate audit with access logs, authentication metrics, artifact provenance, and infrastructure logs. See [Authentication](./authentication-and-licensing), [Architecture](./architecture), and [Runbooks](./runbooks).
