@@ -64,3 +64,5 @@ replace github.com/acme/weather => ../weather-fork
 1. **Git-Native Identity**: The canonical identity of a module is its Git URL (e.g., `github.com/acme/weather`).
 2. **Per-Module Bounds**: Every module maintains its own independent `protobuf.mod`. MVS operates per-module rather than forcing global monorepo single-version constraints.
 3. **Replace Guardrail**: Local `replace` directives work during generation. `easyp mod tidy` and `easyp mod update` reject them until they are removed, so a reproducible Git lock never records a local path.
+
+For multiple local modules in one repository, run `easyp mod tidy` from each module directory; each writes its own `protobuf.lock`. `generate.modules` can select local modules by repository-relative path or module identity. A Git dependency is currently checked out and read from its repository root only: nested `protobuf.mod` files are not discovered as separate remote modules. A local `replace` can target a nested module directory.
