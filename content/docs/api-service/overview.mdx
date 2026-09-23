@@ -29,19 +29,25 @@ the same for every caller.
 
 ## How it works
 
-```
- developer / CI                      EasyP API Service                         storage
-┌──────────────┐  GenerateCode   ┌──────────────────────────────┐        ┌──────────────────┐
-│  easyp CLI   │ ───────────────▶│ gRPC listener (TLS / mTLS)   │        │ PostgreSQL       │
-│  or Go SDK   │  plugin name +  │  rate limit · concurrency    │◀──────▶│  plugin registry │
-│              │  CodeGenerator- │  auth · licence              │        │  audit log (Ent.)│
-│              │  Request        │            │                 │        └──────────────────┘
-│              │                 │  worker pool ─ resolve plugin│        ┌──────────────────┐
-│              │                 │            │  (cache miss) ──┼───────▶│ S3-compatible    │
-│              │                 │  child process: plugin       │        │  plugin archives │
-│              │◀─────────────── │  stdin → stdout              │        └──────────────────┘
-└──────────────┘ CodeGenerator-  └──────────────────────────────┘
-                 Response
+```mermaid
+sequenceDiagram
+  participant C as easyp CLI / Go SDK
+  participant S as EasyP API Service
+  participant DB as PostgreSQL
+  participant O as S3 storage
+  participant P as Plugin process
+  C->>S: GenerateCode(plugin, CodeGeneratorRequest)
+  Note over S: rate limit · concurrency · auth · licence
+  S->>DB: resolve group/name:version
+  DB-->>S: command, env, sha256
+  opt not in local cache
+    S->>O: download plugin.tgz
+    Note over S: verify sha256, unpack
+  end
+  S->>P: start, request on stdin
+  Note over P: timeout · output limit · clean env
+  P-->>S: CodeGeneratorResponse on stdout
+  S-->>C: CodeGeneratorResponse
 ```
 
 1. The client parses `.proto` files locally and builds one `CodeGeneratorRequest`

@@ -5,17 +5,27 @@ description: "Путь запроса GenerateCode через сервис: ин
 
 ## Компоненты
 
-```
-                 ┌────────────────────────── easyp-svc (один процесс) ──────────────────────────┐
- :23410 gRPC ───▶│ цепочка интерсепторов ─▶ API-хендлеры ─▶ core ─▶ WorkerPool ─▶ Registry     │
- :23411 HTTP ───▶│ /metrics                                        │            │   │            │
- :23412 HTTP ───▶│ /live  /  (readiness: PostgreSQL)               │            │   └─▶ exec плагина
- :23413 HTTP ───▶│ /mcp  (только при mcp.enabled)                  │            ▼                │
-                 │                                  воркер аудита ◀┘        кеш плагинов (диск)  │
-                 └───────────────────────────────────────┬──────────────────────┬───────────────┘
-                                                          ▼                      ▼
-                                                     PostgreSQL          S3-совместимое хранилище
-                                                 plugins, audit_log        архивы плагинов
+```mermaid
+flowchart TB
+  grpc([":23410 gRPC"])
+  mcp([":23413 /mcp<br/>только при mcp.enabled"])
+  health([":23412 /live · / readiness"])
+  subgraph one["easyp-svc — один процесс"]
+    chain["Цепочка интерсепторов"] --> api["API-хендлеры"] --> core["Core"]
+    core --> pool["WorkerPool"] --> reg["Registry"]
+    core --> audit["Писатель аудита"]
+    reg --> exec["Процесс плагина"]
+  end
+  cache[("Кеш плагинов<br/>plugins_dir")]
+  pg[("PostgreSQL<br/>plugins · audit_log")]
+  s3[("S3")]
+  grpc --> chain
+  mcp --> core
+  health -. "readiness" .-> pg
+  reg --> cache
+  reg <--> pg
+  audit --> pg
+  reg -. "промах кеша" .-> s3
 ```
 
 Один бинарник `easyp-svc` — это и сервер (`service start`), и CLI оператора.

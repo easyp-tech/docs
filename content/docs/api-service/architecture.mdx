@@ -5,17 +5,27 @@ description: "The path of a GenerateCode request through the service: intercepto
 
 ## Components
 
-```
-                 ┌────────────────────────── easyp-svc (one process) ───────────────────────────┐
- :23410 gRPC ───▶│ interceptor chain ─▶ API handlers ─▶ core ─▶ WorkerPool ─▶ Registry          │
- :23411 HTTP ───▶│ /metrics                                        │            │   │            │
- :23412 HTTP ───▶│ /live  /  (readiness: PostgreSQL)               │            │   └─▶ exec plugin
- :23413 HTTP ───▶│ /mcp  (only when mcp.enabled)                   │            ▼                │
-                 │                                   audit worker ◀┘       plugin cache (disk)   │
-                 └───────────────────────────────────────┬──────────────────────┬───────────────┘
-                                                          ▼                      ▼
-                                                     PostgreSQL          S3-compatible storage
-                                                 plugins, audit_log        plugin archives
+```mermaid
+flowchart TB
+  grpc([":23410 gRPC"])
+  mcp([":23413 /mcp<br/>only with mcp.enabled"])
+  health([":23412 /live · / readiness"])
+  subgraph one["easyp-svc — one process"]
+    chain["Interceptor chain"] --> api["API handlers"] --> core["Core"]
+    core --> pool["WorkerPool"] --> reg["Registry"]
+    core --> audit["Audit writer"]
+    reg --> exec["Plugin process"]
+  end
+  cache[("Plugin cache<br/>plugins_dir")]
+  pg[("PostgreSQL<br/>plugins · audit_log")]
+  s3[("S3")]
+  grpc --> chain
+  mcp --> core
+  health -. "readiness" .-> pg
+  reg --> cache
+  reg <--> pg
+  audit --> pg
+  reg -. "cache miss" .-> s3
 ```
 
 One binary, `easyp-svc`, is both the server (`service start`) and the operator
