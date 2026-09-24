@@ -46,6 +46,10 @@ The global flags are `--cfg` (alias `--config`, default `easyp.yaml`), `--debug`
 
 `lint` and `breaking` read the v1 `easyp.yaml`. They use the nearest module's declared roots and locked or local dependency roots for imports. A policy may exist without a `protobuf.mod`; in that case the commands use the scanned files and built-in imports.
 
+`generate` and `ls-files` also work without `protobuf.mod` when there are no module dependencies: the current project directory is treated as the source root.
+
+EasyP expands environment variables in `easyp.yaml` and `easyp.gen.yaml` before parsing or validation. `${NAME}` uses the variable value, `${NAME:-default}` supplies a fallback, and `$${NAME}` leaves a literal `${NAME}`. An unset variable without a fallback becomes an empty string. YAML comments are ignored during expansion. `protobuf.mod` and `protobuf.lock` do not use this substitution.
+
 `breaking` applies the nearest `breaking` section to each reported file. When nested policies select different Git baselines, it compares against each baseline and reports an issue only under the policy that selected it.
 
 `validate-config` recursively checks every `easyp.yaml`, `easyp.gen.yaml`, `protobuf.mod`, and `protobuf.lock` below the current directory. Pass `--cfg <file>` to check one file or `--cfg <directory>` to scan another directory. JSON errors identify the file; YAML structure errors also include line and column. Invalid lock versions, incomplete entries, and malformed hashes are reported as validation errors.
@@ -61,6 +65,8 @@ easyp validate-config --cfg ./services/api/easyp.gen.yaml
 `ls-files` lists local `.proto` files from `protobuf.mod` roots. By default it also includes reachable imports from dependencies and bundled well-known protos, resolving dependencies through the v1 lock or local replacements. Use `--include-imports=false` to list only local files without resolving dependencies. JSON output contains `files`, `roots`, and any import `errors`.
 
 `schema-gen --out-dir schemas` writes separate JSON Schemas for `easyp.yaml`, `easyp.gen.yaml`, and `protobuf.lock`, each with a `-v1.schema.json` filename and an unversioned alias. `protobuf.mod` is a text manifest, so validate it with `validate-config` instead. CLI validation also checks semantic rules beyond the JSON Schemas.
+
+The exported `github.com/easyp-tech/easyp/mcp/easypconfig` package registers `easyp_config_describe` with an MCP server through `easypconfig.RegisterTool(server)`. The tool describes the two editable YAML files and reads the same JSON Schemas as `schema-gen`. It does not describe `protobuf.mod` or `protobuf.lock`.
 
 ## Minimal files
 
