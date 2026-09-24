@@ -38,6 +38,14 @@ In accordance with EasyP's zero-duplication principles, `easyp.gen.yaml` **never
       description: "Local executable binary or WASM plugin identifier.",
       type: "string"
     },
+    "plugins[].path": {
+      description: "Explicit plugin binary path. Relative paths are resolved from the directory where easyp generate runs.",
+      type: "string"
+    },
+    "plugins[].command": {
+      description: "Custom plugin command as an executable followed by its arguments.",
+      type: "string[]"
+    },
     "plugins[].remote": {
       description: "gRPC or HTTP remote code generation service URL.",
       type: "string"
@@ -145,3 +153,16 @@ A repository-root `easyp.gen.yaml` may provide `options.go.package_prefix` as a 
 The current v1 generator selects complete modules. `generate.packages` is reserved for a later release, once its matching syntax is specified.
 
 Remote plugins require a `version` such as `v2.0.0`. EasyP sends that exact version to the remote generator. For local `protoc-gen-*` executables and bundled WASM plugins, the executable selected at runtime determines the version; the separate `version` field is rejected because EasyP cannot verify it.
+
+Each plugin declares exactly one source: `name`, `path`, `command`, or `remote`. Use `path` for a specific binary and `command` for an executable plus arguments. Both run from the directory where `easyp generate` starts and, like any Protobuf plugin, must read a `CodeGeneratorRequest` from stdin and write a `CodeGeneratorResponse` to stdout.
+
+```yaml
+version: v1
+plugins:
+  - path: ./tools/protoc-gen-custom
+    out: ./gen/custom
+  - command: [sh, ./tools/protoc-plugin.sh]
+    out: ./gen/script
+```
+
+The separate `version` field is also unavailable for `path` and `command`.

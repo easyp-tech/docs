@@ -48,7 +48,7 @@ easyp generate --descriptor_set_out descriptors.pb --include_imports
 
 ## Plugins and managed options
 
-`plugins[].name` selects a local executable or a bundled WASM plugin. EasyP selects bundled plugins through the existing plugin resolver. A remote plugin uses `remote` with a separate pinned semantic `version`. Plugin outputs are relative to the generator file.
+`plugins[].name` selects a local executable or a bundled WASM plugin. EasyP selects bundled plugins through the existing plugin resolver. `plugins[].path` runs a binary at an explicit path, while `plugins[].command` runs a command with arguments. Each plugin sets exactly one of `name`, `path`, `command`, or `remote`. A remote plugin uses `remote` with a separate pinned semantic `version`. Relative binary paths and commands run from the directory where EasyP starts; plugin outputs are relative to the generator file.
 
 The existing managed rules remain available under `generate.managed`, including module, package, path, and field selectors. `options.go.package_prefix` can provide a Go package prefix; a repository-root generator file can supply a default for nested generator files. See the full [`easyp.gen.yaml` reference](/docs/reference/easyp-gen-yaml).
 

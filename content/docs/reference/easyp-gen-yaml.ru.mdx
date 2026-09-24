@@ -38,6 +38,14 @@ description: "Полная спецификация файла easyp.gen.yaml, �
       description: "Имя локального бинарного файла или WASM плагина.",
       type: "string"
     },
+    "plugins[].path": {
+      description: "Явный путь к бинарному плагину. Относительный путь считается от каталога запуска easyp generate.",
+      type: "string"
+    },
+    "plugins[].command": {
+      description: "Команда запуска собственного плагина: список из исполняемого файла и аргументов.",
+      type: "string[]"
+    },
     "plugins[].remote": {
       description: "URL удалённого сервиса генерации кода (gRPC или HTTP).",
       type: "string"
@@ -145,3 +153,16 @@ plugins:
 Сейчас v1 генерирует модули целиком. `generate.packages` оставлено для будущей версии после определения синтаксиса выбора пакетов.
 
 Удалённому плагину нужен `version`, например `v2.0.0`. EasyP передаёт именно эту версию удалённому генератору. Для локального `protoc-gen-*` и встроенного WASM версию определяет выбранный исполняемый файл; отдельное поле `version` отклоняется, поскольку EasyP не может его проверить.
+
+Для каждого плагина указывают ровно один источник: `name`, `path`, `command` или `remote`. `path` запускает конкретный бинарный файл, а `command` принимает список из программы и её аргументов. Оба варианта работают из каталога запуска `easyp generate` и, как любой плагин Protobuf, должны принимать `CodeGeneratorRequest` из stdin и возвращать `CodeGeneratorResponse` в stdout.
+
+```yaml
+version: v1
+plugins:
+  - path: ./tools/protoc-gen-custom
+    out: ./gen/custom
+  - command: [sh, ./tools/protoc-plugin.sh]
+    out: ./gen/script
+```
+
+Для `path` и `command` отдельное поле `version` также не указывается.
