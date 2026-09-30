@@ -27,7 +27,7 @@ easyp lint --path proto
 easyp breaking --path proto --against main
 ~~~
 
-<code>mod tidy</code> разрешает зависимости и записывает <code>protobuf.lock</code>. <code>mod download</code> скачивает только зафиксированные коммиты. <code>mod update</code> обновляет версии в пределах текущей мажорной версии и пересоздаёт lock. Локальные <code>replace</code> работают при генерации и линтинге; перед <code>mod tidy</code> или <code>mod update</code> их нужно убрать, чтобы получить воспроизводимый lock.
+Без замен <code>mod tidy</code> записывает lock, <code>mod download</code> устанавливает зафиксированные коммиты, а <code>mod update</code> обновляет требования в пределах текущей мажорной версии и lock. При наличии <code>replace</code> команды работают с локальным эффективным графом и сохраняют <code>protobuf.lock</code> побайтно; отсутствующий lock не создаётся. <code>mod tidy</code> также не меняет манифест. <code>get</code> и <code>mod update</code> могут менять явные требования, но не добавляют транзитивные зависимости только из форка. <code>mod download</code> устанавливает только нужные незаменённые снимки. Для публикуемого lock удалите замены и выполните <code>mod tidy</code>. Подробнее: [локальные замены](/ru/docs/guides/debugging-replace).
 
 ## Флаги команд
 
@@ -66,7 +66,7 @@ easyp validate-config --cfg ./services --format json
 easyp validate-config --cfg ./services/api/easyp.gen.yaml
 ~~~
 
-<code>mod vendor</code> проверяет зафиксированные Git-зависимости и копирует их <code>.proto</code> в <code>easyp_vendor</code> по import path. Старый каталог заменяется только после успешного копирования всех файлов. Совпадающие import path вызывают ошибку. Сначала выполните <code>mod tidy</code>; локальные <code>replace</code> нельзя вендорить.
+<code>mod vendor</code> проверяет зафиксированные Git-зависимости и копирует их <code>.proto</code> в <code>easyp_vendor</code> по import path. Старый каталог заменяется только после успешного копирования всех файлов. Совпадающие import path вызывают ошибку. При наличии локальных <code>replace</code> копируется эффективный граф локальных и проверенных удалённых исходников без изменения опубликованного lock.
 
 <code>ls-files</code> показывает локальные <code>.proto</code> из корней <code>protobuf.mod</code>. По умолчанию команда также включает достижимые импорты из зависимостей и встроенных well-known proto, разрешая зависимости через v1 lock или локальные замены. <code>--include-imports=false</code> показывает только локальные файлы без разрешения зависимостей. В JSON есть поля <code>files</code>, <code>roots</code> и, при проблемах с импортами, <code>errors</code>.
 

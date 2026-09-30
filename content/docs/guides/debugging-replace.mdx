@@ -20,7 +20,7 @@ require (
 replace github.com/acme/weather => ../weather-fork
 ~~~
 
-The relative replacement path is resolved from the directory containing this <code>protobuf.mod</code>, so it points to <code>proto/weather-fork</code>, regardless of the shell's working directory. Keep the replacement's module roots and imports valid.
+The relative replacement path is resolved from the directory containing this <code>protobuf.mod</code>, so it points to <code>proto/weather-fork</code>, regardless of the shell's working directory. Absolute paths also work. The replacement's native <code>protobuf.mod</code> must declare <code>github.com/acme/weather</code>; a missing directory or mismatched identity is an error.
 
 ## Local Development Workflow
 
@@ -30,19 +30,22 @@ With a generator file in <code>proto/user</code>, run from the repository root:
 easyp generate --project ./proto/user
 ~~~
 
-Generation uses the replacement's local sources for the replaced dependency. You can iterate on both schemas without publishing a new dependency tag for every edit.
+Only the main consumer's replacements apply, at every depth of the required graph. EasyP reads the replacement's <code>protobuf.mod</code> requirements and source roots; dependency-owned replacements are ignored. Relative paths always use the main manifest directory. A replacement alone does not add a dependency, and unused replacements are not read or fetched. Ordinary dependency cycles are deduplicated. Legacy dependency metadata remains supported through the existing compatibility reader; dependency plugins are not executed.
+
+Generate, selected dependency generation, both descriptor export modes, lint, ls-files and breaking import resolution use this same effective graph. Replaced modules need no remote fetch and may be unpublished. A fully local graph works offline without a lock.
+
+## Local Mode and the Published Lock
+
+While the main manifest contains replacements, EasyP leaves an existing <code>protobuf.lock</code> **byte-for-byte unchanged** and does not create one if absent. Local paths, local versions/hashes and fork-only transitive dependencies never enter the shared lock. This is an explicit EasyP invariant: <code>protobuf.lock</code> is not <code>go.sum</code>, and this does not mean Go never updates <code>go.sum</code> with replacements. The main-module replacement semantics follow [Go's replacement model](https://go.dev/ref/mod#go-mod-file-replace).
+
+- <code>mod tidy</code> resolves and validates the effective graph and installs needed remote snapshots without editing the manifest or lock.
+- <code>get</code> may edit the explicitly requested requirement. <code>mod update</code> refreshes unreplaced direct requirements using the existing version rules; replaced requirements keep their declared versions without a remote lookup. Neither command promotes fork-only transitives or writes a lock.
+- <code>mod download</code> verifies/installs only needed unreplaced snapshots. It can resolve new remote requirements of the fork without adding them to the shared lock; replaced roots and unused lock entries are not downloaded.
+- <code>mod vendor</code> copies current local and verified remote sources into <code>easyp_vendor</code> without writing the lock. This local artifact does not prove published reproducibility.
 
 <Callout type="info">
-Dependency downloads are unnecessary only when the whole dependency graph is local or already in verified cache. One local replacement does not make unreplaced dependencies or their transitive imports local. Required remote dependencies still need valid locks and may need downloads; remote plugins still need network access.
+The effective graph exists only in memory. Matching published revisions and versionless pins use verified cached snapshots. A new remote requirement of a fork can need network access for resolution and installation; immutable-version and content checks still apply. Remote plugins also retain their network requirements.
 </Callout>
-
-## Reproducible Lock Guardrail
-
-<Callout type="warn">
-<code>easyp mod tidy</code> and <code>easyp mod update</code> explicitly reject active local replacements, even when generation can run with them. Remove the replacements before resolving a reproducible dependency lock.
-</Callout>
-
-These are mutating dependency commands, not read-only CI checks. Use <code>easyp mod download</code> to install and verify an already prepared lock; it is not a blanket check forbidding local replacements. Review the manifest before release.
 
 ### Preparing for PR Submission
 
@@ -52,4 +55,4 @@ These are mutating dependency commands, not read-only CI checks. Use <code>easyp
 4. Run <code>easyp mod tidy</code> in that module to update <code>protobuf.lock</code>.
 5. Regenerate the selected project, run consumer tests, and commit the reviewed manifest, lock, and generated changes.
 
-For breaking checks, replacements inside the Git repository use each revision's own contents. External local replacements are rejected because the baseline has no recoverable historical copy. See [breaking checks](/docs/cli/breaking-changes).
+For breaking checks, replacements inside the Git repository use each revision's own contents. External local replacements are rejected because the baseline has no recoverable historical copy. A versionless remote requirement from a historical fork needs a historical lock pin; current HEAD cannot substitute for the baseline. See [breaking checks](/docs/cli/breaking-changes).

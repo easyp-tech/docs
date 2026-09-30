@@ -21,7 +21,7 @@ require (
 
 A versionless requirement adds no constraint when the graph supplies a SemVer or exact commit. Only a still-unconstrained requirement uses current HEAD on the first <code>mod tidy</code>; subsequent tidy runs preserve the lock pin, while <code>mod update</code> refreshes HEAD. Explicit commits stay pinned.
 
-<code>replace module =&gt; ../local-copy</code> points generation and linting at a local directory. Relative paths use the owning <code>protobuf.mod</code> directory; absolute paths are used directly. Remove local replacements before <code>get</code>, <code>mod tidy</code>, or <code>mod update</code> writes a reproducible Git lock.
+<code>replace module =&gt; ../local-copy</code> applies only from the main <code>protobuf.mod</code>, including to transitive requirements. All relative replacement paths use the main manifest directory; absolute paths are used directly. With <code>replace</code>, commands use a local effective graph and preserve <code>protobuf.lock</code> byte-for-byte; a missing lock is not created. <code>mod tidy</code> also leaves the manifest unchanged. <code>get</code> and <code>mod update</code> may edit explicit requirements without adding fork-only transitives. <code>mod download</code> installs only needed unreplaced snapshots. Remove replacements and run <code>mod tidy</code> to produce a publishable lock. See [local replacements](/docs/guides/debugging-replace).
 
 For a Git repository with several manifests, require each nested module separately by its identity. For example, <code>require repo/foo</code> and <code>require repo/bar</code> need no module-specific tags if HEAD is suitable. A <code>v1.2.3</code> release of the module in <code>foo/</code> uses tag <code>foo/v1.2.3</code>. Each module's roots are resolved independently.
 
@@ -43,7 +43,7 @@ easyp mod vendor
 easyp generate
 ~~~
 
-Commit <code>protobuf.mod</code> and <code>protobuf.lock</code> for repeatable builds. The module cache is under <code>$HOME/.easyp/v1/git</code> by default; set <code>EASYPPATH</code> to change its parent directory. <code>mod vendor</code> requires the lock and rejects local replacements and duplicate import paths. The <code>easyp_vendor</code> directory is a copy of dependency sources, not a replacement for the lock.
+Commit <code>protobuf.mod</code> and <code>protobuf.lock</code> for repeatable builds. The module cache is under <code>$HOME/.easyp/v1/git</code> by default; set <code>EASYPPATH</code> to change its parent directory. Without replacements, <code>mod vendor</code> uses the published lock. With replacements it snapshots the effective graph without writing that lock. Duplicate import paths are errors. The <code>easyp_vendor</code> directory is a copy of dependency sources, not a replacement for the lock.
 
 ## Immutable tags and cache reuse
 
