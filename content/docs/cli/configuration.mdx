@@ -90,7 +90,17 @@ easyp validate-config --cfg ./services/api/easyp.gen.yaml
 
 <code>schema-gen --out-dir schemas</code> writes separate JSON Schemas for <code>easyp.yaml</code>, <code>easyp.gen.yaml</code>, and <code>protobuf.lock</code>, each with a <code>-v1.schema.json</code> filename and an unversioned alias. <code>protobuf.mod</code> is a text manifest, so validate it with <code>validate-config</code> instead. CLI validation also checks semantic rules beyond the JSON Schemas.
 
-The exported <code>github.com/easyp-tech/easyp/mcp/easypconfig</code> package registers <code>easyp_config_describe</code> with an MCP server through <code>easypconfig.RegisterTool(server)</code>. The tool describes the two editable YAML files and reads the same JSON Schemas as <code>schema-gen</code>. It does not describe <code>protobuf.mod</code> or <code>protobuf.lock</code>.
+The exported <code>github.com/easyp-tech/easyp/mcp/easypconfig</code> package registers <code>easyp_config_describe</code> through <code>easypconfig.RegisterTool(server)</code>. The tool describes <code>easyp.yaml</code>, <code>easyp.gen.yaml</code>, <code>protobuf.lock</code> and <code>protobuf.mod</code>. YAML references use the same JSON Schemas as <code>schema-gen</code>; the text manifest returns grammar instead of a fabricated YAML/JSON Schema.
+
+~~~json
+{"file":"protobuf.mod","path":"require[].version"}
+~~~
+
+~~~json
+{"file":"protobuf.lock","path":"modules[0].commit"}
+~~~
+
+<code>file</code> is an exact format selector, not a path to read. Output includes <code>format</code>; YAML examples retain <code>yaml</code>, while manifest examples contain <code>format: text</code> and <code>text</code>. The <code>grammar</code> object describes text directives and block rules. All detail flags default to true; <code>include_schema=false</code> suppresses either the YAML schema or text grammar. <code>examples_limit</code> defaults to 10 and must be 1–50; invalid bounds are errors. The reference does not read project files, access the network, execute plugins or expand variables. Sample commit/hash values are synthetic, not verified repository contents.
 
 ## Minimal files
 

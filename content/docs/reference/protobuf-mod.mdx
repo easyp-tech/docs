@@ -96,3 +96,7 @@ The pre-module <code>+incompatible</code> exception is supported only for unsuff
 See [Go major version suffixes](https://go.dev/ref/mod#major-version-suffixes) and [mapping versions to commits](https://go.dev/ref/mod#vcs-version).
 
 As in Go, an unversioned local replacement may contain a native manifest with the same unsuffixed identity while replacing an explicit legacy <code>+incompatible</code> requirement. This does not certify the published revision: the overlay preserves the shared lock, and frozen mode rejects replacements. Published fetches and both cold and warm locked installations still enforce the pre-native metadata check.
+
+## MCP reference
+
+<code>easyp_config_describe</code> describes this format without reading local files. Use <code>file: protobuf.mod</code> and <code>path: require[].version</code>. See [configuration reference via MCP](/docs/cli/configuration).
