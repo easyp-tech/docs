@@ -90,7 +90,17 @@ easyp validate-config --cfg ./services/api/easyp.gen.yaml
 
 <code>schema-gen --out-dir schemas</code> создаёт отдельные JSON Schema для <code>easyp.yaml</code>, <code>easyp.gen.yaml</code> и <code>protobuf.lock</code>: файлы с суффиксом <code>-v1.schema.json</code> и псевдонимы без версии. <code>protobuf.mod</code> — текстовый манифест; проверяйте его командой <code>validate-config</code>. CLI также проверяет семантические правила, не выраженные в JSON Schema.
 
-Экспортируемый пакет <code>github.com/easyp-tech/easyp/mcp/easypconfig</code> регистрирует инструмент <code>easyp_config_describe</code> в MCP-сервере через <code>easypconfig.RegisterTool(server)</code>. Инструмент описывает два редактируемых YAML-файла и использует те же JSON Schema, что и <code>schema-gen</code>. Он не описывает <code>protobuf.mod</code> и <code>protobuf.lock</code>.
+Экспортируемый пакет <code>github.com/easyp-tech/easyp/mcp/easypconfig</code> регистрирует <code>easyp_config_describe</code> через <code>easypconfig.RegisterTool(server)</code>. Инструмент описывает <code>easyp.yaml</code>, <code>easyp.gen.yaml</code>, <code>protobuf.lock</code> и <code>protobuf.mod</code>. YAML-справка использует те же JSON Schema, что и <code>schema-gen</code>; для текстового manifest возвращается грамматика, а не вымышленная YAML/JSON Schema.
+
+~~~json
+{"file":"protobuf.mod","path":"require[].version"}
+~~~
+
+~~~json
+{"file":"protobuf.lock","path":"modules[0].commit"}
+~~~
+
+<code>file</code> выбирает известный формат, а не путь для чтения. В ответе есть <code>format</code>; YAML-примеры сохраняют поле <code>yaml</code>, а примеры manifest содержат <code>format: text</code> и <code>text</code>. Объект <code>grammar</code> описывает директивы и правила блоков. Все флаги детализации по умолчанию включены; <code>include_schema=false</code> убирает YAML-схему или текстовую грамматику. <code>examples_limit</code> по умолчанию равен 10 и должен быть от 1 до 50; неверные границы вызывают ошибку. Справочник не читает файлы проекта, не обращается к сети, не запускает плагины и не раскрывает переменные. Commit и hash в примерах синтетические, а не проверенные данные репозитория.
 
 ## Минимальный пример
 

@@ -73,3 +73,7 @@ The <code>hash</code> uses Go's <code>dirhash.Hash1</code> over all regular file
 The v1 cache reuses an object store per Git remote. A known exact commit can be fetched without contacting the remote. A cold request first tries a depth-one fetch of the exact commit; if the server rejects that request, EasyP falls back to advertised reachable history. The original commit is still required: HEAD is never substituted. Tag lookups are refreshed separately so cache reuse cannot hide a retag. A commit absent from cache can still require access to its source.
 
 The <code>source</code> identity and SemVer <code>version</code> must satisfy the [major-version rules](/docs/reference/protobuf-mod): unsuffixed v0/v1, matching <code>/vN</code> for v2+. Invalid suffixes fail before installation. An unsuffixed v2+ <code>+incompatible</code> entry additionally requires the exact revision to have no native manifest, including when installed content is already cached. Commit pins still verify the exact native module identity, including in frozen mode.
+
+## MCP reference
+
+<code>easyp_config_describe</code> describes this format without reading local files. Use <code>file: protobuf.lock</code> and <code>path: modules[].commit</code>. See [configuration reference via MCP](/docs/cli/configuration).
