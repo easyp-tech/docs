@@ -13,7 +13,7 @@ roots proto
 
 require (
     github.com/acme/shared v1.2.0
-    github.com/acme/weather v2.1.0
+    github.com/acme/weather/v2 v2.1.0
 )
 ~~~
 
@@ -26,6 +26,8 @@ A versionless requirement adds no constraint when the graph supplies a SemVer or
 For a Git repository with several manifests, require each nested module separately by its identity. For example, <code>require repo/foo</code> and <code>require repo/bar</code> need no module-specific tags if HEAD is suitable. A <code>v1.2.3</code> release of the module in <code>foo/</code> uses tag <code>foo/v1.2.3</code>. Each module's roots are resolved independently.
 
 Module commands and <code>get</code> find the nearest ancestor <code>protobuf.mod</code> within the workspace. <code>easyp get &lt;module&gt;</code> adds a direct requirement; <code>@v1.2.3</code> or <code>@&lt;full-commit&gt;</code> selects a version. Without a suffix, the unconstrained-requirement rules above apply. Transitive requirements are added with <code>// indirect</code>, and repeated calls do not duplicate entries. Resolution errors leave the manifest and lock unchanged.
+
+Major versions use Go-style identities: v0/v1 are unsuffixed; v2+ requires matching <code>/vN</code>. The <code>+incompatible</code> exception requires verified pre-native metadata; it never bypasses a native manifest. See [exact grammar and Git mapping](/docs/reference/protobuf-mod).
 
 ## Commands
 

@@ -79,3 +79,5 @@ easyp generate
 Run <code>mod download</code> when the migrated project has a lock. Check real generated code, not only the exit status of configuration validation. Recursive multi-project generation now requires explicit <code>--all</code> or repeated <code>--project</code>; migration does not authorize unrelated projects.
 
 Command plugins now receive literal argv rather than an implicitly assembled shell command. Review legacy commands that relied on shell operators; use an explicit shell invocation only when that is intentional. Migration does not prove equivalence of arbitrary plugin side effects.
+
+An unsuffixed native v2+ dependency cannot be converted automatically. Select a published <code>/vN</code> identity and matching version, or a valid v0/v1 release; migration never renames dependencies or substitutes versions. An explicit <code>+incompatible</code> requirement is eligible only when the exact revision has no native manifest; migration does not add the marker speculatively. Requirements from older metadata are also checked when used at the native source boundary. See [major version identities](/docs/reference/protobuf-mod).

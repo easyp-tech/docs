@@ -50,7 +50,7 @@ roots (
 require (
     github.com/googleapis/googleapis v1.5.0
     github.com/acme/weather v1.2.3
-    github.com/grpc-ecosystem/grpc-gateway v2.19.0 // indirect
+    github.com/acme/gateway/v2 v2.19.0 // indirect
 )
 
 // Local debug replacement
@@ -74,3 +74,25 @@ SemVer requirements select the maximum requested minimum. SemVer and SHA require
 A local <code>replace</code> may target a nested module directory. Its native manifest must declare the replaced identity, and its requirements participate in the effective graph. Relative paths always use the main manifest directory, even at transitive depths; absolute paths are used directly. Historical breaking comparisons map in-repository replacements to the corresponding revision snapshot and reject external local paths. Preserving the lock is an explicit EasyP invariant, not a claim that Go never changes <code>go.sum</code>.
 
 For example, with <code>repo/foo/protobuf.mod</code> containing <code>roots proto</code>, EasyP reads files under the physical repository path <code>repo/foo/proto</code>. A file at <code>repo/foo/proto/user/v1/user.proto</code> has the protobuf import path <code>user/v1/user.proto</code>: import paths are relative to the resolved root, so the module directory and the root directory are not repeated in imports. With <code>roots .</code>, the physical root is <code>repo/foo</code>.
+
+## Major version identities
+
+v0 and v1 use the same unsuffixed module path. v2 and later require a final <code>/vN</code> component matching the SemVer major, with no leading zeros: <code>require github.com/acme/weather/v2 v2.1.0</code>. <code>/v0</code>, <code>/v1</code>, <code>/v01</code> and <code>/v2.0</code> are invalid module suffixes. Ordinary components such as <code>/2024</code> and <code>/v2beta</code> are not suffixes. This does not restrict package directories or protobuf import paths. Go's special <code>gopkg.in/name.vN</code> spelling is recognized by the same suffix helpers.
+
+The rule applies to declared module identities, requirements, replacement source identities, fetched native metadata and lock entries. Full commits and omitted versions still require the exact requested native identity. Absolute local Git paths and explicit URLs are supported; the logical URL host/path is checked separately from transport credentials and ports. EasyP preserves the original identity spelling.
+
+| Identity | Physical directory containing <code>protobuf.mod</code> | Tag for the example release |
+|---|---|---|
+| <code>repo</code> | repository root | <code>v1.2.0</code> |
+| <code>repo/v2</code> | root or <code>v2/</code> | <code>v2.0.0</code> |
+| <code>repo/sub/v2</code> | <code>sub/</code> or <code>sub/v2/</code> | <code>sub/v2.0.0</code> |
+
+The major suffix is logical and is not included in the tag prefix: <code>v2/v2.0.0</code> is not the release tag for <code>repo/v2</code>. Both lightweight and annotated tags work. The manifest at an allowed location must declare the exact requested identity; finding a tag alone is insufficient.
+
+<code>repo</code> and <code>repo/v2</code> can coexist as distinct module, lock and replacement identities. MVS chooses the highest requested minimum per identity. You must provide distinct protobuf import paths yourself: EasyP never renames packages or imports, and duplicate import paths still fail. Same-major updates, exact SHA/tag agreement, immutable tags, local replacement lock preservation and frozen verification continue to apply.
+
+The pre-module <code>+incompatible</code> exception is supported only for unsuffixed v2+ revisions without a native <code>protobuf.mod</code>. EasyP reads the underlying tag without the suffix and verifies metadata on the exact fetched or cached commit before accepting the lock entry. It rejects native manifests even when the marker is present. Legacy updates retain the marker; local replacements remain unversioned overlays and never publish their graph to the lock. Migration never silently renames a source or changes its version.
+
+See [Go major version suffixes](https://go.dev/ref/mod#major-version-suffixes) and [mapping versions to commits](https://go.dev/ref/mod#vcs-version).
+
+As in Go, an unversioned local replacement may contain a native manifest with the same unsuffixed identity while replacing an explicit legacy <code>+incompatible</code> requirement. This does not certify the published revision: the overlay preserves the shared lock, and frozen mode rejects replacements. Published fetches and both cold and warm locked installations still enforce the pre-native metadata check.
