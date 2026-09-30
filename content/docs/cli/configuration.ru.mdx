@@ -29,6 +29,24 @@ easyp breaking --path proto --against main
 
 Без замен <code>mod tidy</code> записывает lock, <code>mod download</code> устанавливает зафиксированные коммиты, а <code>mod update</code> обновляет требования в пределах текущей мажорной версии и lock. При наличии <code>replace</code> команды работают с локальным эффективным графом и сохраняют <code>protobuf.lock</code> побайтно; отсутствующий lock не создаётся. <code>mod tidy</code> также не меняет манифест. <code>get</code> и <code>mod update</code> могут менять явные требования, но не добавляют транзитивные зависимости только из форка. <code>mod download</code> устанавливает только нужные незаменённые снимки. Для публикуемого lock удалите замены и выполните <code>mod tidy</code>. Подробнее: [локальные замены](/ru/docs/guides/debugging-replace).
 
+## Явный режим frozen
+
+Используйте <code>--frozen</code>, когда сборка должна опираться на сохранённый граф зависимостей. По умолчанию флаг выключен; <code>CI=true</code> его не включает. Каждому выбранному native-модулю, чей граф зависимостей используется, нужны <code>protobuf.mod</code> и <code>protobuf.lock</code>, в том числе пустой lock при отсутствии зависимостей. Явный путь от workspace в <code>generate.modules</code> использует манифест и lock выбранного модуля; каталогу только с <code>easyp.gen.yaml</code> отдельная пара не нужна. Выбор зависимости по идентификатору по-прежнему требует манифест и lock потребителя. Описанный ниже запуск исходников без манифеста доступен только без frozen.
+
+~~~bash
+easyp --frozen generate
+easyp lint --frozen --path proto
+easyp breaking --frozen --against main
+easyp mod --frozen download
+easyp mod vendor --frozen
+~~~
+
+Флаг принимается глобально перед командой; локально у <code>generate</code>, <code>lint</code>, <code>breaking</code>, <code>ls-files</code>, <code>get</code>, <code>init</code> и <code>migrate</code>; у родительской команды <code>mod</code> и каждой из четырёх её подкоманд. Значение true на любом уровне включает режим. Дочерний <code>--frozen=false</code> не отменяет true у родителя.
+
+Frozen отклоняет все корневые <code>replace</code>, даже неиспользуемые, до обращения к путям замен или скачивания зависимостей. Проверяются прямые и транзитивные требования относительно lock и содержимое кеша. Режим не разрешает версии заново, не ищет HEAD/теги зависимостей и не записывает манифест или lock. Отсутствующий или устаревший lock вызывает ошибку. Точные коммиты из lock могут загружаться в кеш: frozen не означает автономную работу без сети.
+
+<code>mod tidy</code>, <code>get</code>, <code>mod update</code>, <code>init</code> и <code>migrate</code> отклоняют запуск в frozen; предварительный просмотр и интерактивная миграция тоже запрещены. Подготовьте файлы вне frozen. Генерация проверяет все выбранные графы до запуска любого плагина. Lint сохраняет действующую область политик; breaking использует собственные манифест и lock базовой ревизии. Даже <code>ls-files --include-imports=false</code> проверяет frozen-граф. Подробнее — в [менеджере пакетов](/ru/docs/cli/package-manager).
+
 ## Флаги команд
 
 | Команда | Основные флаги |
@@ -38,11 +56,11 @@ easyp breaking --path proto --against main
 | <code>breaking</code> | <code>--path</code> (<code>-p</code>), <code>--root</code> (<code>-r</code>), <code>--against</code> |
 | <code>init</code> | <code>--dir</code> (<code>-d</code>), <code>--module</code> |
 | <code>validate-config</code> | <code>--config</code> (псевдоним <code>--cfg</code>), <code>--format</code> |
-| <code>mod vendor</code> | Нет собственных флагов |
+| <code>mod download/tidy/vendor/update</code> | <code>--frozen</code> |
 | <code>ls-files</code> | <code>--include-imports</code> (по умолчанию <code>true</code>), <code>--format</code> (<code>json</code> или <code>text</code>) |
 | <code>schema-gen</code> | <code>--out-dir</code> (по умолчанию <code>schemas</code>) |
 
-Общие флаги: <code>--cfg</code> (псевдоним <code>--config</code>, по умолчанию <code>easyp.yaml</code>), <code>--debug</code> (<code>-d</code>) и <code>--format</code> (<code>-f</code>, <code>text</code> или <code>json</code>). Переменные <code>EASYP_CFG</code>, <code>EASYP_DEBUG</code> и <code>EASYP_FORMAT</code> задают значения по умолчанию. Кеш модулей находится в <code>EASYPPATH</code> или <code>$HOME/.easyp</code>.
+Общие флаги: <code>--cfg</code> (псевдоним <code>--config</code>, по умолчанию <code>easyp.yaml</code>), <code>--debug</code> (<code>-d</code>), <code>--format</code> (<code>-f</code>, <code>text</code> или <code>json</code>) и <code>--frozen</code>. Переменные <code>EASYP_CFG</code>, <code>EASYP_DEBUG</code> и <code>EASYP_FORMAT</code> задают значения по умолчанию. Кеш модулей находится в <code>EASYPPATH</code> или <code>$HOME/.easyp</code>.
 
 По умолчанию <code>generate</code> выбирает ближайший <code>easyp.gen.yaml</code> в текущем или родительском каталоге workspace. <code>--project</code> можно повторять для нескольких явных потребителей. <code>--all</code> отдельно включает рекурсивный выбор внутри каталога запуска и несовместим с <code>--project</code>. <code>--workspace</code> задаёт границу для путей модулей и наследования; по умолчанию используется ближайший Git-репозиторий или охватывающие файлы EasyP. Модули и корни исходников берутся из <code>protobuf.mod</code>; <code>generate.packages</code> зарезервировано и отклоняется при непустом значении. Флагов <code>generate --path</code> и <code>generate --root</code> нет.
 
@@ -68,7 +86,7 @@ easyp validate-config --cfg ./services/api/easyp.gen.yaml
 
 <code>mod vendor</code> проверяет зафиксированные Git-зависимости и копирует их <code>.proto</code> в <code>easyp_vendor</code> по import path. Старый каталог заменяется только после успешного копирования всех файлов. Совпадающие import path вызывают ошибку. При наличии локальных <code>replace</code> копируется эффективный граф локальных и проверенных удалённых исходников без изменения опубликованного lock.
 
-<code>ls-files</code> показывает локальные <code>.proto</code> из корней <code>protobuf.mod</code>. По умолчанию команда также включает достижимые импорты из зависимостей и встроенных well-known proto, разрешая зависимости через v1 lock или локальные замены. <code>--include-imports=false</code> показывает только локальные файлы без разрешения зависимостей. В JSON есть поля <code>files</code>, <code>roots</code> и, при проблемах с импортами, <code>errors</code>.
+<code>ls-files</code> показывает локальные <code>.proto</code> из корней <code>protobuf.mod</code>. По умолчанию команда также включает достижимые импорты из зависимостей и встроенных well-known proto, разрешая зависимости через v1 lock или локальные замены. <code>--include-imports=false</code> показывает только локальные файлы; вне frozen это пропускает разрешение зависимостей. В JSON есть поля <code>files</code>, <code>roots</code> и, при проблемах с импортами, <code>errors</code>.
 
 <code>schema-gen --out-dir schemas</code> создаёт отдельные JSON Schema для <code>easyp.yaml</code>, <code>easyp.gen.yaml</code> и <code>protobuf.lock</code>: файлы с суффиксом <code>-v1.schema.json</code> и псевдонимы без версии. <code>protobuf.mod</code> — текстовый манифест; проверяйте его командой <code>validate-config</code>. CLI также проверяет семантические правила, не выраженные в JSON Schema.
 
