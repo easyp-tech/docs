@@ -181,3 +181,9 @@ plugins:
 По умолчанию <code>easyp generate</code> выбирает ближайший конфиг в текущем или родительском каталоге workspace. Повторяйте <code>--project</code> для явного выбора нескольких потребителей; <code>--all</code> отдельно включает рекурсивный выбор. <code>--workspace</code> задаёт границу для путей модулей и наследования.
 
 <code>plugins[].with_imports</code> по умолчанию равен false. Значение true добавляет транзитивные импорты в список файлов для генерации только этого плагина. Дескрипторы импортов для связывания доступны и при false. Флаги <code>--descriptor_set_out</code> и <code>--descriptor_set_out_dir</code> взаимоисключающие; <code>--include_imports</code> меняет только содержимое экспорта, независимо от <code>with_imports</code>. См. [выбор проектов и экспорт дескрипторов](/ru/docs/cli/generator).
+
+## Проверка managed-опций
+
+Валидация конфигурации и генерация отклоняют неизвестные file/field options и значения неподходящего типа. Булевым опциям вроде <code>java_multiple_files</code> нужен YAML boolean, а не строка в кавычках. Строковым опциям нужны строки. <code>optimize_for</code> принимает <code>SPEED</code>, <code>CODE_SIZE</code> или <code>LITE_RUNTIME</code>; <code>jstype</code> — <code>JS_NORMAL</code>, <code>JS_STRING</code> или <code>JS_NUMBER</code>. Неверное правило не должно незаметно заменяться стандартными managed-настройками.
+
+Версию remote-плагина указывайте отдельным полем <code>version</code>, а не после двоеточия в последнем сегменте пути. Порт сервера в имени хоста допустим. Например, <code>remote: localhost:8080/go</code> вместе с <code>version: v1.2.3</code>.
