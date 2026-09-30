@@ -13,7 +13,7 @@ roots proto
 
 require (
     github.com/acme/shared v1.2.0
-    github.com/acme/weather v2.1.0
+    github.com/acme/weather/v2 v2.1.0
 )
 ~~~
 
@@ -26,6 +26,8 @@ require (
 Если в Git-репозитории несколько манифестов, объявляйте каждый вложенный модуль отдельно по его имени. Например, <code>require repo/foo</code> и <code>require repo/bar</code> не требуют отдельных тегов, если HEAD подходит. Для релиза <code>v1.2.3</code> модуля в <code>foo/</code> используется тег <code>foo/v1.2.3</code>. Корни каждого модуля разрешаются независимо.
 
 Команды <code>mod</code> и <code>get</code> находят ближайший <code>protobuf.mod</code> в предках в пределах workspace. <code>easyp get &lt;модуль&gt;</code> добавляет прямое требование; <code>@v1.2.3</code> или <code>@&lt;полный-коммит&gt;</code> задаёт версию. Без суффикса применяется описанное выше неограниченное требование. Транзитивные требования дописываются с <code>// indirect</code>, повторный вызов не создаёт дубликаты. При ошибке разрешения манифест и lock не меняются.
+
+Мажорные версии используют идентичность как в Go: v0/v1 — без суффикса, v2+ — с соответствующим <code>/vN</code>. Исключение <code>+incompatible</code> требует проверки домодульных метаданных и не обходит нативный manifest. См. [точную грамматику и Git mapping](/ru/docs/reference/protobuf-mod).
 
 ## Команды
 
