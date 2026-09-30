@@ -41,7 +41,26 @@ Local replacements inside the repository use the contents of the corresponding r
 
 ## Categories and unstable packages
 
-Existing compatibility checks remain enabled. The only supported additional category is <code>FILE</code>, which adds declaration-move checks between files. <code>PACKAGE</code>, <code>WIRE</code>, <code>WIRE_JSON</code>, and other categories are reserved and unimplemented; they cannot be selected.
+Nonempty <code>breaking.categories</code> selects real descriptor-based profiles: <code>FILE</code>, <code>PACKAGE</code>, <code>WIRE_JSON</code>, or <code>WIRE</code>. Omitted or empty categories retain the legacy checker; this is not an alias for WIRE. Multiple profiles apply their union without duplicate diagnostics.
+
+| Change | FILE | PACKAGE | WIRE_JSON | WIRE |
+|---|---|---|---|---|
+| Move a declaration within its package, preserving options | Reject | Allow | Allow | Allow |
+| Rename a field, even with its old JSON name retained | Reject | Reject | Reject | Allow |
+| Change int32 to int64 | Reject | Reject | Reject | Allow |
+| Change int32 to uint32 | Reject | Reject | Allow | Allow |
+| Change string to bytes | Reject | Reject | Reject | Allow |
+| Change bytes to string or int32 to sint32 | Reject | Reject | Reject | Reject |
+| Delete a non-required field | Reject | Reject | Reserve number and name | Reserve number |
+| Add/remove a required field or change a real oneof | Reject | Reject | Reject | Reject |
+| Add explicit optional presence | Reject | Reject | Allow | Allow |
+| Convert repeated entry messages to a compatible map | Reject | Reject | Reject | Allow |
+
+A map is encoded as repeated entry messages; repeated scalar values are not compatible merely because their type equals the map value type. Existing reserved names and number ranges cannot be released in any profile. Enum aliases are checked by name/number pairs for source/JSON and by retained numbers for WIRE. RPC/service removal, request/response identity, streaming, idempotency, and actual default-value changes remain checked. Source profiles additionally check supported file/field code-generation options, enum openness, declaration and extension ranges. WIRE_JSON also checks JSON format capability.
+
+Current and baseline sources are compiled separately using their own imports and pinned revisions. Diagnostics retain source coordinates and repository-relative paths; consumer managed options are not applied. Profiles work with section-scoped extends, ignores, local overlays and frozen verification. No source, manifest, lock or plugin output is written by breaking.
+
+The precise implemented rule catalog is <code>internal/config/breaking_profiles.go</code>. This feature does not claim full rule-for-rule Buf equivalence. It checks standard descriptor properties and supported effective Edition features, not arbitrary application-defined option semantics or external generated-code behavior. Unsupported syntax/editions are rejected by the pinned compiler instead of being declared compatible.
 
 <code>breaking.ignore_unstable</code> defaults to false. When true, it excludes packages on both sides whose final component matches <code>vNtest...</code>, <code>vNalpha</code>, <code>vNbeta</code>, <code>vNpMalpha</code>, or <code>vNpMbeta</code>. N and M are positive numbers without leading zeros; alpha/beta may have a similarly positive sequence number, and test may have any suffix. For example, <code>acme.v1beta1</code> is skipped, while <code>acme.v1beta1.service</code> and <code>acme.v0alpha1</code> are not. Stable packages and their references to unstable types remain checked; source reading and import resolution precede filtering.
 
