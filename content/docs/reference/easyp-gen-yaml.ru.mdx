@@ -3,9 +3,9 @@ title: "Справочник easyp.gen.yaml"
 description: "Полная спецификация файла easyp.gen.yaml, управляющего кодогенерацией на стороне потребителя, выводами плагинов, WASM/remote запуском и managed-опциями."
 ---
 
-Файл `easyp.gen.yaml` задаёт **правила генерации кода на стороне потребителя**. Находясь рядом с приложением или сервисом, он определяет, какие модули компилировать, какие плагины вызывать, куда записывать сгенерированный код и какие managed-опции применять.
+Файл <code>easyp.gen.yaml</code> задаёт **правила генерации кода на стороне потребителя**. Находясь рядом с приложением или сервисом, он определяет, какие модули компилировать, какие плагины вызывать, куда записывать сгенерированный код и какие managed-опции применять.
 
-В соответствии с принципом недублирования источников EasyP, `easyp.gen.yaml` **никогда** не содержит URL репозиториев или версий зависимостей — источники и версии протоколов определяются строго через `protobuf.mod` и `protobuf.lock`.
+Список <code>generate.modules</code> выбирает модули по имени или локальному пути. Требования к версиям схем объявляются в <code>protobuf.mod</code>, а выбранные коммиты и хеши сохраняются в <code>protobuf.lock</code>.
 
 ---
 
@@ -19,11 +19,11 @@ description: "Полная спецификация файла easyp.gen.yaml, �
       default: "v1"
     },
     generate: {
-      description: "Блок выбора модулей и пакетов для генерации.",
+      description: "Выбор целых модулей; фильтрация пакетов зарезервирована.",
       type: "object"
     },
     "generate.modules": {
-      description: "Идентификаторы модулей или локальные пути относительно корня репозитория. Зависимости разрешаются через protobuf.mod и его lock рядом с этим конфигом; если соседнего манифеста нет, используются корневые модуль и lock. Если поле отсутствует, выбирается этот локальный модуль.",
+      description: "Идентификаторы модулей или локальные пути относительно workspace. Зависимости используют ближайший protobuf.mod рядом с конфигом или выше в пределах workspace и его lock. Без списка выбирается этот модуль; без манифеста — каталог проекта.",
       type: "string[]"
     },
     "generate.packages": {
@@ -47,7 +47,7 @@ description: "Полная спецификация файла easyp.gen.yaml, �
       type: "string[]"
     },
     "plugins[].remote": {
-      description: "URL удалённого сервиса генерации кода (gRPC или HTTP).",
+      description: "URL удалённого плагина для выполнения через gRPC; версия задаётся отдельно.",
       type: "string"
     },
     "plugins[].version": {
@@ -58,16 +58,21 @@ description: "Полная спецификация файла easyp.gen.yaml, �
       description: "Директория назначения относительно easyp.gen.yaml для результатов.",
       type: "string"
     },
+    "plugins[].with_imports": {
+      description: "Генерирует транзитивные импорты только этим плагином. Независимо от флага экспорта --include_imports.",
+      type: "boolean",
+      default: "false"
+    },
     "plugins[].opts": {
       description: "Параметры и флаги плагина (словарь или список строк).",
       type: "object | string[]"
     },
     options: {
-      description: "Managed-опции пакетов, сгруппированные по целевым языкам.",
+      description: "Настройки префикса Go-пакетов.",
       type: "object"
     },
     "options.go.package_prefix": {
-      description: "Базовый префикс Go-пакета, автоматически добавляемый к go_package.",
+      description: "Вычисляет go_package, меняя только Go-опции. Полный managed mode требует generate.managed.enabled: true.",
       type: "string"
     },
     "generate.managed": {
@@ -81,35 +86,39 @@ description: "Полная спецификация файла easyp.gen.yaml, �
 
 ## Примеры конфигураций
 
-### Проектный генератор (`backend/easyp.gen.yaml`)
+### Проектный генератор (<code>backend/easyp.gen.yaml</code>)
 
-```yaml
+~~~yaml
 version: v1
-
 generate:
-  modules:
-    - proto/user
-    - proto/order
-
+  modules: [proto/user, proto/order]
+  managed:
+    enabled: true
+    override:
+      - file_option: go_package_prefix
+        value: github.com/acme/backend/gen
+      - file_option: go_package_prefix
+        module: github.com/acme/user
+        value: github.com/acme/backend/gen/user
+      - file_option: go_package_prefix
+        module: github.com/acme/order
+        value: github.com/acme/backend/gen/order
 plugins:
   - name: go
-    out: ./gen/go
-    opts:
-      paths: source_relative
+    out: .
+    with_imports: true
+    opts: [module=github.com/acme/backend]
   - name: go-grpc
-    out: ./gen/go
-    opts:
-      paths: source_relative
-      require_unimplemented_servers: false
+    out: .
+    with_imports: true
+    opts: [module=github.com/acme/backend, require_unimplemented_servers=false]
+~~~
 
-options:
-  go:
-    package_prefix: github.com/acme/backend/gen/go
-```
+В примере Go-модуль потребителя называется <code>github.com/acme/backend</code>. Локальные модули объявляют имена <code>github.com/acme/user</code> и <code>github.com/acme/order</code>; их import path — <code>v1/user.proto</code> и <code>v1/order.proto</code>. Общая зависимость экспортирует <code>common/v1/common.proto</code>. Результаты попадают в отдельные каталоги <code>gen/user/v1</code>, <code>gen/order/v1</code> и <code>gen/common/v1</code>. Разным Go-пакетам нужны разные выходные каталоги; EasyP не добавляет неявный префикс имени модуля.
 
-### Удалённая веб-генерация (`frontend/easyp.gen.yaml`)
+### Удалённая веб-генерация (<code>frontend/easyp.gen.yaml</code>)
 
-```yaml
+~~~yaml
 version: v1
 
 generate:
@@ -122,19 +131,19 @@ plugins:
     out: ./src/gen
     opts:
       target: ts
-```
+~~~
 
 ---
 
-## Managed Options (`options`)
+## Managed Options (<code>options</code>)
 
-Вместо явного прописывания опций вроде `option go_package = "..."` внутри каждого `.proto` файла, блок `options` в EasyP группирует настройки по целевым языкам программирования.
+Вместо явного прописывания опций вроде <code>option go_package = "..."</code> внутри каждого <code>.proto</code> файла, блок <code>options</code> в EasyP группирует настройки по целевым языкам программирования.
 
-Например, указание `options.go.package_prefix: github.com/acme/backend/gen/go` автоматически вычисляет пути импортов на основе структуры директорий модуля без модификации исходных `.proto` файлов.
+Например, <code>options.go.package_prefix</code> вычисляет <code>go_package</code> по пути proto-файла без изменения исходника. Сам префикс меняет только Go-опции: он не включает значения по умолчанию для Java, C#, PHP, Ruby, Objective-C или C++. Для полного managed mode и преобразований опций полей явно задайте <code>generate.managed.enabled: true</code>. Go-селекторы disable, включая <code>go_package</code>, подавляют префикс.
 
-Существующие правила managed mode доступны в `generate.managed`. Например, переопределение для конкретного Protobuf-пакета:
+Существующие правила managed mode доступны в <code>generate.managed</code>. Например, переопределение для конкретного Protobuf-пакета:
 
-```yaml
+~~~yaml
 version: v1
 generate:
   managed:
@@ -146,23 +155,29 @@ generate:
 plugins:
   - name: go
     out: ./gen/go
-```
+~~~
 
-Корневой `easyp.gen.yaml` может задавать `options.go.package_prefix` по умолчанию для вложенных генераторов. Локальные правила `generate.managed` имеют приоритет над унаследованным префиксом. Префикс, заданный в том же файле генератора, имеет наивысший приоритет. Списки плагинов не наследуются.
+Корневой <code>easyp.gen.yaml</code> может задавать <code>options.go.package_prefix</code> по умолчанию для вложенных генераторов. Локальные правила <code>generate.managed</code> имеют приоритет над унаследованным префиксом. Префикс, заданный в том же файле генератора, имеет наивысший приоритет. Списки плагинов не наследуются.
 
-Сейчас v1 генерирует модули целиком. `generate.packages` оставлено для будущей версии после определения синтаксиса выбора пакетов.
+Сейчас v1 генерирует модули целиком. Поле <code>generate.packages</code> зарезервировано и не реализовано: его нужно опустить или оставить пустым; непустое значение вызывает ошибку.
 
-Удалённому плагину нужен `version`, например `v2.0.0`. EasyP передаёт именно эту версию удалённому генератору. Для локального `protoc-gen-*` и встроенного WASM версию определяет выбранный исполняемый файл; отдельное поле `version` отклоняется, поскольку EasyP не может его проверить.
+Удалённому плагину нужен <code>version</code>, например <code>v2.0.0</code>. EasyP передаёт именно эту версию удалённому генератору. Для локального <code>protoc-gen-&#42;</code> и встроенного WASM версию определяет выбранный исполняемый файл; отдельное поле <code>version</code> отклоняется, поскольку EasyP не может его проверить.
 
-Для каждого плагина указывают ровно один источник: `name`, `path`, `command` или `remote`. `path` запускает конкретный бинарный файл, а `command` принимает список из программы и её аргументов. Оба варианта работают из каталога запуска `easyp generate` и, как любой плагин Protobuf, должны принимать `CodeGeneratorRequest` из stdin и возвращать `CodeGeneratorResponse` в stdout.
+Для каждого плагина указывают ровно один источник: <code>name</code>, <code>path</code>, <code>command</code> или <code>remote</code>. <code>path</code> запускает конкретный бинарный файл, а <code>command</code> принимает список из программы и её аргументов. Оба варианта работают из каталога запуска <code>easyp generate</code> и, как любой плагин Protobuf, должны принимать <code>CodeGeneratorRequest</code> из stdin и возвращать <code>CodeGeneratorResponse</code> в stdout.
 
-```yaml
+~~~yaml
 version: v1
 plugins:
   - path: ./tools/protoc-gen-custom
     out: ./gen/custom
   - command: [sh, ./tools/protoc-plugin.sh]
     out: ./gen/script
-```
+~~~
 
-Для `path` и `command` отдельное поле `version` также не указывается.
+Для <code>path</code> и <code>command</code> отдельное поле <code>version</code> также не указывается.
+
+## Выбор проекта и импорты
+
+По умолчанию <code>easyp generate</code> выбирает ближайший конфиг в текущем или родительском каталоге workspace. Повторяйте <code>--project</code> для явного выбора нескольких потребителей; <code>--all</code> отдельно включает рекурсивный выбор. <code>--workspace</code> задаёт границу для путей модулей и наследования.
+
+<code>plugins[].with_imports</code> по умолчанию равен false. Значение true добавляет транзитивные импорты в список файлов для генерации только этого плагина. Дескрипторы импортов для связывания доступны и при false. Флаги <code>--descriptor_set_out</code> и <code>--descriptor_set_out_dir</code> взаимоисключающие; <code>--include_imports</code> меняет только содержимое экспорта, независимо от <code>with_imports</code>. См. [выбор проектов и экспорт дескрипторов](/ru/docs/cli/generator).

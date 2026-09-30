@@ -3,30 +3,32 @@ title: "Git-зависимости с конфигом Buf"
 description: "Как пилотная версия EasyP v1 извлекает корни proto из Git-зависимостей на Buf."
 ---
 
-Проект EasyP v1 перечисляет Git-модули в `protobuf.mod`. Репозиторий зависимости может использовать конфигурацию Buf: EasyP читает её и находит корни исходных `.proto`. Дублировать эти корни в `easyp.gen.yaml` потребителя не нужно.
+Проект EasyP v1 перечисляет Git-модули в <code>protobuf.mod</code>. Репозиторий зависимости может использовать конфигурацию Buf: EasyP читает её и находит корни исходных <code>.proto</code>. Дублировать эти корни в <code>easyp.gen.yaml</code> потребителя не нужно.
 
 | Файл зависимости | Корни, которые использует EasyP |
 |------------------|---------------------------------|
-| `buf.work.yaml` v1 | `directories` |
-| `buf.yaml` v2 | `modules[].path` |
-| `buf.yaml` v1 | Корень репозитория |
-| `buf.yaml` v1beta1 | `build.roots` или корень репозитория |
+| <code>buf.work.yaml</code> v1 | <code>directories</code> |
+| <code>buf.yaml</code> v2 | <code>modules[].path</code> |
+| <code>buf.yaml</code> v1 | Корень репозитория |
+| <code>buf.yaml</code> v1beta1 | <code>build.roots</code> или корень репозитория |
 
-Если у зависимости нет конфигурации EasyP или Buf, её корнем считается каталог репозитория. Если есть старые EasyP `protobuf.mod` или `easyp.yaml`, EasyP также читает транзитивные требования и объявленные корни.
+Если у зависимости нет конфигурации EasyP или Buf, её корнем считается каталог репозитория. Если есть старые EasyP <code>protobuf.mod</code> или <code>easyp.yaml</code>, EasyP также читает транзитивные требования и объявленные корни.
 
-```text
+При адаптации старого <code>easyp.yaml</code> требования берутся и из <code>deps</code>, и из Git-входов генерации. Точные дубликаты источник/версия удаляются, разные минимумы сохраняются для MVS; некорректные deps вызывают ошибку. Совпадающий нативный <code>protobuf.mod</code> имеет приоритет. Читаются только метаданные, плагины зависимости не запускаются.
+
+~~~text
 # protobuf.mod потребителя
 module github.com/acme/service
 roots proto
 require github.com/acme/buf-contracts v1.2.0
-```
+~~~
 
-```bash
+~~~bash
 easyp mod tidy
 easyp mod download
 easyp generate
-```
+~~~
 
-`mod tidy` разрешает Git-зависимость и записывает выбранный коммит и хеш содержимого в `protobuf.lock`. Имена зависимостей Buf Registry не превращаются в Git URL автоматически: подходящий Git-источник надо объявить в манифесте потребителя. Фильтры Buf include/exclude для корней Git-зависимостей пока не поддерживаются и вызывают ошибку.
+<code>mod tidy</code> разрешает Git-зависимость и записывает выбранный коммит и хеш содержимого в <code>protobuf.lock</code>. Имена зависимостей Buf Registry не превращаются в Git URL автоматически: подходящий Git-источник надо объявить в манифесте потребителя. Фильтры Buf include/exclude для корней Git-зависимостей пока не поддерживаются и вызывают ошибку.
 
-После `mod tidy` команда `mod vendor` может скопировать `.proto` зафиксированной Git-зависимости в `easyp_vendor`, используя корни из её конфигурации Buf. Подробнее — в [руководстве менеджера пакетов](/ru/docs/cli/package-manager).
+После <code>mod tidy</code> команда <code>mod vendor</code> может скопировать <code>.proto</code> зафиксированной Git-зависимости в <code>easyp_vendor</code>, используя корни из её конфигурации Buf. Подробнее — в [руководстве менеджера пакетов](/ru/docs/cli/package-manager).

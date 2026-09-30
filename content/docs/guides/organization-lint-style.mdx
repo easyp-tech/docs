@@ -1,20 +1,16 @@
 ---
-title: "Organizational Lint Policy Sharing"
-description: "How to centralize linter rules using extends, and handle legacy directories via cascading configurations."
+title: "Organizational Lint Policies"
+description: "Keep explicit repository policies consistent and use whole-section cascading for local exceptions."
 ---
 
-Maintaining consistent Protobuf linting rules across hundreds of microservice repositories is a common challenge. This guide demonstrates how to share organizational base policies using `linters.extends` and manage exceptions cleanly.
+Teams can keep a reviewed lint policy in each repository and use directory policies for exceptions. EasyP v1 does not fetch shared policies: <code>linters.extends</code> and <code>breaking.extends</code> are reserved, and nonempty values are rejected. There is no built-in shared-policy delivery mechanism.
 
----
+## 1. Defining a Repository Policy
 
-## 1. Defining a Shared Base Policy
+Store the complete policy in <code>proto/easyp.yaml</code>:
 
-Platform engineering teams can publish a centralized linting policy repository (e.g. `github.com/uzum/proto-policy/lint-base`).
-
-```yaml
-# Shared policy repo: github.com/uzum/proto-policy/lint-base/easyp.yaml
+~~~yaml
 version: v1
-
 linters:
   default: STANDARD
   enable:
@@ -22,58 +18,62 @@ linters:
     - RPC_REQUEST_RESPONSE_UNIQUE
   disable:
     - PACKAGE_VERSION_SUFFIX
-
 linters-settings:
   ENUM_ZERO_VALUE_SUFFIX:
     suffix: UNSPECIFIED
-```
-
----
-
-## 2. Inheriting Policies via `extends`
-
-Individual service repositories inherit the central policy using `linters.extends`. They can also override individual rules locally:
-
-```yaml
-# Service repo: proto/easyp.yaml
-version: v1
-
-linters:
-  extends: github.com/uzum/proto-policy/lint-base
-  disable:
-    - PACKAGE_VERSION_SUFFIX # Local exception to shared policy
-
 breaking:
   baseline: git:main
-  categories:
-    - WIRE
-```
+  categories: [FILE]
+~~~
 
----
+Review policy changes alongside schema changes. <code>FILE</code> adds declaration-move checks to the existing compatibility checks; categories such as <code>WIRE</code> are not supported.
 
-## 3. Handling Legacy Subtrees via Directory Cascading
+## 2. Understanding Section Cascading
 
-If your repository contains legacy Protobuf files that cannot yet adhere to corporate standards, create a targeted `easyp.yaml` inside the legacy directory:
+Each of <code>linters</code>, <code>linters-settings</code>, <code>issues</code>, and <code>breaking</code> comes as a whole from the nearest file defining that section. Fields within a section are not partially merged.
 
-```text
+For example, a child <code>linters</code> section containing only <code>disable</code> does not retain the parent's <code>enable</code> list. Write the complete intended linter selection in the child. Sections omitted by the child still come from the nearest ancestor that defines them.
+
+## 3. Handling Legacy Subtrees
+
+~~~text
 proto/
-├── easyp.yaml          # Standard corporate policy for active services
+├── easyp.yaml
 ├── user/v1/user.proto
 └── legacy/
-    ├── easyp.yaml      # MINIMAL policy override strictly for legacy/
+    ├── easyp.yaml
     └── old.proto
-```
+~~~
 
-`proto/legacy/easyp.yaml`:
+To apply a reduced lint policy only to <code>proto/legacy</code>, put this in <code>proto/legacy/easyp.yaml</code>:
 
-```yaml
+~~~yaml
 version: v1
-
 linters:
   default: MINIMAL
   disable:
     - FIELD_LOWER_SNAKE_CASE
     - ENUM_VALUE_PREFIX
-```
+~~~
 
-Due to EasyP's nearest-file cascading rule, the relaxed policy applies exclusively to `.proto` files under `proto/legacy/`, while the rest of the repository adheres to corporate standards.
+The child replaces the complete <code>linters</code> section. The ancestor's <code>linters-settings</code> and <code>breaking</code> sections still apply because the child does not define them.
+
+If only one rule needs an exception, keep the parent linter selection and add an <code>issues</code> section to the parent policy instead:
+
+~~~yaml
+# Add to proto/easyp.yaml
+issues:
+  exclude-rules:
+    - path: legacy/**/*.proto
+      linters: [FIELD_LOWER_SNAKE_CASE]
+~~~
+
+This path is relative to <code>proto/easyp.yaml</code>, including when the section is inherited by a deeper directory. A child <code>issues: &#123;&#125;</code> clears inherited exclusions.
+
+Run the policy explicitly from the repository root:
+
+~~~bash
+easyp --cfg proto/easyp.yaml lint --path .
+~~~
+
+See the [policy reference](/docs/reference/easyp-yaml) for supported rules, path patterns, and comment suppressions.

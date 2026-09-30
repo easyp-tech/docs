@@ -3,33 +3,65 @@ title: "Linter"
 description: "Configure and run the EasyP v1 protobuf linter."
 ---
 
-`easyp lint` checks `.proto` files using the v1 policy in `easyp.yaml`. It reports source locations and rule names for findings.
+<code>easyp lint</code> checks <code>.proto</code> files using the v1 policy in <code>easyp.yaml</code>, reporting source locations and rule names.
 
-```yaml
-# easyp.yaml
+~~~yaml
 version: v1
 linters:
   default: STANDARD
   enable: [COMMENT_SERVICE]
   disable: [SERVICE_SUFFIX]
+  allow_comment_ignores: true
 linters-settings:
   ENUM_ZERO_VALUE_SUFFIX:
     suffix: UNSPECIFIED
 issues:
   exclude-rules:
-    - linters: [COMMENT_FIELD]
-```
+    - path: legacy/**/*.proto
+      linters: [COMMENT_FIELD]
+    - path: generated
+~~~
 
-The available presets are `MINIMAL`, `BASIC`, `STANDARD`, and `COMMENTS`. `enable` and `disable` add or remove individual rules. The pilot supports `ENUM_ZERO_VALUE_SUFFIX.suffix` and `SERVICE_SUFFIX.suffix` settings. Pathless `issues.exclude-rules` apply to every scanned file; path globs and `linters.extends` are not implemented yet and produce an error.
+Presets are <code>MINIMAL</code>, <code>BASIC</code>, <code>STANDARD</code>, and <code>COMMENTS</code>. Enable/disable and exclusion lists accept implemented rules and groups. Repetition is idempotent; disabling wins. Unknown names are errors, including when repeated in the opposite list. <code>PACKAGE_NO_IMPORT_CYCLE</code> is reserved and cannot be selected. Supported settings are <code>ENUM_ZERO_VALUE_SUFFIX.suffix</code> and <code>SERVICE_SUFFIX.suffix</code>. <code>linters.extends</code> is reserved and must be omitted or empty.
 
-```bash
+~~~bash
 easyp lint --path proto
 easyp --format json lint --path proto
 easyp lint --root ./contracts --path proto
-```
+~~~
 
-`--path` is relative to the scan root. By default the scan root is the directory of the selected policy file; `--root` changes it. The linter uses the nearest module's source roots and local or locked dependency roots to resolve imports. A policy can also be used without `protobuf.mod`.
+<code>--path</code> is relative to the scan root, which defaults to the selected policy's directory; <code>--root</code> changes it. Policy lookup searches upward within the workspace. Without an ancestor policy, one unambiguous outermost descendant policy can be selected; multiple independent policies require <code>--cfg</code>. An explicit config takes precedence. Each nested policy section replaces the nearest inherited section as a whole.
 
-Nested `easyp.yaml` files may override policy sections for files beneath their directories. See the [`easyp.yaml` reference](/docs/reference/easyp-yaml) for the supported fields and merging rules.
+The linter resolves imports using the nearest module's source roots and local or locked dependencies. A policy can also run without <code>protobuf.mod</code>. Vendored sources and hidden storage/Git directories are excluded from lint target discovery, including explicit vendor paths; dependency sources remain available for imports.
 
-The older `lint.use`, `lint.except`, and `lint.ignore_only` configuration is not accepted by the v1 CLI.
+## Exclude paths
+
+<code>issues.exclude-rules.path</code> is relative to the policy file supplying the effective <code>issues</code> section, even when that section is inherited. Patterns support <code>&#42;</code>, <code>?</code>, <code>[]</code>, and complete <code>&#42;&#42;</code> segments. Single-segment wildcards do not cross <code>/</code>; <code>&#42;&#42;</code> matches zero or more segments. Literal directories include their subtree. A literal <code>.proto</code> path matches that file only. Absolute paths, backslashes, traversal, and malformed patterns are rejected.
+
+A pathless rule applies to all files covered by that issues section. An empty or omitted <code>linters</code> list excludes matching files entirely. An empty rule <code>&#123;&#125;</code> explicitly ignores all files. A nested <code>issues: &#123;&#125;</code> clears inherited exclusions. The example suppresses only <code>COMMENT_FIELD</code> in legacy files and excludes the generated subtree entirely.
+
+## Suppress with comments
+
+~~~proto
+// easyp:disable FIELD_LOWER_SNAKE_CASE
+message Example {
+  string legacyField = 1;
+}
+
+message Another {
+  string legacyField = 1; // easyp:disable FIELD_LOWER_SNAKE_CASE
+}
+
+// easyp:disable MESSAGE_PASCAL_CASE
+message old_name {}
+message another_old_name {}
+// easyp:enable MESSAGE_PASCAL_CASE
+~~~
+
+An unpaired disable must annotate a declaration and covers that declaration's line or block. A paired disable/enable bounds a region in the same file; nested regions for the same rule are balanced. Suppressions do not leak to other files or policies. Rule names may be comma- or whitespace-separated; comment directives accept individual rules, not groups.
+
+Legacy <code>nolint:RULE</code> and <code>buf:lint:ignore RULE</code> remain declaration annotations. An explanation may follow a space-delimited <code>--</code> or <code>//</code> separator. Only parsed comments are interpreted. Empty directives, unknown rules, unsupported actions, and unmatched enables are errors with source locations.
+
+<code>linters.allow_comment_ignores</code> defaults to true for each effective policy. Set it to false to disable comment suppression in that policy; malformed directives remain errors on files being linted.
+
+See the [policy reference](/docs/reference/easyp-yaml). The older <code>lint.use</code>, <code>lint.except</code>, and <code>lint.ignore_only</code> configuration is not accepted by the v1 CLI.

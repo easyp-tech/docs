@@ -1,141 +1,104 @@
 ---
 title: "Multi-Target Code Generation"
-description: "Configuring independent per-project generation specs for backend microservices and web frontends with unified versioning in EasyP."
+description: "Select independent backend and frontend generation projects that consume the same protobuf modules."
 ---
 
-In modern polyglot architectures, multiple applications (such as Go microservices, TypeScript frontends, and Python data pipelines) consume code generated from the same Protocol Buffer schemas. EasyP uses a file-per-project generation model (`easyp.gen.yaml`) that keeps generation targets isolated while guaranteeing version alignment through `protobuf.mod` and `protobuf.lock`.
-
-<Callout type="info">
-Unlike legacy tools where generation inputs and dependency source versions are mixed into generator files, EasyP strictly decouples generation configuration (`easyp.gen.yaml`) from dependency manifests (`protobuf.mod`). Generation target files contain zero version specifications for proto dependencies.
-</Callout>
+Go services and TypeScript clients can consume the same Protocol Buffer schemas while keeping separate <code>easyp.gen.yaml</code> files. Dependency identities and requirements belong in <code>protobuf.mod</code>; resolved dependency commits and hashes belong in <code>protobuf.lock</code>.
 
 ## Project Architecture & Configuration
 
-Each consuming project defines its own `easyp.gen.yaml` file inside its project directory. EasyP automatically discovers all `easyp.gen.yaml` files in the repository hierarchy when executing `easyp generate`.
+This example has modules at <code>proto/user</code> and <code>proto/order</code>, each with its own <code>protobuf.mod</code>. The backend selects both modules; the frontend selects only the user module. Paths in <code>generate.modules</code> are relative to the repository root.
 
-<Tabs items={["backend/easyp.gen.yaml", "frontend/easyp.gen.yaml", "Root easyp.gen.yaml"]}>
-  <Tab value="backend/easyp.gen.yaml">
-    ```yaml
-    # backend/easyp.gen.yaml - Go Backend Services
-    version: v1
+### Backend project
 
-    generate:
-      modules:
-        - proto/user
-        - proto/order
+~~~yaml
+# backend/easyp.gen.yaml
+version: v1
+generate:
+  modules:
+    - proto/user
+    - proto/order
+plugins:
+  - name: go
+    out: ./gen/go
+    opts:
+      paths: source_relative
+  - name: go-grpc
+    out: ./gen/go
+    opts:
+      paths: source_relative
+      require_unimplemented_servers: false
+options:
+  go:
+    package_prefix: github.com/acme/app/backend/gen/go
+~~~
 
-    plugins:
-      - name: go
-        version: v1.34.2
-        out: ./gen/go
-        opts:
-          paths: source_relative
-      - name: go-grpc
-        version: v1.4.0
-        out: ./gen/go
-        opts:
-          paths: source_relative
-          require_unimplemented_servers: false
+Install the required <code>protoc-gen-go</code> and <code>protoc-gen-go-grpc</code> executables in the build environment. Control their versions there; a local plugin cannot declare <code>version</code> in this file.
 
-    options:
-      go:
-        package_prefix: github.com/uzum/delivery/backend/gen/go
-    ```
-  </Tab>
-  <Tab value="frontend/easyp.gen.yaml">
-    ```yaml
-    # frontend/easyp.gen.yaml - Web Client Application
-    version: v1
+### Frontend project
 
-    generate:
-      modules:
-        - proto/user
+~~~yaml
+# frontend/easyp.gen.yaml
+version: v1
+generate:
+  modules:
+    - proto/user
+plugins:
+  - name: es
+    out: ./src/gen
+    opts:
+      target: ts
+~~~
 
-    plugins:
-      - remote: gen.easyp.tech/es
-        version: v2.0.0
-        out: ./src/gen
-        opts:
-          target: ts
-    ```
-  </Tab>
-  <Tab value="Root easyp.gen.yaml">
-    ```yaml
-    # easyp.gen.yaml (Repository Root)
-    version: v1
+This project requires <code>protoc-gen-es</code> on <code>PATH</code>. Output directories are relative to the project file, so backend and frontend output stay separate. Give modules distinct proto-relative output paths if they share an output directory.
 
-    # Root configuration holds repository-wide defaults for managed options
-    options:
-      go:
-        package_prefix: github.com/uzum/delivery/gen/go
-    ```
-  </Tab>
-</Tabs>
+### Shared Go option
 
-### Key Configuration Elements
+An ancestor generator file can supply a Go package prefix:
 
-- **`generate.modules`**: List of module paths (local path or canonical repository URL without version) to include in generation. If omitted, EasyP defaults to generating all protocols owned by the current module.
-- **`generate.packages`**: Selective package filter when only a subset of a module's packages are required.
-- **`plugins`**: Array of code generator plugins to execute:
-  - `name`: Local binary or WASM module identifier.
-  - `remote`: Cloud generation service endpoint.
-  - `version`: Exact pinned plugin version. `:latest` tags are prohibited to ensure build reproducibility.
-  - `out`: Output directory path relative to the project file.
-  - `opts`: Key-value map or list of plugin-specific option flags.
-- **`options`**: Language-scoped managed options (e.g. `options.go.package_prefix`). Managed options apply consistently across all plugins for a given language to prevent import path mismatches.
+~~~yaml
+# easyp.gen.yaml at the repository root
+version: v1
+options:
+  go:
+    package_prefix: github.com/acme/app/gen/go
+~~~
+
+The nearest explicit <code>options.go.package_prefix</code> wins. The backend above overrides this value. This inheritance does not copy <code>generate</code> or <code>plugins</code> into child projects. The prefix sets <code>go_package</code>; full managed mode is configured separately through <code>generate.managed</code>.
+
+## Key Configuration Elements
+
+- <code>generate.modules</code> selects complete local modules or canonical module identities available in the selected dependency context. With no list, generation uses the nearest enclosing module, or the project directory when no manifest exists.
+- <code>generate.packages</code> is reserved. Omit it or leave it empty; package filtering is not implemented.
+- Each plugin selects exactly one source: <code>name</code>, <code>path</code>, <code>command</code>, or <code>remote</code>, and requires <code>out</code>.
+- <code>opts</code> accepts a map or a list of option strings. <code>with_imports: true</code> also generates transitive imports for that plugin.
 
 ## Plugin Execution Sources
 
-EasyP supports three execution mechanisms for code generator plugins, allowing teams to balance local performance with build hermeticity:
+| Source | Version control |
+| --- | --- |
+| <code>name</code> | Uses the installed executable; supported built-in names fall back to bundled WASM when no matching executable is on PATH. Pin the build environment and EasyP binary. |
+| <code>path</code> or <code>command</code> | Uses the executable you provide. Manage its version outside the generator YAML. |
+| <code>remote</code> | Requires a separate pinned semantic <code>version</code>; do not embed the version in the remote name. |
 
-<Tabs items={["Local Binary (name)", "WASM Sandbox (name)", "Remote Service (remote)"]}>
-  <Tab value="Local Binary (name)">
-    ```yaml
-    plugins:
-      - name: go
-        version: v1.34.2
-        out: ./gen/go
-        opts:
-          paths: source_relative
-    ```
-    EasyP locates the `protoc-gen-go` binary on the host system `$PATH`. The declared version is verified against the installed binary.
-  </Tab>
-  <Tab value="WASM Sandbox (name)">
-    ```yaml
-    plugins:
-      - name: go
-        version: v1.34.2
-        out: ./gen/go
-        opts:
-          paths: source_relative
-    ```
-    When configured for WASM execution, EasyP executes the plugin inside an embedded WebAssembly runtime, providing complete OS and toolchain independence.
-  </Tab>
-  <Tab value="Remote Service (remote)">
-    ```yaml
-    plugins:
-      - remote: gen.easyp.tech/es
-        version: v2.0.0
-        out: ./src/gen
-        opts:
-          target: ts
-    ```
-    EasyP streams protocol descriptors to a remote generation service, receiving pre-compiled source files. Zero local toolchain installation is required.
-  </Tab>
-</Tabs>
+Local and bundled plugins reject a nonempty <code>version</code> because EasyP cannot verify it against the executable. Remote execution requires network access. Neither WASM nor a remote version pin alone guarantees identical output bytes.
 
 ## Execution Workflow
 
-Run `easyp generate` from the repository root to trigger code generation across all configured projects:
+From the repository root, select the projects explicitly:
 
-```bash
-# Discover and execute all easyp.gen.yaml files in workspace
-easyp generate
+~~~bash
+easyp generate --project ./backend --project ./frontend
+~~~
 
-# Target a specific project directory only
-easyp generate --project ./backend
-```
+Or recursively select every project below the working directory:
 
-Because all projects consume proto versions locked in `protobuf.lock`, the Go backend and TypeScript frontend generated code are guaranteed to be in sync.
+~~~bash
+easyp generate --all
+~~~
 
-For complete generator options, see the [EasyP Generator Reference](/docs/cli/generator) and [Build Reproducibility Guide](/docs/guides/build-reproducibility).
+Do not combine <code>--all</code> and <code>--project</code>. Without either flag, <code>easyp generate</code> selects the nearest enclosing <code>easyp.gen.yaml</code>; it does not recurse through child projects.
+
+Projects selecting the same module use that module's manifest and dependency lock. Separate modules can have different dependency graphs, so review their locks and test the generated clients together.
+
+See the [generator reference](/docs/reference/easyp-gen-yaml) and [build reproducibility guide](/docs/guides/reproducibility).

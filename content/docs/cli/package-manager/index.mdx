@@ -3,11 +3,11 @@ title: "Package Manager"
 description: "Resolve and lock Git-based protobuf dependencies in EasyP v1."
 ---
 
-The v1 package manager reads `protobuf.mod` and writes `protobuf.lock`. It records each selected Git commit and an `h1:` content hash, then verifies the hash when downloading or reusing a cached module.
+The v1 package manager reads <code>protobuf.mod</code> and writes <code>protobuf.lock</code>. It records each selected Git commit and an <code>h1:</code> content hash, then verifies the hash when downloading or reusing a cached module.
 
 ## Declare dependencies
 
-```text
+~~~text
 module github.com/acme/contracts
 roots proto
 
@@ -15,36 +15,48 @@ require (
     github.com/acme/shared v1.2.0
     github.com/acme/weather v2.1.0
 )
-```
+~~~
 
-`roots` defaults to `.` when omitted. A requirement may omit its version: `mod tidy` resolves the Git repository's current HEAD and locks its exact commit. Repeating `tidy` keeps that commit; `mod update` refreshes versionless requirements to HEAD. You may instead give a SemVer tag or a full 40- or 64-character Git commit hash. `replace module => ../local-copy` points generation and linting at a local checkout. Remove local replacements before writing a reproducible lock with `mod tidy` or `mod update`.
+<code>roots</code> defaults to <code>.</code>. SemVer requirements select the maximum requested minimum. A full 40- or 64-hex-character commit specifies an exact revision. A tag and SHA are compatible when the selected tag resolves to that same commit; different commits conflict. SHA values are not ordered as SemVer by date or Git ancestry.
 
-For a Git repository with multiple `protobuf.mod` files, require each nested module separately by the identity declared in its manifest. For untagged modules, write `require repo/foo` and `require repo/bar`; EasyP finds both manifests and locks the resolved commits without module-specific tags. Explicit commit hashes stay pinned during `mod update`. Tagged releases remain optional: a module in `foo/` uses a tag such as `foo/v1.2.3`. EasyP resolves each module's source roots independently.
+A versionless requirement adds no constraint when the graph supplies a SemVer or exact commit. Only a still-unconstrained requirement uses current HEAD on the first <code>mod tidy</code>; subsequent tidy runs preserve the lock pin, while <code>mod update</code> refreshes HEAD. Explicit commits stay pinned.
 
-Run `easyp get <module>` from the directory containing your `protobuf.mod` to add a requirement without editing the file. Use `@v1.2.3` or `@<full-commit>` to select a specific version. A newly added requirement without a suffix resolves the current Git HEAD; repeating the command keeps its existing lock pin. The chosen module is a direct requirement; dependencies discovered through it are added to `protobuf.mod` with `// indirect`. Repeating the command does not duplicate requirements. If resolution fails, the manifest and lock are not changed.
+<code>replace module =&gt; ../local-copy</code> points generation and linting at a local directory. Relative paths use the owning <code>protobuf.mod</code> directory; absolute paths are used directly. Remove local replacements before <code>get</code>, <code>mod tidy</code>, or <code>mod update</code> writes a reproducible Git lock.
+
+For a Git repository with several manifests, require each nested module separately by its identity. For example, <code>require repo/foo</code> and <code>require repo/bar</code> need no module-specific tags if HEAD is suitable. A <code>v1.2.3</code> release of the module in <code>foo/</code> uses tag <code>foo/v1.2.3</code>. Each module's roots are resolved independently.
+
+Module commands and <code>get</code> find the nearest ancestor <code>protobuf.mod</code> within the workspace. <code>easyp get &lt;module&gt;</code> adds a direct requirement; <code>@v1.2.3</code> or <code>@&lt;full-commit&gt;</code> selects a version. Without a suffix, the unconstrained-requirement rules above apply. Transitive requirements are added with <code>// indirect</code>, and repeated calls do not duplicate entries. Resolution errors leave the manifest and lock unchanged.
 
 ## Commands
 
 | Command | Behavior |
 |---------|----------|
-| `easyp get <module>[@version\|@commit]` | Adds or promotes a direct requirement, resolves transitive requirements, and writes `protobuf.lock` |
-| `easyp mod tidy` | Resolves direct and transitive requirements and writes `protobuf.lock` |
-| `easyp mod download` | Downloads the exact commits in `protobuf.lock` and verifies their hashes |
-| `easyp mod update` | Refreshes requirements within their current major versions, then updates the lock |
-| `easyp mod vendor` | Verifies locked dependencies and copies their `.proto` files into `easyp_vendor` |
+| <code>easyp get &lt;module&gt;[@version&#124;@commit]</code> | Adds or promotes a direct requirement, resolves transitive requirements, and writes <code>protobuf.lock</code> |
+| <code>easyp mod tidy</code> | Resolves direct and transitive requirements and writes <code>protobuf.lock</code> |
+| <code>easyp mod download</code> | Downloads the exact commits in <code>protobuf.lock</code> and verifies their hashes |
+| <code>easyp mod update</code> | Refreshes requirements within their current major versions, then updates the lock |
+| <code>easyp mod vendor</code> | Verifies locked dependencies and copies their <code>.proto</code> files into <code>easyp_vendor</code> |
 
-```bash
+~~~bash
 easyp get github.com/acme/contracts/proto/user
 easyp mod vendor
 easyp generate
-```
+~~~
 
-Commit `protobuf.mod` and `protobuf.lock` for repeatable builds. The module cache is under `$HOME/.easyp/v1/git` by default; set `EASYPPATH` to change its parent directory. `mod vendor` requires the lock and rejects local replacements and duplicate import paths. The `easyp_vendor` directory is a copy of dependency sources, not a replacement for the lock.
+Commit <code>protobuf.mod</code> and <code>protobuf.lock</code> for repeatable builds. The module cache is under <code>$HOME/.easyp/v1/git</code> by default; set <code>EASYPPATH</code> to change its parent directory. <code>mod vendor</code> requires the lock and rejects local replacements and duplicate import paths. The <code>easyp_vendor</code> directory is a copy of dependency sources, not a replacement for the lock.
+
+## Immutable tags and cache reuse
+
+<code>tidy</code>, <code>get</code>, and <code>update</code> verify each fetched previously locked SemVer against its recorded commit and hash. A republished tag raises <code>ErrLockedVersionChanged</code> before installing the new graph or writing the manifest or lock, including for transitive dependencies and warm caches. Selecting a new version and refreshing unconstrained HEAD requirements remain available.
+
+<code>mod download</code> retrieves the locked commit even after a tag moves, if that commit remains available. Reused Git objects let known exact commits avoid remote access. A cold request first tries a depth-one fetch of the exact commit and falls back to reachable history when needed; it never substitutes HEAD. Tag lookups are refreshed separately, and installed contents remain hash-verified.
 
 ## Dependencies using Buf or older EasyP
 
-A Git dependency may declare its proto roots in `buf.work.yaml`, Buf v1 or v2 `buf.yaml`, or an older EasyP `easyp.yaml`. Older EasyP `protobuf.mod` requirements are also read transitively. If none of those files exists, its repository root is used. This compatibility applies to dependency metadata; the consuming project uses v1 `protobuf.mod`.
+A Git dependency may declare its proto roots in <code>buf.work.yaml</code>, Buf v1 or v2 <code>buf.yaml</code>, or an older EasyP <code>easyp.yaml</code>. Older EasyP <code>protobuf.mod</code> requirements are also read transitively. If none of those files exists, its repository root is used. This compatibility applies to dependency metadata; the consuming project uses v1 <code>protobuf.mod</code>.
 
-Buf Registry dependencies have no automatic Git identity. Declare the corresponding Git module in the consuming `protobuf.mod` when those imports are needed. Buf include/exclude filters are not supported as Git import roots and produce an explicit error.
+When adapting an older <code>easyp.yaml</code>, both <code>deps</code> and generation Git inputs contribute requirements. Exact source/version duplicates are removed; different minimums remain visible to MVS, and malformed deps fail explicitly. A matching native <code>protobuf.mod</code> takes precedence. Only metadata is read; dependency plugins are never executed.
 
-See [`protobuf.mod`](/docs/reference/protobuf-mod) and [`protobuf.lock`](/docs/reference/protobuf-lock) for their field-level formats.
+Buf Registry dependencies have no automatic Git identity. Declare the corresponding Git module in the consuming <code>protobuf.mod</code> when those imports are needed. Buf include/exclude filters are not supported as Git import roots and produce an explicit error.
+
+See [<code>protobuf.mod</code>](/docs/reference/protobuf-mod) and [<code>protobuf.lock</code>](/docs/reference/protobuf-lock) for their field-level formats.

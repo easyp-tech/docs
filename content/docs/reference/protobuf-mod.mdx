@@ -3,7 +3,7 @@ title: "protobuf.mod Reference"
 description: "Specification for protobuf.mod, the tool-neutral DSL for defining Protocol Buffer module identities, roots, requirements, and local replace directives."
 ---
 
-The `protobuf.mod` file resides at the root of a Protocol Buffer module. Designed as a **tool-neutral standard**, it contains zero tool-specific settings (no linter flags, generator plugins, or vendor extensions). It is strictly focused on module identity, inner root directories, dependency requirements, and local source overrides.
+The <code>protobuf.mod</code> file resides at the root of a Protocol Buffer module. Designed as a **tool-neutral standard**, it contains zero tool-specific settings (no linter flags, generator plugins, or vendor extensions). It is strictly focused on module identity, inner root directories, dependency requirements, and local source overrides.
 
 ---
 
@@ -12,7 +12,7 @@ The `protobuf.mod` file resides at the root of a Protocol Buffer module. Designe
 <TypeTable
   type={{
     module: {
-      description: "Canonical module identity URL or path (e.g. github.com/acme/user). Reserved for vanity paths & registry publishing.",
+      description: "Canonical Git module identity, for example github.com/acme/user.",
       type: "directive"
     },
     roots: {
@@ -28,7 +28,7 @@ The `protobuf.mod` file resides at the root of a Protocol Buffer module. Designe
       type: "annotation"
     },
     replace: {
-      description: "Local source replacement directive mapping a module URL to a local filesystem path or alternate repo.",
+      description: "Local module replacement: absolute paths are used directly; relative paths are resolved from this protobuf.mod directory.",
       type: "directive"
     }
   }}
@@ -38,7 +38,7 @@ The `protobuf.mod` file resides at the root of a Protocol Buffer module. Designe
 
 ## Example Specification
 
-```protobuf
+~~~protobuf
 // proto/user/protobuf.mod
 
 module github.com/acme/user
@@ -55,16 +55,22 @@ require (
 
 // Local debug replacement
 replace github.com/acme/weather => ../weather-fork
-```
+~~~
 
 ---
 
 ## Behavior Rules
 
-1. **Git-Native Identity**: The canonical identity of a module is its Git URL (e.g., `github.com/acme/weather`).
-2. **Per-Module Bounds**: Every module maintains its own independent `protobuf.mod`. MVS operates per-module rather than forcing global monorepo single-version constraints.
-3. **Replace Guardrail**: Local `replace` directives work during generation. `easyp get`, `easyp mod tidy`, and `easyp mod update` reject them until they are removed, so a reproducible Git lock never records a local path.
+1. **Git-Native Identity**: The canonical identity of a module is its Git URL (e.g., <code>github.com/acme/weather</code>).
+2. **Per-Module Bounds**: Every module maintains its own independent <code>protobuf.mod</code>. MVS operates per-module rather than forcing global monorepo single-version constraints.
+3. **Replace Guardrail**: Local <code>replace</code> directives work during generation. <code>easyp get</code>, <code>easyp mod tidy</code>, and <code>easyp mod update</code> reject them until they are removed, so a reproducible Git lock never records a local path.
 
-For multiple modules in one repository, put a `protobuf.mod` in each module directory. Run `easyp mod tidy` from each local module directory; each writes its own `protobuf.lock`. `generate.modules` can select local modules by repository-relative path or module identity. A consumer declares each nested Git module separately by its declared identity. For example, `require github.com/acme/contracts/proto/user` needs no tag or manually supplied commit: `mod tidy` finds the repository's current HEAD and records its exact commit in `protobuf.lock`. Repeating `tidy` preserves that commit; `mod update` refreshes a versionless requirement to the current HEAD. An explicitly supplied full 40- or 64-character commit stays pinned during update. SemVer requirements remain supported for tagged releases; a nested module tagged `v1.2.3` uses `proto/user/v1.2.3`, matching the [Go multi-module tag convention](https://go.dev/ref/mod#mapping-versions-to-commits). Each required module has its own lock entry and source roots. A local `replace` can target a nested module directory.
+For multiple modules, place a <code>protobuf.mod</code> in each module directory. Module commands and <code>get</code> select the nearest ancestor manifest within the workspace; each module keeps its own <code>protobuf.lock</code>. <code>generate.modules</code> selects local modules by identity or workspace-relative path. A consumer declares each nested Git module separately by its manifest identity.
 
-For example, with `repo/foo/protobuf.mod` containing `roots proto`, EasyP reads files under the physical repository path `repo/foo/proto`. A file at `repo/foo/proto/user/v1/user.proto` has the protobuf import path `user/v1/user.proto`: import paths are relative to the resolved root, so the module directory and the root directory are not repeated in imports. With `roots .`, the physical root is `repo/foo`.
+A version may be omitted, for example <code>require github.com/acme/contracts/proto/user</code>. This adds no constraint if the graph already supplies a SemVer or exact commit. Only a still-unconstrained requirement uses the existing lock pin during <code>tidy</code>, or current HEAD without a pin; <code>mod update</code> refreshes it to HEAD. An explicit full 40- or 64-hex-character commit remains an exact constraint.
+
+SemVer requirements select the maximum requested minimum. SemVer and SHA requirements are compatible only when the selected tag points to that exact commit. Different explicit commits or a selected tag at another commit conflict; SHA values, dates, and commit ancestry are not given a semantic version order. For a nested module in <code>proto/user</code>, version <code>v1.2.3</code> uses tag <code>proto/user/v1.2.3</code>. Each module has its own lock entry and roots.
+
+A local <code>replace</code> can target a nested module. Relative paths are resolved from the owning <code>protobuf.mod</code>; absolute paths are used directly, regardless of the generation consumer's directory. Breaking comparisons use revision-local contents for replacements inside the repository and reject external local replacements.
+
+For example, with <code>repo/foo/protobuf.mod</code> containing <code>roots proto</code>, EasyP reads files under the physical repository path <code>repo/foo/proto</code>. A file at <code>repo/foo/proto/user/v1/user.proto</code> has the protobuf import path <code>user/v1/user.proto</code>: import paths are relative to the resolved root, so the module directory and the root directory are not repeated in imports. With <code>roots .</code>, the physical root is <code>repo/foo</code>.

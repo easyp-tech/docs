@@ -1,25 +1,48 @@
 ---
 title: "Breaking Changes Detection"
-description: "Compare protobuf schemas with a Git ref using EasyP v1."
+description: "Compare protobuf schemas with a Git baseline and revision-local dependencies in EasyP v1."
 ---
 
-`easyp breaking` compares current `.proto` files with a Git reference and reports incompatible changes detected by the existing checker.
+<code>easyp breaking</code> compares selected current <code>.proto</code> files with a Git baseline and reports incompatible changes.
 
-```yaml
-# easyp.yaml
+~~~yaml
 version: v1
 breaking:
   baseline: git:main
+  categories: [FILE]
+  ignore_unstable: true
   ignore: [experimental]
-```
+~~~
 
-```bash
+~~~bash
 easyp breaking --path proto --against main
 easyp --format json breaking --path proto
-```
+~~~
 
-`breaking.baseline` selects the Git ref. If it is absent, `--against` supplies the ref (default `master`). `--path` selects a directory relative to the scan root; `--root` changes that root from the policy file's directory. `breaking.ignore` excludes directories from the check.
+## Select a baseline and files
 
-The v1 pilot keeps the existing breaking check set. `breaking.categories`, `breaking.ignore_unstable`, and `breaking.extends` are not implemented and return an error instead of silently changing behavior. The old `breaking_check.against_git_ref` key is not accepted by the v1 CLI.
+Precedence is explicit <code>--against</code>, then <code>breaking.baseline</code>, then <code>master</code>. Even explicit <code>--against master</code> overrides configuration. An empty or whitespace-only flag is an error; a missing explicit Git baseline never falls back to the configured one.
 
-See the [`easyp.yaml` reference](/docs/reference/easyp-yaml) for the policy format. For imports, the checker uses the module and dependency roots resolved for the scan root; a policy can also run without a module manifest.
+The baseline can name a local branch, a lightweight or annotated tag, a full commit SHA, or another locally resolvable Git revision such as <code>HEAD</code>. Required refs and objects must already be present in the checkout. A bare branch name takes precedence over an identically named tag; use <code>refs/tags/v1.2.0</code> to select the tag explicitly. In YAML use <code>git:refs/tags/v1.2.0</code>; for the CLI pass <code>--against refs/tags/v1.2.0</code> without a <code>git:</code> or <code>git-ref=</code> prefix.
+
+<code>--path</code> selects a file or directory relative to the scan root; <code>--root</code> changes that root from the policy directory. Checked file identities remain repository-relative. <code>breaking.ignore</code> excludes directories; vendored sources are excluded from targets.
+
+<code>breaking.ignore</code> paths are relative to the file supplying the effective <code>breaking</code> section, not the Git root or <code>--root</code>. For example, <code>ignore: [generated]</code> in <code>api/easyp.yaml</code> excludes <code>api/generated</code>, including when that section is inherited. Entries must be nonempty local relative paths; absolute paths and paths escaping the policy directory or repository are rejected.
+
+Policies come from current configuration. Each nearest defined <code>breaking</code> section applies as a whole; nested policies may select different baselines. Repeated identical findings are emitted once.
+
+## Revision-local contexts
+
+Each selected module is compared separately. Current and baseline revisions use their own module roots, <code>protobuf.mod</code>, <code>protobuf.lock</code>, and dependencies. Baseline sources, manifests, and locks are read from an isolated Git snapshot. The caller's checkout, manifest, and lock are unchanged; the verified dependency cache may be populated. Temporary snapshots are removed after use.
+
+Baseline-only files and deleted modules remain checkable, including through <code>--path</code>. Dependency findings use the policy of the selected files. A policy can also run without a module manifest.
+
+Local replacements inside the repository use the contents of the corresponding revision; absolute paths inside the repository are mapped into the baseline snapshot. External local replacements are rejected because they have no recoverable historical identity. Use a locked dependency for a reproducible baseline.
+
+## Categories and unstable packages
+
+Existing compatibility checks remain enabled. The only supported additional category is <code>FILE</code>, which adds declaration-move checks between files. <code>PACKAGE</code>, <code>WIRE</code>, <code>WIRE_JSON</code>, and other categories are reserved and unimplemented; they cannot be selected.
+
+<code>breaking.ignore_unstable</code> defaults to false. When true, it excludes packages on both sides whose final component matches <code>vNtest...</code>, <code>vNalpha</code>, <code>vNbeta</code>, <code>vNpMalpha</code>, or <code>vNpMbeta</code>. N and M are positive numbers without leading zeros; alpha/beta may have a similarly positive sequence number, and test may have any suffix. For example, <code>acme.v1beta1</code> is skipped, while <code>acme.v1beta1.service</code> and <code>acme.v0alpha1</code> are not. Stable packages and their references to unstable types remain checked; source reading and import resolution precede filtering.
+
+<code>breaking.extends</code> is reserved: omit it or leave it empty. Nonempty shared-policy references are unsupported. The old <code>breaking_check.against_git_ref</code> key is not accepted by the v1 CLI. See the [policy reference](/docs/reference/easyp-yaml) for all fields.

@@ -1,141 +1,104 @@
 ---
 title: "Многоцелевая генерация кода"
-description: "Настройка независимых конфигураций генерации для бэкенда и фронтенда при едином версионировании модулей в EasyP."
+description: "Явный выбор независимых проектов генерации для бэкенда и фронтенда, использующих одни protobuf-модули."
 ---
 
-В современных полиглотных архитектурах несколько приложений (например, Go-микросервисы, TypeScript-фронтенд и Python-сервисы аналитики) используют код, сгенерированный из одних и тех же схем Protocol Buffer. EasyP использует модель генерации «файл-на-проект» (`easyp.gen.yaml`), которая изолирует цели генерации и при этом гарантирует согласованность версий через `protobuf.mod` и `protobuf.lock`.
-
-<Callout type="info">
-В отличие от устаревших инструментов, где источники генерации и версии зависимостей смешивались в одном файле генератора, EasyP строго разделяет конфигурацию генерации (`easyp.gen.yaml`) и манифест зависимостей (`protobuf.mod`). Файлы генерации не содержат указаний версий proto-зависимостей.
-</Callout>
+Go-сервисы и TypeScript-клиенты могут использовать одни схемы Protocol Buffer с отдельными файлами <code>easyp.gen.yaml</code>. Идентификаторы и требования зависимостей задаются в <code>protobuf.mod</code>, а выбранные коммиты и хеши — в <code>protobuf.lock</code>.
 
 ## Архитектура проектов и конфигурация
 
-Каждый проект-потребитель определяет собственный файл `easyp.gen.yaml` внутри своей директории. При запуске `easyp generate` EasyP автоматически находит все файлы `easyp.gen.yaml` в дереве репозитория.
+В примере модули находятся в <code>proto/user</code> и <code>proto/order</code>, каждый со своим <code>protobuf.mod</code>. Бэкенд выбирает оба модуля, фронтенд — только пользовательский. Пути в <code>generate.modules</code> отсчитываются от корня репозитория.
 
-<Tabs items={["backend/easyp.gen.yaml", "frontend/easyp.gen.yaml", "Коренной easyp.gen.yaml"]}>
-  <Tab value="backend/easyp.gen.yaml">
-    ```yaml
-    # backend/easyp.gen.yaml - Go Бэкенд Сервисы
-    version: v1
+### Проект бэкенда
 
-    generate:
-      modules:
-        - proto/user
-        - proto/order
+~~~yaml
+# backend/easyp.gen.yaml
+version: v1
+generate:
+  modules:
+    - proto/user
+    - proto/order
+plugins:
+  - name: go
+    out: ./gen/go
+    opts:
+      paths: source_relative
+  - name: go-grpc
+    out: ./gen/go
+    opts:
+      paths: source_relative
+      require_unimplemented_servers: false
+options:
+  go:
+    package_prefix: github.com/acme/app/backend/gen/go
+~~~
 
-    plugins:
-      - name: go
-        version: v1.34.2
-        out: ./gen/go
-        opts:
-          paths: source_relative
-      - name: go-grpc
-        version: v1.4.0
-        out: ./gen/go
-        opts:
-          paths: source_relative
-          require_unimplemented_servers: false
+Установите нужные исполняемые файлы <code>protoc-gen-go</code> и <code>protoc-gen-go-grpc</code> в окружении сборки. Их версии фиксируются там; локальный плагин не может задавать <code>version</code> в этом файле.
 
-    options:
-      go:
-        package_prefix: github.com/uzum/delivery/backend/gen/go
-    ```
-  </Tab>
-  <Tab value="frontend/easyp.gen.yaml">
-    ```yaml
-    # frontend/easyp.gen.yaml - Веб-приложение
-    version: v1
+### Проект фронтенда
 
-    generate:
-      modules:
-        - proto/user
+~~~yaml
+# frontend/easyp.gen.yaml
+version: v1
+generate:
+  modules:
+    - proto/user
+plugins:
+  - name: es
+    out: ./src/gen
+    opts:
+      target: ts
+~~~
 
-    plugins:
-      - remote: gen.easyp.tech/es
-        version: v2.0.0
-        out: ./src/gen
-        opts:
-          target: ts
-    ```
-  </Tab>
-  <Tab value="Коренной easyp.gen.yaml">
-    ```yaml
-    # easyp.gen.yaml (Корень репозитория)
-    version: v1
+Проекту нужен <code>protoc-gen-es</code> в <code>PATH</code>. Каталоги вывода задаются относительно проектного файла, поэтому результаты бэкенда и фронтенда разделены. Если несколько модулей пишут в один каталог, используйте разные относительные пути proto-файлов, определяющие пути вывода.
 
-    # Корневой файл содержит общие managed-опции для всех проектов репозитория
-    options:
-      go:
-        package_prefix: github.com/uzum/delivery/gen/go
-    ```
-  </Tab>
-</Tabs>
+### Общая Go-опция
 
-### Ключевые элементы конфигурации
+Вышестоящий файл генератора может задавать префикс Go-пакетов:
 
-- **`generate.modules`**: Список путей к модулям (локальный путь или URL репозитория без версии) для генерации. Если не указан, EasyP генерирует все протоколы своего модуля.
-- **`generate.packages`**: Точечный фильтр пакетов, если требуется только часть пакетов модуля.
-- **`plugins`**: Массив плагинов кодогенерации:
-  - `name`: Идентификатор локального бинарника или WASM-модуля.
-  - `remote`: Эндпоинт удалённого сервиса генерации.
-  - `version`: Точно зафиксированная версия плагина. Использование `:latest` запрещено для обеспечения воспроизводимости.
-  - `out`: Путь к директории назначения относительно проектного файла.
-  - `opts`: Опции плагина в виде словаря или списка строк.
-- **`options`**: Управляемые опции для конкретного языка (например, `options.go.package_prefix`). Они единообразно применяются ко всем плагинам языка, предотвращая расхождения в путях импорта.
+~~~yaml
+# easyp.gen.yaml в корне репозитория
+version: v1
+options:
+  go:
+    package_prefix: github.com/acme/app/gen/go
+~~~
+
+Побеждает ближайшее явно заданное значение <code>options.go.package_prefix</code>. Бэкенд выше переопределяет его. Такое наследование не копирует <code>generate</code> или <code>plugins</code> в дочерние проекты. Префикс задаёт <code>go_package</code>; полный managed mode настраивается отдельно через <code>generate.managed</code>.
+
+## Ключевые элементы конфигурации
+
+- <code>generate.modules</code> выбирает целые локальные модули или канонические идентификаторы модулей, доступные в выбранном контексте зависимостей. Без списка используется ближайший вышестоящий модуль, а при отсутствии манифеста — каталог проекта.
+- <code>generate.packages</code> зарезервировано. Опустите поле или оставьте пустой список: фильтрация пакетов не реализована.
+- Каждый плагин выбирает ровно один источник: <code>name</code>, <code>path</code>, <code>command</code> или <code>remote</code>, и обязательно задаёт <code>out</code>.
+- <code>opts</code> принимает словарь или список строк опций. <code>with_imports: true</code> дополнительно генерирует транзитивные импорты для этого плагина.
 
 ## Источники плагинов
 
-EasyP поддерживает три механизма выполнения плагинов кодогенерации:
+| Источник | Управление версией |
+| --- | --- |
+| <code>name</code> | Использует установленный исполняемый файл; поддерживаемые встроенные имена переходят на комплектный WASM, если соответствующего файла нет в PATH. Фиксируйте окружение сборки и бинарник EasyP. |
+| <code>path</code> или <code>command</code> | Использует предоставленный исполняемый файл. Управляйте его версией вне YAML генератора. |
+| <code>remote</code> | Требует отдельную фиксированную семантическую <code>version</code>; не включайте версию в имя удалённого плагина. |
 
-<Tabs items={["Локальный бинарник (name)", "WASM песочница (name)", "Удалённый сервис (remote)"]}>
-  <Tab value="Локальный бинарник (name)">
-    ```yaml
-    plugins:
-      - name: go
-        version: v1.34.2
-        out: ./gen/go
-        opts:
-          paths: source_relative
-    ```
-    EasyP находит бинарный файл `protoc-gen-go` в системной переменной `$PATH`. Объявленная версия сверяется с установленной.
-  </Tab>
-  <Tab value="WASM песочница (name)">
-    ```yaml
-    plugins:
-      - name: go
-        version: v1.34.2
-        out: ./gen/go
-        opts:
-          paths: source_relative
-    ```
-    При использовании WASM-режима EasyP запускает плагин внутри встроенной WebAssembly-песочницы, обеспечивая полную независимость от ОС и окружения.
-  </Tab>
-  <Tab value="Удалённый сервис (remote)">
-    ```yaml
-    plugins:
-      - remote: gen.easyp.tech/es
-        version: v2.0.0
-        out: ./src/gen
-        opts:
-          target: ts
-    ```
-    EasyP отправляет описатели протоколов на удаленный сервис генерации и получает готовые исходные файлы. Установка локального инструментария не требуется.
-  </Tab>
-</Tabs>
+Локальные и встроенные плагины отклоняют непустое поле <code>version</code>: EasyP не может проверить его соответствие исполняемому файлу. Удалённая генерация требует сети. Ни WASM, ни фиксация удалённой версии сами по себе не гарантируют побайтовую идентичность результата.
 
-## Процесс выполнения
+## Запуск генерации
 
-Запустите `easyp generate` из корня репозитория для выполнения генерации по всем проектам:
+Из корня репозитория явно выберите проекты:
 
-```bash
-# Автоматическое обнаружение и выполнение всех easyp.gen.yaml в проекте
-easyp generate
+~~~bash
+easyp generate --project ./backend --project ./frontend
+~~~
 
-# Ограничение генерации конкретным проектом
-easyp generate --project ./backend
-```
+Или рекурсивно выберите все проекты ниже рабочего каталога:
 
-Поскольку все проекты получают версии протоколов из зафиксированного `protobuf.lock`, сгенерированный код для Go и TypeScript гарантированно находится в синхронном состоянии.
+~~~bash
+easyp generate --all
+~~~
 
-Подробную информацию о генераторе смотрите в [Справочнике генератора EasyP](/ru/docs/cli/generator) и [Руководстве по воспроизводимости сборок](/ru/docs/guides/build-reproducibility).
+Не сочетайте <code>--all</code> и <code>--project</code>. Без этих флагов <code>easyp generate</code> выбирает ближайший вышестоящий <code>easyp.gen.yaml</code>, а не обходит дочерние проекты.
+
+Проекты, выбравшие один модуль, используют его манифест и lock зависимостей. У разных модулей графы зависимостей могут отличаться: проверяйте их lock-файлы и тестируйте сгенерированные клиенты вместе.
+
+См. [справочник генератора](/ru/docs/reference/easyp-gen-yaml) и [руководство по воспроизводимости](/ru/docs/guides/reproducibility).
