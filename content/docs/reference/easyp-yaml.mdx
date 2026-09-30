@@ -3,7 +3,7 @@ title: "easyp.yaml Reference"
 description: "Complete specification for easyp.yaml, configuring producer-side linting rules, breaking change detection, path exclusions, and policy inheritance."
 ---
 
-<code>easyp.yaml</code> defines lint and compatibility policies for protobuf schemas. Each section uses its nearest definition in the directory tree. Explicit policy loading through <code>linters.extends</code> and <code>breaking.extends</code> is reserved and unimplemented: omit these fields or leave them empty.
+<code>easyp.yaml</code> defines lint and compatibility policies for protobuf schemas. Each section uses its nearest definition in the directory tree. Explicit <code>linters.extends</code> and <code>breaking.extends</code> inherit section-scoped bases from bounded local files or declared, locked modules. See [shared policies](/docs/guides/organization-lint-style).
 
 ---
 
@@ -39,7 +39,7 @@ description: "Complete specification for easyp.yaml, configuring producer-side l
       default: "true"
     },
     "linters.extends": {
-      description: "Reserved and unimplemented. Omit or leave empty; nonempty values are rejected.",
+      description: "Base policy from a local ./ or ../ reference, or a declared locked module with optional #policy-path. Local values override the base.",
       type: "string"
     },
     "linters-settings": {
@@ -81,7 +81,7 @@ description: "Complete specification for easyp.yaml, configuring producer-side l
       type: "string[]"
     },
     "breaking.extends": {
-      description: "Reserved and unimplemented. Omit or leave empty; nonempty values are rejected.",
+      description: "Base policy from a local ./ or ../ reference, or a declared locked module with optional #policy-path. Local values override the base.",
       type: "string"
     }
   }}
@@ -154,7 +154,7 @@ The baseline can name a local branch, a lightweight or annotated tag, a full com
 
 Each selected module uses revision-local roots, manifests, and locks for its current and baseline revisions. The baseline is read from an isolated Git snapshot; the caller's checkout, manifest, and lock are unchanged. Policies come from current configuration and may each select a different baseline. See the [breaking guide](/docs/cli/breaking-changes) for local replacement limits.
 
-The only supported additional category is <code>FILE</code>, which checks declarations moved between files. Existing checks remain enabled. <code>PACKAGE</code>, <code>WIRE</code>, <code>WIRE_JSON</code>, and other categories are unimplemented and cannot be selected. <code>linters.extends</code> and <code>breaking.extends</code> likewise do not load local or remote shared policies: nonempty values are rejected.
+The only supported additional category is <code>FILE</code>, which checks declarations moved between files. Existing checks remain enabled. <code>PACKAGE</code>, <code>WIRE</code>, <code>WIRE_JSON</code>, and other categories are unimplemented and cannot be selected. Shared policies use local relative paths or declared-module#policy-path; versions belong only in the module manifest and lock.
 
 ## Unstable packages
 

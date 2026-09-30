@@ -22,7 +22,7 @@ issues:
     - path: generated
 ~~~
 
-Пресеты: <code>MINIMAL</code>, <code>BASIC</code>, <code>STANDARD</code> и <code>COMMENTS</code>. Списки enable/disable и исключений принимают реализованные правила и группы. Повторы не добавляют проверок; отключение приоритетнее включения. Неизвестные имена — ошибки, даже если повторены в противоположном списке. <code>PACKAGE_NO_IMPORT_CYCLE</code> зарезервировано и выбирать его нельзя. Поддерживаются настройки <code>ENUM_ZERO_VALUE_SUFFIX.suffix</code> и <code>SERVICE_SUFFIX.suffix</code>. Поле <code>linters.extends</code> зарезервировано: его нужно опустить или оставить пустым.
+Пресеты: <code>MINIMAL</code>, <code>BASIC</code>, <code>STANDARD</code> и <code>COMMENTS</code>. Списки enable/disable и исключений принимают реализованные правила и группы. Повторы не добавляют проверок; отключение приоритетнее включения. Неизвестные имена — ошибки, даже если повторены в противоположном списке. <code>PACKAGE_NO_IMPORT_CYCLE</code> зарезервировано и выбирать его нельзя. Поддерживаются настройки <code>ENUM_ZERO_VALUE_SUFFIX.suffix</code> и <code>SERVICE_SUFFIX.suffix</code>. <code>linters.extends</code> подключает локальную или закреплённую базу перед локальными изменениями; см. [общие политики](/ru/docs/guides/organization-lint-style).
 
 ~~~bash
 easyp lint --path proto

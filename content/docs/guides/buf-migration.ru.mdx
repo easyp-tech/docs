@@ -12,7 +12,7 @@ description: "Пошаговое руководство по миграции к
 | Конструкция Buf | Эквивалент в EasyP | Ключевое отличие |
 | --- | --- | --- |
 | <code>buf.yaml</code> (секция deps) | <code>protobuf.mod</code> | Независимый от инструментов DSL; использует Git URL вместо BSR. |
-| <code>buf.yaml</code> (секция lint) | <code>easyp.yaml</code> (linters) | Использует пресеты и списки правил; каждая секция политики берётся целиком из ближайшего определения. Непустое <code>extends</code> не поддерживается. |
+| <code>buf.yaml</code> (секция lint) | <code>easyp.yaml</code> (linters) | Использует пресеты и списки правил; каждая секция политики берётся целиком из ближайшего определения. <code>extends</code> явно подключает базу секции из локального файла или существующего закреплённого модуля. |
 | <code>buf.yaml</code> (секция breaking) | <code>easyp.yaml</code> (breaking) | Явное сравнение с git-baseline (например, <code>git:main</code>). |
 | <code>buf.gen.yaml</code> | <code>easyp.gen.yaml</code> | Находится у потребителя и выбирает целые модули. |
 | <code>buf.gen.yaml</code> (managed) | <code>easyp.gen.yaml</code> (generate.managed) | Явный managed mode; <code>options.go.package_prefix</code> — отдельная настройка только для Go. |

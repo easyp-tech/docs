@@ -82,7 +82,7 @@ easyp breaking --path proto --against refs/tags/v1.2.0
 
 Choose the intended previous release rather than assuming tag creation order defines compatibility history. Each revision uses its own module manifests, locks, and dependencies, so a breaking check can fetch dependencies beyond those needed by the current checkout.
 
-<code>FILE</code> is the only supported additional category. <code>ignore_unstable</code> works for the supported package suffixes. Ignore paths are relative to the policy file defining the <code>breaking</code> section: here <code>proto/experimental</code> is relative to the root policy. Nested sections replace whole sections; nonempty <code>extends</code> is unsupported.
+<code>FILE</code> is the only supported additional category. <code>ignore_unstable</code> works for the supported package suffixes. Ignore paths are relative to the policy file defining the <code>breaking</code> section: here <code>proto/experimental</code> is relative to the root policy. Nested sections replace whole sections; <code>extends</code> explicitly loads a section base from a local file or an existing locked module.
 
 ## Selecting Generation Projects
 

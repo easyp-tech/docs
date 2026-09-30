@@ -12,7 +12,7 @@ This guide maps Buf configuration to the EasyP v1 files and commands. Review eac
 | Buf Construct | EasyP Equivalent | Key Distinction |
 | --- | --- | --- |
 | <code>buf.yaml</code> (deps section) | <code>protobuf.mod</code> | Tool-neutral dependency DSL; uses Git URLs instead of proprietary BSR names. |
-| <code>buf.yaml</code> (lint section) | <code>easyp.yaml</code> (linters) | Uses presets and rule lists; each policy section comes whole from its nearest definition. Nonempty <code>extends</code> is unsupported. |
+| <code>buf.yaml</code> (lint section) | <code>easyp.yaml</code> (linters) | Uses presets and rule lists; each policy section comes whole from its nearest definition. <code>extends</code> explicitly loads a section base from a local file or an existing locked module. |
 | <code>buf.yaml</code> (breaking section) | <code>easyp.yaml</code> (breaking) | Explicit git baseline comparison (e.g. <code>git:main</code>). |
 | <code>buf.gen.yaml</code> | <code>easyp.gen.yaml</code> | Resides at consumer project level and selects complete modules. |
 | <code>buf.gen.yaml</code> (managed) | <code>easyp.gen.yaml</code> (generate.managed) | Explicit managed mode; <code>options.go.package_prefix</code> is a separate Go-only convenience. |

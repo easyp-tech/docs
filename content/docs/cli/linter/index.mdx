@@ -22,7 +22,7 @@ issues:
     - path: generated
 ~~~
 
-Presets are <code>MINIMAL</code>, <code>BASIC</code>, <code>STANDARD</code>, and <code>COMMENTS</code>. Enable/disable and exclusion lists accept implemented rules and groups. Repetition is idempotent; disabling wins. Unknown names are errors, including when repeated in the opposite list. <code>PACKAGE_NO_IMPORT_CYCLE</code> is reserved and cannot be selected. Supported settings are <code>ENUM_ZERO_VALUE_SUFFIX.suffix</code> and <code>SERVICE_SUFFIX.suffix</code>. <code>linters.extends</code> is reserved and must be omitted or empty.
+Presets are <code>MINIMAL</code>, <code>BASIC</code>, <code>STANDARD</code>, and <code>COMMENTS</code>. Enable/disable and exclusion lists accept implemented rules and groups. Repetition is idempotent; disabling wins. Unknown names are errors, including when repeated in the opposite list. <code>PACKAGE_NO_IMPORT_CYCLE</code> is reserved and cannot be selected. Supported settings are <code>ENUM_ZERO_VALUE_SUFFIX.suffix</code> and <code>SERVICE_SUFFIX.suffix</code>. <code>linters.extends</code> loads a local or locked-module base before local adjustments; see [shared policies](/docs/guides/organization-lint-style).
 
 ~~~bash
 easyp lint --path proto
