@@ -60,3 +60,9 @@ When adapting an older <code>easyp.yaml</code>, both <code>deps</code> and gener
 Buf Registry dependencies have no automatic Git identity. Declare the corresponding Git module in the consuming <code>protobuf.mod</code> when those imports are needed. Buf include/exclude filters are not supported as Git import roots and produce an explicit error.
 
 See [<code>protobuf.mod</code>](/docs/reference/protobuf-mod) and [<code>protobuf.lock</code>](/docs/reference/protobuf-lock) for their field-level formats.
+
+## Reachable imports and direct requirements
+
+Before writing a new manifest or lock, <code>mod tidy</code> checks the import closure reachable from the local module, including imports inside dependency files. Missing files and invalid reachable protobuf syntax stop the operation. Unrelated files in a dependency are not all compiled or linted. An import under <code>google/protobuf/</code> must actually exist; the prefix alone does not make it a bundled file.
+
+When a local source starts importing a previously indirect module, <code>tidy</code> removes the existing <code>// indirect</code> marker while preserving its version and unrelated comments. This does not discover an arbitrary Git repository from an unknown proto path. Registry-specific Buf dependency identities still require explicit Git mapping and are not silently converted into repository URLs.
