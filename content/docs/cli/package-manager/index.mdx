@@ -67,6 +67,27 @@ Before writing a new manifest or lock, <code>mod tidy</code> checks the import c
 
 When a local source starts importing a previously indirect module, <code>tidy</code> removes the existing <code>// indirect</code> marker while preserving its version and unrelated comments. This does not discover an arbitrary Git repository from an unknown proto path. Registry-specific Buf dependency identities still require explicit Git mapping and are not silently converted into repository URLs.
 
+## Frozen builds
+
+Commit <code>protobuf.mod</code> and <code>protobuf.lock</code>, then opt into <code>--frozen</code> explicitly. Even a module with no dependencies needs an empty lock; a source directory without a native manifest is rejected. <code>CI=true</code> does not enable this mode.
+
+~~~bash
+# Prepare and review the lock outside frozen mode
+easyp mod tidy
+# Use the committed graph; exact-commit cache fills are allowed
+easyp mod download --frozen
+easyp --frozen generate
+easyp mod --frozen vendor
+~~~
+
+Global, <code>mod</code>-level, and leaf-command placement are supported. A true value anywhere in the command lineage stays enabled even if a child passes <code>--frozen=false</code>. See [all supported placements](/docs/cli/configuration#explicit-frozen-mode).
+
+Frozen rejects every root <code>replace</code> before accessing its path or fetching dependencies, including unused replacements. It verifies the manifest's direct requirements and the locked modules' transitive requirements; missing, invalid, incomplete, or stale locks fail instead of being repaired. Dependencies selected by identity use the consumer's manifest and lock and do not need their own lock files. Explicit workspace-relative generation module paths instead use the selected native module's manifest and lock; a generator-only directory needs no separate pair. Dependency-local replacement directives remain ignored.
+
+There is no dependency re-resolution, HEAD/tag lookup, or manifest/lock creation or rewriting. Missing cache entries may be fetched at their exact locked commits. Content hashes are verified on cold and warm caches; corrupted installed contents fail rather than silently replacing the recorded hash. Frozen is not offline, and remote plugins can still need network access.
+
+<code>mod download</code> installs the verified graph. <code>mod vendor</code> validates it before writing <code>easyp_vendor</code>. <code>mod tidy</code>, <code>get</code>, <code>mod update</code>, <code>init</code>, and <code>migrate</code> refuse frozen execution, including migration preview. Remove replacements and prepare the manifest/lock outside frozen mode. The normal local replacement and vendor behavior above is unchanged.
+
 ## Cache and revision-access errors
 
 A hash mismatch in an installed module identifies the exact cache directory. Preserve it for investigation or quarantine only that entry, then retry <code>easyp mod download</code>. Do not rewrite <code>protobuf.lock</code> to hide the mismatch; the command does not automatically delete or repair the cache.

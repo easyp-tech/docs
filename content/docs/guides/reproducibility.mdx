@@ -44,3 +44,12 @@ Local replacement contents are editable and are not pinned by the published depe
 - Keep generated-output checks and consumer tests: valid locks and semantic versions do not prove schema compatibility or identical output bytes.
 
 See [local replacement debugging](/docs/guides/debugging-replace) and [GitHub Actions](/docs/ci-cd/github-actions).
+
+## Explicit frozen verification
+
+~~~bash
+easyp mod download --frozen
+easyp generate --frozen
+~~~
+
+Frozen mode validates existing manifests and locks, refuses all main-module local replacements, and never resolves new dependency versions or writes either file. It may fetch exact locked commits into the cache. It is not enabled by the CI environment. Mutating commands such as tidy/update refuse frozen execution; prepare the published graph first. See [frozen configuration](/docs/cli/configuration#explicit-frozen-mode).
