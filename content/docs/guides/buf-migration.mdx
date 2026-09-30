@@ -83,7 +83,7 @@ plugins:
       paths: source_relative
 ~~~
 
-The local <code>go</code> plugin requires <code>protoc-gen-go</code> in the build environment. Fix its version there; local plugins reject a YAML <code>version</code>. Remote plugins require a separate pinned semantic version. <code>generate.packages</code> is reserved and cannot filter packages.
+The local <code>go</code> plugin requires <code>protoc-gen-go</code> in the build environment. Fix its version there; local plugins reject a YAML <code>version</code>. Remote plugins require a separate pinned semantic version. <code>generate.packages</code> selects exact protobuf package names within the selected modules.
 
 ### Step 5: Tidy and Verify
 

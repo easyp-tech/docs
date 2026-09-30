@@ -69,7 +69,7 @@ The nearest explicit <code>options.go.package_prefix</code> wins. The backend ab
 ## Key Configuration Elements
 
 - <code>generate.modules</code> selects complete local modules or canonical module identities available in the selected dependency context. With no list, generation uses the nearest enclosing module, or the project directory when no manifest exists.
-- <code>generate.packages</code> is reserved. Omit it or leave it empty; package filtering is not implemented.
+- <code>generate.packages</code> selects exact protobuf package names, not prefixes or globs. Empty selects all source files.
 - Each plugin selects exactly one source: <code>name</code>, <code>path</code>, <code>command</code>, or <code>remote</code>, and requires <code>out</code>.
 - <code>opts</code> accepts a map or a list of option strings. <code>with_imports: true</code> also generates transitive imports for that plugin.
 
