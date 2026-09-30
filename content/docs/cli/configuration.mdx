@@ -14,6 +14,8 @@ The v1 pilot separates module dependencies, generation, and lint and breaking po
 
 The CLI commands use the v1 files directly. They do not fall back to the older EasyP generation, lint, breaking, or module-management configuration. A Git dependency can still use older EasyP or Buf configuration: the dependency reader extracts its requirements and proto roots for import resolution.
 
+For guided v0 migration, run <code>easyp migrate</code> in a terminal. Explicit <code>--interactive</code> starts the wizard with supplied values; <code>--interactive=false</code> disables it. Supplying <code>--module</code> without requesting the wizard preserves the original preview. See [v0 migration](/docs/migration/easyp-v0).
+
 ## Typical workflow
 
 ~~~bash

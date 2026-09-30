@@ -5,13 +5,31 @@ description: "Preview-first migration that preserves configuration and verifies 
 
 The v1 CLI does not execute the old combined configuration. Use the explicit migration command for supported, unambiguous v0 projects. Keep the project in version control and stop other writers before applying changes.
 
+## Interactive terminal wizard
+
+~~~bash
+# Starts the wizard when both input and output are terminals.
+easyp migrate
+
+# Explicit wizard with prefilled values.
+easyp migrate --interactive --dir . --module github.com/acme/contracts
+~~~
+
+The wizard asks for the project directory and module identity when those flags are omitted. An existing native manifest or the current directory's local Git origin can supply an identity suggestion; accepting a suggestion is still an explicit input step. This lookup does not contact a server or display Git credentials.
+
+It shows the actual candidate files before asking to proceed. When dependencies need verification, it asks separately for permission to resolve them and write their cache. After verification, it shows the complete plan, including the lock, and asks whether to apply it and create backups. Enter means **no** at both confirmations. Even prefilled <code>--write</code> and <code>--resolve-lock</code> do not bypass wizard confirmations. No plugin is executed.
+
+Declining, Ctrl+C or EOF before application leaves project files unchanged. Cache entries from previously authorized resolution may remain. A change to the project during the prompts is detected instead of silently overwriting it. The existing restrictions and multi-file crash boundary still apply.
+
+For compatibility, supplying <code>--module</code> without <code>--interactive</code> keeps the existing flag-only behavior, including in a terminal. <code>--interactive=false</code> explicitly disables prompting. Redirected input or output never triggers the wizard, and forced <code>--interactive</code> requires both streams to be terminals; a pipe of yes answers is not accepted as interactive consent. Scripts must supply <code>--module</code> and the relevant explicit flags.
+
 ## Preview first
 
 ~~~bash
 easyp migrate --dir . --module github.com/acme/contracts
 ~~~
 
-Without <code>--write</code>, the command prints actual candidate files and warnings. It does not change the project or execute plugins. A plain preview does not resolve dependencies or write their cache.
+In flag-only mode, without <code>--write</code>, the command prints actual candidate files and warnings. It does not change the project or execute plugins. A plain preview does not resolve dependencies or write their cache.
 
 The candidate files are <code>easyp.yaml</code> for policies, <code>easyp.gen.yaml</code> for generation, <code>protobuf.mod</code> for module metadata, and a verified <code>protobuf.lock</code> when dependency conversion is required. The supplied module identity is literal and must match the intended local module.
 
