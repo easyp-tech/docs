@@ -35,7 +35,7 @@ Adapt <code>gen</code> to your tracked output directories. The second command ca
 
 A local <code>replace</code> redirects one dependency to disk. It avoids dependency downloads only when the whole dependency graph is local or already present in verified cache. Unreplaced dependencies can still require downloads, and a remote generator still needs network access.
 
-Local replacement contents are editable and are not pinned by a reproducible dependency lock. <code>easyp mod tidy</code> and <code>easyp mod update</code> explicitly reject active local replacements. Remove replacements and publish the intended versions before resolving a release lock.
+Local replacement contents are editable and are not pinned by the published dependency lock. With replacements, <code>mod tidy</code> validates an ephemeral effective graph and leaves the shared manifest/lock unchanged; <code>get</code>/<code>mod update</code> may edit explicit requirements but never write a local-graph lock. Remove replacements and publish the intended versions, then run <code>mod tidy</code> to resolve a release lock.
 
 ## CI Practices
 

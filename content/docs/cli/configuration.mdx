@@ -27,7 +27,7 @@ easyp lint --path proto
 easyp breaking --path proto --against main
 ~~~
 
-<code>mod tidy</code> resolves requirements and writes <code>protobuf.lock</code>. <code>mod download</code> fetches exactly the locked commits. <code>mod update</code> refreshes required versions within their current major versions, then updates the lock. Local <code>replace</code> directives work for generation and linting; remove them before <code>mod tidy</code> or <code>mod update</code> writes a reproducible lock.
+Without replacements, <code>mod tidy</code> writes the lock, <code>mod download</code> installs pinned commits, and <code>mod update</code> refreshes requirements within their current major versions and updates the lock. With <code>replace</code>, commands use a local effective graph and preserve <code>protobuf.lock</code> byte-for-byte; a missing lock is not created. <code>mod tidy</code> also leaves the manifest unchanged. <code>get</code> and <code>mod update</code> may edit explicit requirements without adding fork-only transitives. <code>mod download</code> installs only needed unreplaced snapshots. Remove replacements and run <code>mod tidy</code> to produce a publishable lock. See [local replacements](/docs/guides/debugging-replace).
 
 ## Command flags
 
@@ -66,7 +66,7 @@ easyp validate-config --cfg ./services --format json
 easyp validate-config --cfg ./services/api/easyp.gen.yaml
 ~~~
 
-<code>mod vendor</code> verifies the locked Git dependencies and copies their <code>.proto</code> files into <code>easyp_vendor</code> using their import paths. It replaces a previous vendor tree only after all files have been copied successfully. Duplicate import paths are errors. Run <code>mod tidy</code> first; local <code>replace</code> directives cannot be vendored.
+<code>mod vendor</code> verifies the locked Git dependencies and copies their <code>.proto</code> files into <code>easyp_vendor</code> using their import paths. It replaces a previous vendor tree only after all files have been copied successfully. Duplicate import paths are errors. With local <code>replace</code> directives it copies the effective local and verified remote graph without changing the published lock.
 
 <code>ls-files</code> lists local <code>.proto</code> files from <code>protobuf.mod</code> roots. By default it also includes reachable imports from dependencies and bundled well-known protos, resolving dependencies through the v1 lock or local replacements. Use <code>--include-imports=false</code> to list only local files without resolving dependencies. JSON output contains <code>files</code>, <code>roots</code>, and any import <code>errors</code>.
 
