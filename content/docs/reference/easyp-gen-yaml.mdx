@@ -27,7 +27,7 @@ The <code>easyp.gen.yaml</code> file specifies **consumer-side code generation r
       type: "string[]"
     },
     "generate.packages": {
-      description: "Reserved for future package filtering. v1 currently reports an error when this field is nonempty.",
+      description: "Exact protobuf package names among selected modules. Empty selects all sources.",
       type: "string[]"
     },
     plugins: {
@@ -159,7 +159,7 @@ plugins:
 
 A repository-root <code>easyp.gen.yaml</code> may provide <code>options.go.package_prefix</code> as a default for nested generator files. Nested <code>generate.managed</code> rules take precedence over that inherited default. A prefix declared in the same generator file has the highest priority. Plugin lists stay local to each generator file.
 
-The v1 generator selects complete modules. <code>generate.packages</code> is reserved and unimplemented: omit it or leave it empty; nonempty values cause an error.
+The generator selects module sources by default. Nonempty <code>generate.packages</code> filters them by exact protobuf package name. Unknown names fail before plugins; required imports remain in the compilation graph.
 
 Remote plugins require a <code>version</code> such as <code>v2.0.0</code>. EasyP sends that exact version to the remote generator. For local <code>protoc-gen-&#42;</code> executables and bundled WASM plugins, the executable selected at runtime determines the version; the separate <code>version</code> field is rejected because EasyP cannot verify it.
 
@@ -187,3 +187,21 @@ By default, <code>easyp generate</code> selects the closest config in the curren
 Both configuration validation and generation reject unknown managed file or field options and values of the wrong type. Boolean options such as <code>java_multiple_files</code> require a YAML boolean, not a quoted string. String options require strings. <code>optimize_for</code> accepts <code>SPEED</code>, <code>CODE_SIZE</code> or <code>LITE_RUNTIME</code>; <code>jstype</code> accepts <code>JS_NORMAL</code>, <code>JS_STRING</code> or <code>JS_NUMBER</code>. Invalid rules cannot silently fall back to managed defaults.
 
 Place a remote version in the separate <code>version</code> field, not after a colon in the final plugin path. A server port in the host is allowed. For example, use <code>remote: localhost:8080/go</code> with <code>version: v1.2.3</code>.
+
+## Package selection and imports
+
+~~~yaml
+version: v1
+generate:
+  packages: [api.v1]
+plugins:
+  - name: go
+    out: gen/go
+    with_imports: true
+  - name: python
+    out: gen/python
+~~~
+
+Select an existing package in your module. All its files become generation targets, while required imports remain available for compilation. Only the Go plugin above generates those dependencies; the Python plugin generates selected files only. Unrelated packages, including invalid unused declarations, are not compiled. Malformed selected sources and required imports still fail.
+
+Matching is exact and evaluated across all modules of the project. An unknown package fails before any plugin runs; duplicate names do not duplicate execution. Descriptor exports respect the same selection. The separate <code>--include_imports</code> switch adds the selected import closure to the descriptor output without changing plugin targets.

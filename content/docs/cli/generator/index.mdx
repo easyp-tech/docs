@@ -36,7 +36,7 @@ easyp mod tidy
 easyp generate
 ~~~
 
-If <code>generate.modules</code> is omitted, EasyP selects the nearest <code>protobuf.mod</code> beside or above the generator file within the workspace; without a manifest, the project directory is the source root. Explicit entries select local module identities, workspace-relative module paths, or dependencies resolved through the consumer manifest and lock. <code>generate.packages</code> is reserved and must be omitted or empty.
+If <code>generate.modules</code> is omitted, EasyP selects the nearest <code>protobuf.mod</code> beside or above the generator file within the workspace; without a manifest, the project directory is the source root. Explicit entries select local module identities, workspace-relative module paths, or dependencies resolved through the consumer manifest and lock. <code>generate.packages</code> optionally selects exact protobuf package names; empty selects all module sources.
 
 ## Select projects
 
