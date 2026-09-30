@@ -59,7 +59,7 @@ A Git dependency may declare its proto roots in <code>buf.work.yaml</code>, Buf 
 
 When adapting an older <code>easyp.yaml</code>, both <code>deps</code> and generation Git inputs contribute requirements. Exact source/version duplicates are removed; different minimums remain visible to MVS, and malformed deps fail explicitly. A matching native <code>protobuf.mod</code> takes precedence. Only metadata is read; dependency plugins are never executed.
 
-Buf Registry dependencies have no automatic Git identity. Declare the corresponding Git module in the consuming <code>protobuf.mod</code> when those imports are needed. Buf include/exclude filters are not supported as Git import roots and produce an explicit error.
+EasyP reads Buf v1, v1beta1, and v2 <code>deps</code> as BSR references, including dependencies declared by modules selected through a v1 <code>buf.work.yaml</code>. A nonempty list is rejected explicitly with the declaring config and references instead of being silently discarded. Automatic BSR-to-Git mapping is intentionally not implemented yet; a Git dependency that uses BSR dependencies needs equivalent native <code>protobuf.mod</code> metadata before EasyP can resolve it. Buf include/exclude filters are also not supported as Git import roots and produce an explicit error.
 
 See [<code>protobuf.mod</code>](/docs/reference/protobuf-mod) and [<code>protobuf.lock</code>](/docs/reference/protobuf-lock) for their field-level formats.
 
