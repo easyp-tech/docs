@@ -66,3 +66,9 @@ See [<code>protobuf.mod</code>](/docs/reference/protobuf-mod) and [<code>protobu
 Before writing a new manifest or lock, <code>mod tidy</code> checks the import closure reachable from the local module, including imports inside dependency files. Missing files and invalid reachable protobuf syntax stop the operation. Unrelated files in a dependency are not all compiled or linted. An import under <code>google/protobuf/</code> must actually exist; the prefix alone does not make it a bundled file.
 
 When a local source starts importing a previously indirect module, <code>tidy</code> removes the existing <code>// indirect</code> marker while preserving its version and unrelated comments. This does not discover an arbitrary Git repository from an unknown proto path. Registry-specific Buf dependency identities still require explicit Git mapping and are not silently converted into repository URLs.
+
+## Cache and revision-access errors
+
+A hash mismatch in an installed module identifies the exact cache directory. Preserve it for investigation or quarantine only that entry, then retry <code>easyp mod download</code>. Do not rewrite <code>protobuf.lock</code> to hide the mismatch; the command does not automatically delete or repair the cache.
+
+An inaccessible Git repository is not evidence that a tag is absent. If history was fetched but the pinned commit is unavailable, restore access to the original revision instead of substituting HEAD. Tag revalidation and integrity checks remain enabled; no automatic offline fallback is introduced.
