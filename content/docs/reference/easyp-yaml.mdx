@@ -68,7 +68,7 @@ description: "Complete specification for easyp.yaml, configuring producer-side l
       default: "master"
     },
     "breaking.categories": {
-      description: "Only FILE is supported: adds declaration-move checks while existing checks remain enabled. Other categories, including package-related categories, are reserved and rejected.",
+      description: "FILE, PACKAGE, WIRE_JSON, WIRE: distinct compatibility profiles. Omitted/empty preserves legacy checks; multiple profiles apply their union.",
       type: "string[]"
     },
     "breaking.ignore_unstable": {
@@ -154,7 +154,7 @@ The baseline can name a local branch, a lightweight or annotated tag, a full com
 
 Each selected module uses revision-local roots, manifests, and locks for its current and baseline revisions. The baseline is read from an isolated Git snapshot; the caller's checkout, manifest, and lock are unchanged. Policies come from current configuration and may each select a different baseline. See the [breaking guide](/docs/cli/breaking-changes) for local replacement limits.
 
-The only supported additional category is <code>FILE</code>, which checks declarations moved between files. Existing checks remain enabled. <code>PACKAGE</code>, <code>WIRE</code>, <code>WIRE_JSON</code>, and other categories are unimplemented and cannot be selected. Shared policies use local relative paths or declared-module#policy-path; versions belong only in the module manifest and lock.
+Select FILE for file/source compatibility, PACKAGE to allow moves within a package, WIRE_JSON for binary plus JSON, or WIRE for binary. See the [profile matrix](/docs/cli/breaking-changes). Omitted/empty categories preserve legacy checks. Shared policies remain pinned through the consuming manifest/lock.
 
 ## Unstable packages
 
