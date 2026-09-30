@@ -1,37 +1,51 @@
 ---
 title: "Breaking checks in CI"
-description: "Run the EasyP v1 breaking checker against a Git baseline in CI."
+description: "Run the EasyP v1 breaking checker against a locally available Git baseline in CI."
 ---
 
-The v1 breaking checker compares current `.proto` files with a Git ref. Configure the baseline in `easyp.yaml`:
+The v1 breaking checker compares current <code>.proto</code> files with a Git revision. For a repository with schemas under <code>proto</code>, put this policy in the root <code>easyp.yaml</code>:
 
-```yaml
+~~~yaml
 version: v1
 breaking:
   baseline: git:origin/main
-  ignore: [experimental]
-```
+  categories: [FILE]
+  ignore_unstable: false
+  ignore: [proto/experimental]
+~~~
 
-Then run the check from a checkout containing the comparison ref:
+<code>FILE</code> adds declaration-move checks; existing compatibility checks stay enabled. Other categories are unsupported. Set <code>ignore_unstable: true</code> only if you intend to skip packages with supported unstable version suffixes; see the [breaking checker](/docs/cli/breaking-changes) for the exact forms.
 
-```bash
+The ignore path is relative to the file defining the effective <code>breaking</code> section. In <code>proto/easyp.yaml</code>, the same directory would be <code>ignore: [experimental]</code>. Changing <code>--root</code> does not change that base.
+
+## Run the checks
+
+From the repository root, with the dependency lock prepared:
+
+~~~bash
 easyp mod download
 easyp lint --path proto
 easyp breaking --path proto
-```
+~~~
 
-`mod download` verifies the commits and content hashes already recorded in `protobuf.lock`. Fetch the baseline ref in CI before the breaking check. If no `breaking.baseline` is set, pass the ref through `--against origin/main`; the command's default is `master`.
+<code>mod download</code> verifies the commits and content hashes recorded in <code>protobuf.lock</code>. The breaking checker uses each revision's own manifests, locks, and dependency context; the baseline may need additional downloads. Keep manifests and locks committed and resolve dependency updates before the CI check.
 
-For example, a GitHub Actions checkout step can use full history:
+## Make the baseline available
 
-```yaml
+The baseline can be a branch, lightweight or annotated tag, full commit SHA, or another locally resolvable Git revision such as <code>HEAD</code>. Fetch the required refs and objects first. Bare branch names take precedence over identically named tags; use <code>refs/tags/v1.2.0</code> to select a tag explicitly.
+
+An explicit <code>--against</code> overrides <code>breaking.baseline</code>; without either, the default is <code>master</code>. Pass the ref directly to the flag, without <code>git:</code> or <code>git-ref=</code>.
+
+After provisioning a v1-capable EasyP binary, these GitHub Actions steps compare with the pull request's base commit:
+
+~~~yaml
 - uses: actions/checkout@v4
   with:
     fetch-depth: 0
 - name: Check protobuf compatibility
-  run: easyp breaking --path proto --against origin/main
-```
+  env:
+    BASE_REF: ${{ github.event.pull_request.base.sha }}
+  run: easyp breaking --path proto --against "$BASE_REF"
+~~~
 
-Install the v1 pilot binary earlier in the job. Keep `protobuf.mod` and `protobuf.lock` committed, and resolve dependency updates before CI rather than rewriting the lock during a check.
-
-The pilot uses the existing breaking rule set. `breaking.categories` and `breaking.ignore_unstable` are not supported yet and cause an error. See [breaking checks](/docs/cli/breaking-changes).
+Use this snippet in a <code>pull_request</code> job. Full history makes the baseline available in ordinary PR checkouts; a missing revision fails the check instead of selecting a different baseline. See the complete [GitHub Actions workflow](/docs/ci-cd/github-actions).

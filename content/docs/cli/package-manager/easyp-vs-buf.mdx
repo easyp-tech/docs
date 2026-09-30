@@ -3,30 +3,32 @@ title: "Using Buf-configured Git dependencies"
 description: "How the EasyP v1 pilot reads proto roots from Git dependencies that use Buf configuration."
 ---
 
-An EasyP v1 project lists Git modules in `protobuf.mod`. A dependency repository can use Buf configuration; EasyP reads that configuration to find its `.proto` source roots. The consumer does not need to copy those roots into `easyp.gen.yaml`.
+An EasyP v1 project lists Git modules in <code>protobuf.mod</code>. A dependency repository can use Buf configuration; EasyP reads that configuration to find its <code>.proto</code> source roots. The consumer does not need to copy those roots into <code>easyp.gen.yaml</code>.
 
 | Dependency file | Roots used by EasyP |
 |-----------------|---------------------|
-| `buf.work.yaml` v1 | `directories` |
-| `buf.yaml` v2 | `modules[].path` |
-| `buf.yaml` v1 | Repository root |
-| `buf.yaml` v1beta1 | `build.roots`, or repository root if omitted |
+| <code>buf.work.yaml</code> v1 | <code>directories</code> |
+| <code>buf.yaml</code> v2 | <code>modules[].path</code> |
+| <code>buf.yaml</code> v1 | Repository root |
+| <code>buf.yaml</code> v1beta1 | <code>build.roots</code>, or repository root if omitted |
 
-When a dependency has no EasyP or Buf configuration, EasyP uses its repository root. If it has an older EasyP `protobuf.mod` or `easyp.yaml`, EasyP also reads its transitive requirements and declared roots.
+When a dependency has no EasyP or Buf configuration, EasyP uses its repository root. If it has an older EasyP <code>protobuf.mod</code> or <code>easyp.yaml</code>, EasyP also reads its transitive requirements and declared roots.
 
-```text
+When adapting an older <code>easyp.yaml</code>, both <code>deps</code> and generation Git inputs contribute requirements. Exact source/version duplicates are removed; different minimums remain visible to MVS, and malformed deps fail explicitly. A matching native <code>protobuf.mod</code> takes precedence. Only metadata is read; dependency plugins are never executed.
+
+~~~text
 # Consumer protobuf.mod
 module github.com/acme/service
 roots proto
 require github.com/acme/buf-contracts v1.2.0
-```
+~~~
 
-```bash
+~~~bash
 easyp mod tidy
 easyp mod download
 easyp generate
-```
+~~~
 
-`mod tidy` resolves the Git dependency and records the selected commit and content hash in `protobuf.lock`. Buf Registry dependency names are not converted into Git URLs automatically; declare a suitable Git source in the consumer manifest. Buf include/exclude filters are not yet supported for Git dependency import roots and produce an error.
+<code>mod tidy</code> resolves the Git dependency and records the selected commit and content hash in <code>protobuf.lock</code>. Buf Registry dependency names are not converted into Git URLs automatically; declare a suitable Git source in the consumer manifest. Buf include/exclude filters are not yet supported for Git dependency import roots and produce an error.
 
-After `mod tidy`, `mod vendor` can copy the locked Git dependency's `.proto` files into `easyp_vendor` using the roots extracted from its Buf configuration. See the [package manager guide](/docs/cli/package-manager).
+After <code>mod tidy</code>, <code>mod vendor</code> can copy the locked Git dependency's <code>.proto</code> files into <code>easyp_vendor</code> using the roots extracted from its Buf configuration. See the [package manager guide](/docs/cli/package-manager).

@@ -3,7 +3,7 @@ title: "Миграция с Buf на EasyP"
 description: "Пошаговое руководство по миграции конфигураций и команд с Buf на EasyP."
 ---
 
-В данном руководстве подробно рассматривается процесс перехода существующих проектов с **Buf** на **EasyP**.
+Это руководство сопоставляет конфигурацию Buf с файлами и командами EasyP v1. Проверяйте каждую настройку по схеме v1, а не переносите прежнюю конфигурацию без изменений.
 
 ---
 
@@ -11,16 +11,16 @@ description: "Пошаговое руководство по миграции к
 
 | Конструкция Buf | Эквивалент в EasyP | Ключевое отличие |
 | --- | --- | --- |
-| `buf.yaml` (секция deps) | `protobuf.mod` | Независимый от инструментов DSL; использует Git URL вместо BSR. |
-| `buf.yaml` (секция lint) | `easyp.yaml` (linters) | Использует синтаксис golangci-lint; поддерживает каскадирование и `extends`. |
-| `buf.yaml` (секция breaking) | `easyp.yaml` (breaking) | Явное сравнение с git-baseline (например, `git:main`). |
-| `buf.gen.yaml` | `easyp.gen.yaml` | Находится у потребителя; не содержит дублирующих путей к источникам. |
-| `buf.gen.yaml` (managed) | `easyp.gen.yaml` (options) | Сгруппирован по языкам (например, `options.go.package_prefix`). |
-| `buf.lock` | `protobuf.lock` | Включает SHA коммитов Git и хеши содержимого. |
-| `buf dep update` | `easyp mod tidy` | Вычисляет минимальные версии (MVS) помодульно. |
-| `buf lint` | `easyp lint` | Каскадируется через ближайший `easyp.yaml`. |
-| `buf breaking` | `easyp breaking` | CI-гейт против явного baseline. |
-| `buf generate` | `easyp generate` | Автоматически находит все `easyp.gen.yaml`. |
+| <code>buf.yaml</code> (секция deps) | <code>protobuf.mod</code> | Независимый от инструментов DSL; использует Git URL вместо BSR. |
+| <code>buf.yaml</code> (секция lint) | <code>easyp.yaml</code> (linters) | Использует пресеты и списки правил; каждая секция политики берётся целиком из ближайшего определения. Непустое <code>extends</code> не поддерживается. |
+| <code>buf.yaml</code> (секция breaking) | <code>easyp.yaml</code> (breaking) | Явное сравнение с git-baseline (например, <code>git:main</code>). |
+| <code>buf.gen.yaml</code> | <code>easyp.gen.yaml</code> | Находится у потребителя и выбирает целые модули. |
+| <code>buf.gen.yaml</code> (managed) | <code>easyp.gen.yaml</code> (generate.managed) | Явный managed mode; <code>options.go.package_prefix</code> — отдельная настройка только для Go. |
+| <code>buf.lock</code> | <code>protobuf.lock</code> | Включает SHA коммитов Git и хеши содержимого. |
+| <code>buf dep update</code> | <code>easyp mod tidy</code> | Разрешает объявленные требования через MVS и записывает lock; обновления версий проверяйте отдельно. |
+| <code>buf lint</code> | <code>easyp lint</code> | Каскадируется через ближайший <code>easyp.yaml</code>. |
+| <code>buf breaking</code> | <code>easyp breaking</code> | CI-гейт против явного baseline. |
+| <code>buf generate</code> | <code>easyp generate</code> | Выбирает ближайший вышестоящий файл генератора; используйте <code>--project</code> или явный рекурсивный <code>--all</code>. |
 
 ---
 
@@ -28,32 +28,32 @@ description: "Пошаговое руководство по миграции к
 
 ### Шаг 1: Первичная инициализация
 
-В новом проекте `easyp init` создаёт `protobuf.mod`, `easyp.yaml` и `easyp.gen.yaml`. Укажите `--module`, если идентификатор Git-модуля нельзя получить из удалённого репозитория `origin`.
+В новом проекте <code>easyp init</code> создаёт <code>protobuf.mod</code>, <code>easyp.yaml</code> и <code>easyp.gen.yaml</code>. Укажите <code>--module</code>, если идентификатор Git-модуля нельзя получить из удалённого репозитория <code>origin</code>.
 
-```bash
+~~~bash
 easyp init --module github.com/acme/my-service
-```
+~~~
 
-Автоматический перенос зависимостей Buf Registry отложен. При наличии `buf.yaml` или `buf.yml` команда `easyp init` завершится до записи файлов: имя `buf.build/...` нельзя безопасно считать URL Git-модуля. Выберите Git-источник для каждой зависимости и создайте v1-файлы явно.
+Автоматический перенос зависимостей Buf Registry отложен. При наличии <code>buf.yaml</code> или <code>buf.yml</code> команда <code>easyp init</code> завершится до записи файлов: имя <code>buf.build/...</code> нельзя безопасно считать URL Git-модуля. Выберите Git-источник для каждой зависимости и создайте v1-файлы явно.
 
-### Шаг 2: Вынос зависимостей в `protobuf.mod`
+### Шаг 2: Вынос зависимостей в <code>protobuf.mod</code>
 
-Перенесите зависимости модулей из `buf.yaml` в `protobuf.mod`:
+Перенесите зависимости модулей из <code>buf.yaml</code> в <code>protobuf.mod</code>:
 
-```protobuf
+~~~protobuf
 // protobuf.mod
 module github.com/acme/my-service
 
 require (
     github.com/googleapis/googleapis v1.5.0
 )
-```
+~~~
 
-### Шаг 3: Конвертация правил в `easyp.yaml`
+### Шаг 3: Конвертация правил в <code>easyp.yaml</code>
 
-Перенесите конфигурацию линтера и breaking-проверок в `easyp.yaml`:
+Перенесите конфигурацию линтера и breaking-проверок в <code>easyp.yaml</code>:
 
-```yaml
+~~~yaml
 # easyp.yaml
 version: v1
 
@@ -62,33 +62,39 @@ linters:
 
 breaking:
   baseline: git:main
-```
+~~~
 
-### Шаг 4: Удаление блоков источников из генератора
+### Шаг 4: Выбор модулей для генерации
 
-В `easyp.gen.yaml` удалите блоки `inputs` (такие как `directory` или `git_repo`). EasyP берёт источники схем напрямую из `protobuf.mod`:
+Замените старые блоки <code>inputs</code> выбором модулей. В примере корневой <code>protobuf.mod</code> владеет схемами, а <code>backend/easyp.gen.yaml</code> выбирает этот корневой модуль через <code>.</code>. Корни исходников определяются манифестом:
 
-```yaml
+~~~yaml
 # backend/easyp.gen.yaml
 version: v1
 
 generate:
   modules:
-    - proto/user
+    - .
 
 plugins:
   - name: go
     out: ./gen/go
     opts:
       paths: source_relative
-```
+~~~
+
+Локальному плагину <code>go</code> нужен <code>protoc-gen-go</code> в окружении сборки. Фиксируйте версию там: локальные плагины отклоняют <code>version</code> в YAML. Удалённым плагинам нужна отдельная фиксированная семантическая версия. <code>generate.packages</code> зарезервировано и не фильтрует пакеты.
 
 ### Шаг 5: Наведение порядка и проверка
 
-Запустите `easyp mod tidy`, затем `easyp lint` и `easyp generate`:
+Из корня репозитория разрешите зависимости, проверьте схемы линтером и запустите выбранный проект генерации:
 
-```bash
+~~~bash
 easyp mod tidy
 easyp lint
-easyp generate
-```
+easyp generate --project ./backend
+~~~
+
+Проверьте и закоммитьте <code>protobuf.mod</code> и <code>protobuf.lock</code>. Перед <code>tidy</code> или <code>update</code> нужно убрать активные локальные замены: обе команды их отклоняют. В CI проверяйте зафиксированные зависимости через <code>easyp mod download</code> и запускайте <code>easyp breaking --against main</code> с доступной локально базой.
+
+В <code>breaking.categories</code> поддерживается только <code>FILE</code>; <code>ignore_unstable</code> доступно. Перед переносом breaking-настроек Buf сверьтесь со [справочником политики](/ru/docs/reference/easyp-yaml), сравните результат генерации и запустите тесты потребителей до отказа от старого workflow.

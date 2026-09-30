@@ -3,9 +3,7 @@ title: "easyp.yaml Reference"
 description: "Complete specification for easyp.yaml, configuring producer-side linting rules, breaking change detection, path exclusions, and policy inheritance."
 ---
 
-The `easyp.yaml` file defines **producer-side policy configuration** for Protocol Buffer schema repositories. It specifies linting standards, breaking change checks against Git baselines, and issue exclusions. Directory cascading is available; explicit `extends` references are reserved until their resolution rules are specified.
-
-`easyp.yaml` files cascade hierarchically down directory structures: for any given `.proto` file, EasyP traverses up the directory tree to find the nearest `easyp.yaml` and applies its configuration.
+<code>easyp.yaml</code> defines lint and compatibility policies for protobuf schemas. Each section uses its nearest definition in the directory tree. Explicit policy loading through <code>linters.extends</code> and <code>breaking.extends</code> is reserved and unimplemented: omit these fields or leave them empty.
 
 ---
 
@@ -19,7 +17,7 @@ The `easyp.yaml` file defines **producer-side policy configuration** for Protoco
       default: "v1"
     },
     linters: {
-      description: "Linter presets, explicit rule enable/disable, and inheritance.",
+      description: "Linter presets, rule/group selection, and per-policy comment suppressions.",
       type: "object"
     },
     "linters.default": {
@@ -28,19 +26,24 @@ The `easyp.yaml` file defines **producer-side policy configuration** for Protoco
       default: "STANDARD"
     },
     "linters.enable": {
-      description: "List of additional linter rules to enable on top of preset.",
+      description: "Additional implemented rule or group names to enable.",
       type: "string[]"
     },
     "linters.disable": {
-      description: "List of linter rules to disable from the active preset.",
+      description: "Implemented rule or group names to disable; disabling wins over enabling.",
       type: "string[]"
     },
+    "linters.allow_comment_ignores": {
+      description: "Allow scoped easyp:disable/enable and legacy markers within the effective policy.",
+      type: "boolean",
+      default: "true"
+    },
     "linters.extends": {
-      description: "Reserved for explicit policy inheritance; currently rejected because ref, path, and merge rules are unspecified.",
+      description: "Reserved and unimplemented. Omit or leave empty; nonempty values are rejected.",
       type: "string"
     },
     "linters-settings": {
-      description: "Rule-specific settings and custom parameter definitions.",
+      description: "Supported settings: ENUM_ZERO_VALUE_SUFFIX.suffix and SERVICE_SUFFIX.suffix.",
       type: "object"
     },
     issues: {
@@ -48,33 +51,37 @@ The `easyp.yaml` file defines **producer-side policy configuration** for Protoco
       type: "object"
     },
     "issues.exclude-rules": {
-      description: "Pathless rules disable the named linters for all files under the selected policy. An empty pathless rule suppresses all issues. Path globs are reserved until their base directory is specified.",
+      description: "Suppress named rules/groups for matching paths. Omitted or empty linters suppress all lint issues in matching files; a completely empty rule explicitly ignores all files covered by the effective issues section.",
       type: "object[]"
+    },
+    "issues.exclude-rules[].path": {
+      description: "Relative to the policy file supplying the issues section. Supports *, ?, [], and complete ** segments; a literal directory covers its subtree.",
+      type: "string"
     },
     breaking: {
       description: "Breaking change detection settings for CI verification.",
       type: "object"
     },
     "breaking.baseline": {
-      description: "Git branch to compare schema changes against (e.g. git:main). When omitted, the existing --against flag applies.",
+      description: "Locally available Git branch, tag, full commit SHA, or revision prefixed with git:. Explicit --against wins; otherwise this field applies, then master.",
       type: "string",
-      default: "--against flag"
+      default: "master"
     },
     "breaking.categories": {
-      description: "Reserved for future category-specific checks; currently rejected when configured.",
+      description: "Only FILE is supported: adds declaration-move checks while existing checks remain enabled. Other categories, including package-related categories, are reserved and rejected.",
       type: "string[]"
     },
     "breaking.ignore_unstable": {
-      description: "Reserved for future unstable-package filtering; currently rejected when true.",
+      description: "Skip packages with a supported unstable version in their final component on both sides of comparison. See exact forms below.",
       type: "boolean",
       default: "false"
     },
     "breaking.ignore": {
-      description: "Directories ignored by the existing breaking checker.",
+      description: "Ignored paths relative to the policy file supplying breaking, not the Git root or --root.",
       type: "string[]"
     },
     "breaking.extends": {
-      description: "Reserved for explicit policy inheritance; currently rejected because ref, path, and merge rules are unspecified.",
+      description: "Reserved and unimplemented. Omit or leave empty; nonempty values are rejected.",
       type: "string"
     }
   }}
@@ -82,52 +89,75 @@ The `easyp.yaml` file defines **producer-side policy configuration** for Protoco
 
 ---
 
-## Example Configuration
+## Example configuration
 
-```yaml
+~~~yaml
 version: v1
-
 linters:
   default: STANDARD
-  enable:
-    - ENUM_VALUE_PREFIX
-    - RPC_REQUEST_RESPONSE_UNIQUE
-  disable:
-    - PACKAGE_VERSION_SUFFIX
-
+  enable: [ENUM_VALUE_PREFIX, RPC_REQUEST_RESPONSE_UNIQUE]
+  disable: [PACKAGE_VERSION_SUFFIX]
+  allow_comment_ignores: true
 linters-settings:
   ENUM_ZERO_VALUE_SUFFIX:
     suffix: UNSPECIFIED
   SERVICE_SUFFIX:
     suffix: Service
-
 issues:
   exclude-rules:
-    - linters:
-        - FIELD_LOWER_SNAKE_CASE
-
+    - path: legacy/**/*.proto
+      linters: [FIELD_LOWER_SNAKE_CASE]
+    - path: generated
 breaking:
   baseline: git:main
-  ignore:
-    - gen
-```
+  categories: [FILE]
+  ignore_unstable: true
+  ignore: [gen]
+~~~
 
----
+## Section cascading
 
-## Directory Cascading
+The <code>linters</code>, <code>linters-settings</code>, <code>issues</code>, and <code>breaking</code> sections each come as a whole from the nearest file defining that section; fields are not partially merged. A child <code>issues: &#123;&#125;</code> clears inherited exclusions. An inherited exclusion path stays relative to the file defining <code>issues</code>, even when the invocation directory or <code>--root</code> is deeper.
 
-EasyP applies the **nearest file rule**: when evaluating a `.proto` file, EasyP searches upward through parent directories for an `easyp.yaml`. 
+Policy discovery searches ancestors within the workspace. If no ancestor policy exists, one unambiguous outermost descendant policy may be selected; multiple independent policies require explicit <code>--cfg</code>. Explicit <code>--cfg</code> takes precedence, and explicit <code>--root</code> supplies the default lookup start.
 
-```text
-proto/
-├── easyp.yaml          # STANDARD policy applies to root & user/
-├── user/
-│   └── v1/user.proto
-└── legacy/
-    ├── easyp.yaml      # MINIMAL policy override applies strictly to legacy/
-    └── old.proto
-```
+## Rule selection and exclusions
 
-Sections are inherited as whole units from the nearest declaring file, preventing confusing partial merges.
+Repeated rule or group names are idempotent, and disabling wins over enabling. Unknown names in enable, disable, and exclusions are errors even if also listed on the opposite side. The reserved <code>PACKAGE_NO_IMPORT_CYCLE</code> rule is unimplemented and cannot be selected.
 
-The v1 `breaking.baseline` selects the Git branch used by the existing EasyP breaking checker. Its rule set is unchanged. Category selection and unstable-package filtering need separate rule semantics and are not active yet. A path-bearing `issues.exclude-rules` entry currently produces an error; pathless entries work without choosing an implicit glob base. Explicit `linters.extends` and `breaking.extends` currently produce errors: the syntax does not yet define a Git ref, policy path, merge precedence, or lock/integrity behavior.
+<code>issues.exclude-rules[].path</code> uses <code>/</code> separators and is anchored to the directory of the file supplying the effective <code>issues</code> section:
+
+| Pattern | Matches |
+| --- | --- |
+| <code>generated</code> | The directory and its whole subtree |
+| <code>api/file.proto</code> | That file |
+| <code>api/&#42;.proto</code> | Files directly inside api |
+| <code>api/?.proto</code> | One character before .proto |
+| <code>api/[a-c].proto</code> | a.proto, b.proto, or c.proto |
+| <code>api/&#42;&#42;/file.proto</code> | Zero or more intermediate directories |
+
+<code>&#42;&#42;</code> must occupy an entire segment. Absolute paths, backslashes, <code>..</code> traversal, and malformed patterns are rejected. A literal path ending in <code>.proto</code> matches that file only; other literal paths cover their subtree. These rules apply to issue exclusions only, not every configuration path.
+
+Without <code>path</code>, the rule applies to all files covered by the effective issues section. <code>linters</code> accepts implemented rule or group names; an omitted or empty list excludes matching files from linting entirely. A completely empty rule <code>&#123;&#125;</code> retains its explicit all-ignore meaning. In the example, the whole <code>generated</code> subtree is excluded, while only the named rule is suppressed in <code>legacy</code>.
+
+## Comment suppressions
+
+<code>linters.allow_comment_ignores</code> defaults to true per effective policy. False disables comment-based suppressions. <code>easyp:disable</code>/<code>easyp:enable</code> provide annotations or bounded regions; legacy <code>nolint:RULE</code> and <code>buf:lint:ignore RULE</code> remain annotations. Unknown names, empty directives, and unmatched enables remain errors even when suppressions are disabled. See the [linter guide](/docs/cli/linter) for examples and scope.
+
+## Breaking checks
+
+Explicit <code>--against</code> wins over <code>breaking.baseline</code>; without either, the default is <code>master</code>. This includes explicit <code>--against master</code>. An empty explicit flag is an error, and a missing Git baseline does not fall back to the configured one.
+
+The baseline can name a local branch, a lightweight or annotated tag, a full commit SHA, or another locally resolvable Git revision such as <code>HEAD</code>. Required refs and objects must already be present in the checkout. A bare branch name takes precedence over an identically named tag; use <code>refs/tags/v1.2.0</code> to select the tag explicitly. In YAML use <code>git:refs/tags/v1.2.0</code>; for the CLI pass <code>--against refs/tags/v1.2.0</code> without a <code>git:</code> or <code>git-ref=</code> prefix.
+
+<code>breaking.ignore</code> paths are relative to the file supplying the effective <code>breaking</code> section, not the Git root or <code>--root</code>. For example, <code>ignore: [generated]</code> in <code>api/easyp.yaml</code> excludes <code>api/generated</code>, including when that section is inherited. Entries must be nonempty local relative paths; absolute paths and paths escaping the policy directory or repository are rejected.
+
+Each selected module uses revision-local roots, manifests, and locks for its current and baseline revisions. The baseline is read from an isolated Git snapshot; the caller's checkout, manifest, and lock are unchanged. Policies come from current configuration and may each select a different baseline. See the [breaking guide](/docs/cli/breaking-changes) for local replacement limits.
+
+The only supported additional category is <code>FILE</code>, which checks declarations moved between files. Existing checks remain enabled. <code>PACKAGE</code>, <code>WIRE</code>, <code>WIRE_JSON</code>, and other categories are unimplemented and cannot be selected. <code>linters.extends</code> and <code>breaking.extends</code> likewise do not load local or remote shared policies: nonempty values are rejected.
+
+## Unstable packages
+
+<code>breaking.ignore_unstable</code> defaults to false. When true, it filters packages by their final protobuf package-name component on both sides of comparison, including dependency packages. Supported forms are <code>vNtest...</code>, <code>vNalpha</code>, <code>vNbeta</code>, <code>vNpMalpha</code>, and <code>vNpMbeta</code>. Alpha/beta may have a positive sequence number; N, M, and that sequence start with 1–9 followed by digits. Test may have any trailing suffix, including none.
+
+For example, <code>acme.v1testFeature</code>, <code>acme.v2alpha3</code>, and <code>acme.v2p3beta</code> are skipped. <code>acme.v1</code>, <code>acme.v0alpha1</code>, <code>acme.v1beta0</code>, and <code>acme.v1beta1.service</code> do not match. Stable packages remain checked, including their references to unstable types. Filtering does not excuse malformed sources: reading and import resolution happen before filtering.

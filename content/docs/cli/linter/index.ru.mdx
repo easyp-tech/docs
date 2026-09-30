@@ -3,33 +3,65 @@ title: "Линтер"
 description: "Настройка и запуск protobuf-линтера EasyP v1."
 ---
 
-`easyp lint` проверяет `.proto` по политике v1 из `easyp.yaml`. В найденных проблемах указываются положение в исходнике и имя правила.
+<code>easyp lint</code> проверяет <code>.proto</code> по политике v1 из <code>easyp.yaml</code>, указывая положение в исходнике и имя правила.
 
-```yaml
-# easyp.yaml
+~~~yaml
 version: v1
 linters:
   default: STANDARD
   enable: [COMMENT_SERVICE]
   disable: [SERVICE_SUFFIX]
+  allow_comment_ignores: true
 linters-settings:
   ENUM_ZERO_VALUE_SUFFIX:
     suffix: UNSPECIFIED
 issues:
   exclude-rules:
-    - linters: [COMMENT_FIELD]
-```
+    - path: legacy/**/*.proto
+      linters: [COMMENT_FIELD]
+    - path: generated
+~~~
 
-Доступные наборы: `MINIMAL`, `BASIC`, `STANDARD`, `COMMENTS`. Поля `enable` и `disable` добавляют или исключают отдельные правила. Пилотная версия поддерживает настройки `ENUM_ZERO_VALUE_SUFFIX.suffix` и `SERVICE_SUFFIX.suffix`. Правила `issues.exclude-rules` без пути действуют на все проверяемые файлы. Глобы путей и `linters.extends` пока не реализованы и вызывают ошибку.
+Пресеты: <code>MINIMAL</code>, <code>BASIC</code>, <code>STANDARD</code> и <code>COMMENTS</code>. Списки enable/disable и исключений принимают реализованные правила и группы. Повторы не добавляют проверок; отключение приоритетнее включения. Неизвестные имена — ошибки, даже если повторены в противоположном списке. <code>PACKAGE_NO_IMPORT_CYCLE</code> зарезервировано и выбирать его нельзя. Поддерживаются настройки <code>ENUM_ZERO_VALUE_SUFFIX.suffix</code> и <code>SERVICE_SUFFIX.suffix</code>. Поле <code>linters.extends</code> зарезервировано: его нужно опустить или оставить пустым.
 
-```bash
+~~~bash
 easyp lint --path proto
 easyp --format json lint --path proto
 easyp lint --root ./contracts --path proto
-```
+~~~
 
-`--path` задаётся относительно корня проверки. По умолчанию корень — каталог выбранного файла политики; `--root` меняет его. Для импортов линтер использует корни ближайшего модуля и его локальных либо зафиксированных зависимостей. Политика может работать и без `protobuf.mod`.
+<code>--path</code> считается от корня проверки, по умолчанию — каталога выбранной политики; <code>--root</code> меняет его. Поиск политики идёт вверх в пределах workspace. Без политики в предках можно выбрать одну однозначную внешнюю политику в потомках; несколько независимых политик требуют <code>--cfg</code>. Явный конфиг имеет приоритет. Каждая вложенная секция целиком заменяет ближайшую унаследованную секцию.
 
-Вложенные `easyp.yaml` могут переопределять секции политики для файлов в своих каталогах. Поддерживаемые поля и правила объединения описаны в [справочнике `easyp.yaml`](/ru/docs/reference/easyp-yaml).
+Для импортов линтер использует корни ближайшего модуля и его локальные или зафиксированные зависимости. Политика может работать без <code>protobuf.mod</code>. Вендорные исходники и скрытые каталоги хранилищ/Git исключены из поиска целей линтинга, включая явные пути в vendor; зависимости остаются доступными для импортов.
 
-Старые поля `lint.use`, `lint.except` и `lint.ignore_only` CLI v1 не принимает.
+## Исключение путей
+
+<code>issues.exclude-rules.path</code> считается от файла политики, предоставляющего эффективную секцию <code>issues</code>, в том числе унаследованную. Поддерживаются <code>&#42;</code>, <code>?</code>, <code>[]</code> и полные сегменты <code>&#42;&#42;</code>. Односегментные шаблоны не пересекают <code>/</code>; <code>&#42;&#42;</code> совпадает с нулём или более сегментами. Буквальный каталог включает своё поддерево. Буквальный путь с окончанием <code>.proto</code> совпадает только с файлом. Абсолютные пути, обратные слеши, переходы к родителю и некорректные шаблоны отклоняются.
+
+Правило без пути действует на все файлы этой секции issues. Пустой или отсутствующий <code>linters</code> исключает совпавшие файлы целиком. Пустое правило <code>&#123;&#125;</code> явно исключает все файлы. Вложенная <code>issues: &#123;&#125;</code> очищает унаследованные исключения. В примере у legacy-файлов подавляется только <code>COMMENT_FIELD</code>, а поддерево generated исключено полностью.
+
+## Подавление комментариями
+
+~~~proto
+// easyp:disable FIELD_LOWER_SNAKE_CASE
+message Example {
+  string legacyField = 1;
+}
+
+message Another {
+  string legacyField = 1; // easyp:disable FIELD_LOWER_SNAKE_CASE
+}
+
+// easyp:disable MESSAGE_PASCAL_CASE
+message old_name {}
+message another_old_name {}
+// easyp:enable MESSAGE_PASCAL_CASE
+~~~
+
+Непарный disable должен аннотировать объявление и действует на его строку или блок. Пара disable/enable ограничивает регион в одном файле; вложенные регионы одного правила сбалансированы. Подавления не переходят в другие файлы или политики. Имена правил разделяются запятыми или пробелами; группы в директивах комментариев не принимаются.
+
+Старые <code>nolint:RULE</code> и <code>buf:lint:ignore RULE</code> остаются аннотациями объявлений. Пояснение можно добавить после отделённого пробелами <code>--</code> или <code>//</code>. Интерпретируются только разобранные комментарии. Пустые директивы, неизвестные правила, неподдерживаемые действия и enable без пары — ошибки с координатами исходника.
+
+<code>linters.allow_comment_ignores</code> по умолчанию равен true для каждой эффективной политики. False отключает подавление комментариями в этой политике; некорректные директивы в проверяемых файлах остаются ошибками.
+
+См. [справочник политики](/ru/docs/reference/easyp-yaml). Старые поля <code>lint.use</code>, <code>lint.except</code> и <code>lint.ignore_only</code> CLI v1 не принимает.

@@ -53,5 +53,5 @@ require (
 ## Key Benefits
 
 1. **Independent Release Cycles**: Team `order` can upgrade to `common v2.0.0` without waiting for Team `user`.
-2. **Zero Monorepo Friction**: Separate lockfiles (`proto/user/protobuf.lock` vs `proto/order/protobuf.lock`) mean pull requests in one service never pollute lockfiles in another.
-3. **Clean Schema Namespaces**: Because FQNs in `user` and `order` do not collide during code generation, each consumer target compiles against its expected dependency version.
+2. **Independent version decisions**: module lockfiles can change independently. Shared configuration or contract changes still require cross-service review.
+3. **Isolated dependency graphs**: each module compiles against its selected version. Generated package namespaces may still collide; configure distinct output/import paths. Incompatible graphs cannot share one descriptor set; use independent exports.
