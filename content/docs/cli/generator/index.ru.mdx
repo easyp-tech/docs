@@ -1,136 +1,98 @@
 ---
 title: "Генератор"
+description: "Выбор проектов-потребителей, генерация protobuf-кода и экспорт дескрипторов в EasyP v1."
 ---
 
-EasyP включает мощный генератор, который упрощает процесс получения кода из proto‑файлов. Благодаря YAML‑конфигурациям работа становится гораздо более удобной и интуитивной по сравнению с прямым использованием команды protoc.
+<code>easyp generate</code> выбирает ближайший <code>easyp.gen.yaml</code> в текущем или родительском каталоге в пределах workspace. Команда компилирует выбранные модули и запускает плагины этого проекта. Имена модулей, корни исходников и версии зависимостей берутся из <code>protobuf.mod</code> и <code>protobuf.lock</code>.
 
-## Ключевые особенности генератора
+## Настройка модуля
 
-1. **Упрощённая генерация кода**:
-    - Генерация кода из proto через декларативную `YAML`‑конфигурацию.
-    - Избавляет от необходимости писать длинные и сложные команды protoc.
+~~~text
+# protobuf.mod
+module github.com/acme/contracts
+roots proto
+require github.com/acme/shared v1.2.0
+~~~
 
-2. **Обёртка над protoc**:
-    - EasyP выступает как удобный слой над protoc, предоставляя декларативный API.
-    - Поддерживает все опции и плагины, доступные protoc.
+~~~yaml
+# easyp.gen.yaml
+version: v1
+plugins:
+  - name: go
+    out: ./gen/go
+    opts:
+      paths: source_relative
+  - name: go-grpc
+    out: ./gen/go
+    opts:
+      paths: source_relative
+options:
+  go:
+    package_prefix: github.com/acme/contracts/gen/go
+~~~
 
-3. **Гибкость и кастомизация**:
-    - Используются те же параметры, что и у плагинов protoc, прямо в конфиге.
-    - Поддерживается множество плагинов и их параметры в одной конфигурации.
+~~~bash
+easyp mod tidy
+easyp generate
+~~~
 
-4. **Генерация из нескольких источников**:
-    - Локальные директории и удалённые Git‑репозитории одновременно.
-    - Лёгкая интеграция с существующими проектами и репозиториями.
+Если <code>generate.modules</code> не указан, EasyP выбирает ближайший <code>protobuf.mod</code> рядом с файлом генератора или выше в пределах workspace; без манифеста корнем исходников становится каталог проекта. Явные элементы выбирают локальный модуль по имени, путь относительно workspace или зависимость из манифеста и lock потребителя. <code>generate.packages</code> выбирает точные имена protobuf-пакетов; пустой список означает все исходники модуля.
 
-5. **Удалённая генерация**:
-    - Генерация из удалённых Git репозиториев без локального checkout.
+## Выбор проектов
 
-6. **Интеграция с менеджером пакетов**:
-    - Прозрачная работа с зависимостями через пакетный менеджер EasyP.
-    - Автоматическое разрешение и подключение proto‑зависимостей.
+~~~bash
+# Только ближайший проект
+easyp generate
+# Ровно два указанных проекта
+easyp generate --project backend --project frontend
+# Явный рекурсивный выбор внутри каталога запуска
+easyp generate --all
+# Явная граница workspace, полезная вне Git
+easyp generate --workspace ../.. --project ..
+~~~
 
-## Справочник конфигурации
+<code>--project</code> можно повторять, но нельзя сочетать с <code>--all</code>. Рекурсивный поиск пропускает скрытые каталоги, <code>easyp_vendor</code>, <code>node_modules</code> и вложенные Git-репозитории. Проект в пропускаемом каталоге можно выбрать явно. Автоматический выбор отклоняет конфигурацию-симлинк; для неё нужен явный выбор проекта. Флаг <code>--all</code> разрешает запуск плагинов найденных проектов, включая command-плагины.
 
-### Сравнение конфигураций генератора
+Границу workspace задаёт ближайший Git-репозиторий, включая worktree с файлом <code>.git</code>. Без Git граница определяется по охватывающим конфигам и манифестам EasyP; <code>--workspace</code> задаёт её явно. Пути проектов и дескрипторов считаются от каталога запуска. Пути результатов плагинов считаются от их <code>easyp.gen.yaml</code>. Флагов <code>--path</code> и <code>--root</code> у команды нет.
 
-<Tabs items={["easyp.gen.yaml", "buf.gen.yaml"]}>
-  <Tab value="easyp.gen.yaml">
-    ```yaml
-    # Зависимости пакетного менеджера
-    deps:
-      - github.com/googleapis/googleapis@common-protos-1_3_1
-      - github.com/grpc-ecosystem/grpc-gateway@v2.19.1
-      - github.com/bufbuild/protoc-gen-validate@v0.10.1
+## Генерация в режиме frozen
 
-    # Конфигурация генератора
-    generate:
-      plugins:
-        - name: go
-          out: ./gen/go
-          opts:
-            paths: source_relative
-            module: github.com/mycompany/myproject
-          with_imports: true
+~~~bash
+easyp generate --frozen --project backend --project frontend
+easyp --frozen generate --all --descriptor_set_out_dir build/descriptors
+~~~
 
-        - name: go-grpc
-          out: ./gen/go
-          opts:
-            paths: source_relative
-            require_unimplemented_servers: false
-    ```
-  </Tab>
-  <Tab value="buf.gen.yaml">
-    ```yaml
-    version: v2
-    plugins:
-      - remote: buf.build/protocolbuffers/go
-        out: gen/go
-        opt:
-          - paths=source_relative
-          - module=github.com/mycompany/myproject
-      - remote: buf.build/grpc/go
-        out: gen/go
-        opt:
-          - paths=source_relative
-          - require_unimplemented_servers=false
-    ```
-  </Tab>
-</Tabs>
+Каждому выбранному локальному native-модулю нужны <code>protobuf.mod</code> и <code>protobuf.lock</code>, в том числе пустой lock без зависимостей. Явный путь от workspace использует файлы выбранного модуля: <code>backend/easyp.gen.yaml</code> с <code>generate.modules: [proto/user]</code> проверяет <code>proto/user/protobuf.mod</code> и <code>proto/user/protobuf.lock</code>. Самому каталогу <code>backend</code>, содержащему только настройки генератора, эти файлы не нужны. Frozen отклоняет все корневые замены, даже неиспользуемые, и проверяет зафиксированный граф прямых и транзитивных зависимостей до запуска любого плагина. Ошибка в проекте, выбранном позже, поэтому не даст запустить плагины более ранних проектов. Проверка действует для обоих режимов экспорта дескрипторов, включая экспорт без плагинов.
 
-### Примеры плагинов для различных языков
+Зависимость, выбранная по идентификатору через <code>generate.modules</code>, требует манифест и lock потребителя; собственный lock в скачанной зависимости не требуется. Невыбранные проекты игнорируются. <code>--frozen</code> не меняет существующие правила выбора и разрешения запуска плагинов через <code>--project</code>/<code>--all</code>.
 
-<Tabs items={["Go", "TypeScript", "Python"]}>
-  <Tab value="Go">
-    ```yaml
-    plugins:
-      - name: go
-        out: ./gen/go
-        opts:
-          paths: source_relative
-      - name: go-grpc
-        out: ./gen/go
-        opts:
-          paths: source_relative
-          require_unimplemented_servers: false
-    ```
-  </Tab>
-  <Tab value="TypeScript">
-    ```yaml
-    plugins:
-      - name: ts
-        out: ./src/gen
-        opts:
-          declaration: true
-          target: es2017
-      - name: grpc-web
-        out: ./src/gen
-        opts:
-          import_style: typescript
-          mode: grpcweb
-    ```
-  </Tab>
-  <Tab value="Python">
-    ```yaml
-    plugins:
-      - name: python
-        out: ./gen/python
-      - name: grpc_python
-        out: ./gen/python
-    ```
-  </Tab>
-</Tabs>
+Точные коммиты из lock могут скачиваться в кеш; хеши проверяются и при повторном использовании кеша. Манифест и lock никогда не переписываются, HEAD/теги зависимостей не разрешаются. Frozen включается явно, а не по окружению CI; он не отключает сеть удалённым плагинам и не фиксирует локальные исполняемые файлы плагинов. Подробнее — в [менеджере пакетов](/ru/docs/cli/package-manager).
 
-## Команды запуска
+## Экспорт дескрипторов
 
-<Tabs items={["CLI", "Configuration"]}>
-  <Tab value="CLI">
-    ```bash
-    easyp generate
-    ```
-  </Tab>
-  <Tab value="Configuration">
-    ```bash
-    easyp --cfg custom-easyp.yaml generate
-    ```
-  </Tab>
-</Tabs>
+~~~bash
+easyp generate --project backend --descriptor_set_out build/backend.pb --include_imports
+easyp generate --all --descriptor_set_out_dir build/descriptors --include_imports
+~~~
+
+<code>--descriptor_set_out</code> объединяет выбранные графы в один бинарный <code>FileDescriptorSet</code>. Одинаковые дескрипторы объединяются; разные определения под одним import path или конфликтующие символы вызывают ошибку. Managed-опции участвуют в проверке совместимости.
+
+<code>--descriptor_set_out_dir</code> записывает отдельный набор для каждой выбранной пары проект/модуль, позволяя потребителям сохранять разные опции и версии зависимостей. Пути проектов повторяются внутри каталога назначения; имя файла содержит безопасное имя модуля и первые 12 hex-символов SHA-256 его полного идентификатора. Внешние проекты размещаются в <code>_external</code>. Посторонние существующие файлы сохраняются.
+
+Флаги назначения взаимоисключающие. <code>--include_imports</code> по умолчанию равен false и добавляет транзитивные импорты только в экспортируемые файлы. Компиляция и проверка совместимости всегда используют полный граф.
+
+Все выбранные графы и пути экспорта проверяются до запуска плагинов. Настроенные плагины всё равно запускаются; проект без плагинов тоже может экспортировать дескрипторы. Дескрипторы записываются после успешного выполнения всех выбранных плагинов с атомарной заменой каждого файла. Общей транзакции для побочных эффектов плагинов и ошибок файловой системы нет.
+
+## Плагины и managed mode
+
+Каждый плагин задаёт ровно один источник: <code>name</code>, <code>path</code>, <code>command</code> или <code>remote</code>. Локальные бинарные файлы и команды запускаются из каталога вызова EasyP. Удалённому плагину нужен зафиксированный SemVer в <code>version</code>; локальные и встроенные плагины отдельную версию не принимают.
+
+Встроенные имена вроде <code>go</code> и <code>go-grpc</code> используют соответствующий <code>protoc-gen-*</code> из <code>PATH</code>, если он доступен; иначе запускается встроенный WASM-плагин.
+
+<code>plugins[].with_imports</code> по умолчанию равен false. Значение true включает генерацию транзитивных импортов только для этого плагина. Остальные плагины по-прежнему получают дескрипторы зависимостей для связывания. Настройка независима от <code>--include_imports</code> при экспорте дескрипторов. Согласуйте Go import path и выходные каталоги: разные Go-пакеты не должны попадать в один каталог. Одинаковые общие результаты объединяются; конфликт содержимого файлов или объявлений Go-пакетов обнаруживается до записи сгенерированных файлов.
+
+<code>options.go.package_prefix</code> меняет только Go-опции. Значения по умолчанию для других языков и преобразования опций полей требуют явного <code>generate.managed.enabled: true</code>. Унаследованный Go-префикс применяется до явных managed-переопределений Go; префикс текущего файла имеет наивысший приоритет. Go-селекторы disable продолжают действовать. Подробнее — в [справочнике конфигурации](/ru/docs/reference/easyp-gen-yaml).
+
+Обычный префикс отображает protobuf-пакет из нескольких компонентов, например <code>common.v1</code>, в <code>&lt;prefix&gt;/common/v1</code>. С явным <code>paths: source_relative</code> выходные каталоги Go следуют эффективному import path плагина под этим префиксом, включая его параметры <code>Mfile.proto</code>. Результаты с insertion point следуют выходному файлу создавшего его плагина. Шаблоны и приоритеты описаны в [справочнике выходных путей Go](/ru/docs/reference/easyp-gen-yaml#выходные-пути-go-и-параметры-m).
+
+Зависимости могут использовать метаданные EasyP v1, старого EasyP, Buf v1 или Buf v2. EasyP читает метаданные зависимостей, не запуская их плагины. Buf includes/excludes действуют и при выборе зависимости или её пакетов для генерации; исключённые файлы нельзя вернуть через импорты. См. [метаданные и фильтры зависимостей](/ru/docs/cli/package-manager#зависимости-на-buf-или-старом-easyp).

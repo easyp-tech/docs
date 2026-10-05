@@ -1,175 +1,89 @@
 ---
 title: "MVS Dependency Resolution"
-description: "Architecture deep-dive into Minimal Version Selection (MVS), diamond dependency graph resolution, protobuf.mod specification, and hermetic lockfiles in EasyP."
+description: "SemVer selection, compatible commit constraints, and reproducible Git dependencies in EasyP."
 ---
 
-EasyP adopts **Minimal Version Selection (MVS)** as its core dependency resolution algorithm for Protocol Buffer modules. Designed by Russ Cox for Go modules, MVS departs from traditional package managers (such as Cargo or npm) by selecting the *oldest* (minimal) explicit version that satisfies all module constraints rather than attempting complex constraint satisfaction or defaulting to the latest version.
+EasyP resolves dependencies separately for each protobuf module. Semantic requirements use **Minimal Version Selection (MVS)**: select the maximum of the requested minimum versions. Exact Git commits and versionless requirements follow separate rules; SHA values have no invented SemVer ordering.
 
-This document provides a technical deep-dive into the MVS algorithm, its diamond dependency resolution behavior, the `protobuf.mod` domain-specific language (DSL), the hermetic `protobuf.lock` file format, and a comparison with alternative dependency models.
+## Selection rules
 
----
+| Requirements for one module | Result |
+| --- | --- |
+| Several SemVer minimums | Maximum requested minimum |
+| One explicit full SHA | Exact commit |
+| Selected SemVer and SHA of the same commit | Compatible; the tag stays in the lock for the semantic constraint |
+| Different explicit SHAs, or selected tag at another commit | Conflict error |
+| Versionless alongside SemVer or SHA | Versionless requirement adds no constraint |
+| Only versionless requirements | Tidy uses the existing lock pin, or HEAD without one; update refreshes HEAD |
 
-## 1. Minimal Version Selection (MVS) Principles
+A commit is not considered “newer” than a minimum version based on its date or ancestry. SemVer/SHA compatibility checks the selected tag's exact commit. If a stronger constraint replaces provisional HEAD, its dependency edges are rebuilt; dependencies and errors from discarded HEAD do not remain in the selected graph. Cyclic unstable versionless constraints are rejected.
 
-Traditional dependency resolution algorithms (such as Cargo's PubGrub or npm's Max Version strategy) treat version selection as a Constraint Satisfaction Problem (CSP) solved via NP-complete SAT solvers or aggressive "latest version" upgrades. In contrast, EasyP's implementation of MVS is built around predictability, determinism, and independence from global registry state.
+## Diamond dependency example
 
-### Key Motivations for MVS in EasyP
+~~~text
+user
+├── common v1.2.0
+└── weather v2.1.0
+    └── common v1.3.0
+~~~
 
-| Challenge in Proto Management | Traditional / Buf v2 Approach | EasyP MVS Approach |
-| --- | --- | --- |
-| **Diamond Dependency Conflicts** | Global workspace-wide resolution forces a single version across all consumers, causing cross-team coupling. | Per-module independent resolution graph. Each module resolves its own minimal requirements. |
-| **Registry Volatility** | `latest` resolution or registry updates can silently alter build output over time. | Deterministic resolution selecting `max(requested_minimums)`. No SAT solver or registry lookups. |
-| **Proto Schema Collision** | Multiple major/minor versions compiled in one proto-root break Fully Qualified Names (FQNs). | Exactly one version of each dependency per module graph, strictly locked via `protobuf.lock`. |
+The <code>user</code> graph selects <code>common v1.3.0</code> and <code>weather v2.1.0</code>. Numerically, <code>v1.3.0</code> satisfies both common minimums; dependency resolution does not prove schema compatibility. Run <code>easyp breaking</code> separately for that check.
 
-### Core Algorithm Behavior
+If user pins a SHA, the selected <code>common v1.3.0</code> tag must point to that exact commit. A <code>v1.2.0</code> tag at that SHA is insufficient when the maximum requirement is <code>v1.3.0</code>. If user's common requirement has no version, weather's semantic minimum determines the selection.
 
-1. **Explicit Version Bounds**: Every requirement in `protobuf.mod` specifies an explicit baseline version (e.g., `github.com/acme/weather v1.2.0`). This version is treated as a *minimum requirement*, not a range constraint.
-2. **Maximum of Minimums**: When multiple modules in a dependency graph request different minimum versions of the same dependency, MVS selects the **maximum** of those requested minimum versions.
-3. **High-Water Mark Determinism**: The resulting selected version is guaranteed to satisfy all minimum requirements without requiring complex backtracking or unexpected automatic major upgrades.
+## Module and descriptor boundaries
 
----
+Each module has its own <code>protobuf.mod</code> and <code>protobuf.lock</code>. For example, <code>proto/user</code> can select <code>common v1.3.0</code> while <code>proto/order</code> selects <code>common v2.0.0</code> in an independent graph.
 
-## 2. Step-by-Step Diamond Dependency Graph Resolution
+Independent graphs do not guarantee that their combined generation output is compatible:
 
-A classic challenge in module dependency management is the "Diamond Dependency" pattern. Consider a scenario where a primary module `user` depends directly on both `common` and `weather`, while `weather` itself depends transitively on an updated version of `common`.
+| Output | Validation |
+| --- | --- |
+| <code>--descriptor_set_out</code> | Merges compatible graphs; conflicting definitions by import path or symbol are errors |
+| <code>--descriptor_set_out_dir</code> | Independent set per project/module pair; graphs are not merged |
+| Plugin output | Identical shared files are deduplicated; different contents at one path or Go packages sharing a directory are errors |
 
-### Graph Structure
+Managed options remain part of compatibility checks. Different dependency versions can have compatible descriptors, while different consumer settings can make them incompatible. <code>--include_imports</code> affects exported contents only; the full graph is always validated. Plugin import generation is separately controlled by <code>with_imports</code>, default false.
 
-```text
-               +-------------------+
-               |    proto/user     | (Root Module)
-               +---------+---------+
-                         |
-           +-------------+-------------+
-           |                           |
-           v                           v
-+---------------------+     +---------------------+
-| github.com/acme/    |     | github.com/acme/    |
-| common v1.2.0       |     | weather v2.1.0      |
-+---------------------+     +----------+----------+
-                                       |
-                                       v
-                            +---------------------+
-                            | github.com/acme/    |
-                            | common v1.3.0       |
-                            +---------------------+
-```
+## Manifest and local replacements
 
-### Step-by-Step MVS Traversal
-
-<Tabs items={["Step 1: Graph Traversal", "Step 2: Version Collection", "Step 3: Maximum Selection", "Step 4: Lockfile Generation"]}>
-  <Tab value="Step 1: Graph Traversal">
-    EasyP begins by parsing the root module's `protobuf.mod` file (`proto/user/protobuf.mod`) and recursively visiting all transitive requirements:
-    - Root `user` requires `github.com/acme/common v1.2.0`.
-    - Root `user` requires `github.com/acme/weather v2.1.0`.
-    - Traversal inspects `github.com/acme/weather v2.1.0`'s `protobuf.mod`, discovering a requirement for `github.com/acme/common v1.3.0`.
-  </Tab>
-  <Tab value="Step 2: Version Collection">
-    The algorithm constructs a list of all requested minimum versions for each canonical module URL:
-    - Target: `github.com/acme/common`
-    - Requested minimums: `[ v1.2.0 (from user), v1.3.0 (from weather) ]`
-  </Tab>
-  <Tab value="Step 3: Maximum Selection">
-    MVS compares the requested minimum versions semantically:
-    `Selected Version = max(v1.2.0, v1.3.0) = v1.3.0`
-    Since `v1.3.0` is backwards-compatible with `v1.2.0` under Semantic Versioning, selecting `v1.3.0` satisfies both `user` and `weather`.
-  </Tab>
-  <Tab value="Step 4: Lockfile Generation">
-    The resolved version set (`common v1.3.0`, `weather v2.1.0`) is written to `protobuf.lock` alongside Git commit hashes and cryptographic content digests.
-  </Tab>
-</Tabs>
-
-### Per-Module Isolation Guarantee
-
-Unlike workspace-wide resolvers, EasyP resolves dependencies on a **per-module basis**. If your repository contains separate service modules under `proto/user` and `proto/order`:
-
-- `proto/user` can resolve `common v1.3.0`.
-- `proto/order` can independently resolve `common v2.0.0`.
-
-Because each proto module maintains its own `protobuf.mod` and `protobuf.lock`, teams can update shared dependencies at their own pace without breaking neighboring services in a monorepo.
-
----
-
-## 3. `protobuf.mod` DSL Directives
-
-The `protobuf.mod` file resides in the root directory of a Protobuf module. It is a tool-neutral specification focused exclusively on dependency declaration.
-
-```protobuf
-// proto/user/protobuf.mod
-
+~~~text
 module github.com/acme/user
-
-roots (
-    proto
-)
-
+roots proto
 require (
-    github.com/googleapis/googleapis v1.5.0
-    github.com/acme/weather v1.2.3
-    github.com/grpc-ecosystem/grpc-gateway v2.19.0 // indirect
+    github.com/acme/common v1.2.0
+    github.com/acme/weather v2.1.0
 )
-
-// Local debug override
 replace github.com/acme/weather => ../weather-fork
-```
+~~~
 
-### Directive Reference
+<code>roots</code> is relative to the manifest directory and defaults to <code>.</code>. The <code>get</code> and <code>mod</code> commands find the nearest ancestor manifest within the workspace. Transitive requirements are recorded with <code>// indirect</code>.
 
-- **`module`**: Declares the canonical module identity (URL/path). Optional when the Git URL matches repository layout.
-- **`roots`**: Defines the inner directory root containing `.proto` schema files (defaults to `.`). This ensures imports resolve cleanly without requiring prefix manipulation.
-- **`require`**: Declares direct and indirect module dependencies with explicit Semantic Version tags.
-  - **`// indirect`**: Appended automatically by `easyp mod tidy` for transitive dependencies not directly imported by the root module's `.proto` files.
-- **`replace`**: Overrides a module dependency with a local file path (`../weather-fork`) or an alternative Git repository/version. Useful for local development and debugging.
+A relative <code>replace</code> target is resolved from its owning <code>protobuf.mod</code>; an absolute target is used directly. Generation and linting support local replacements. <code>get</code>, <code>mod tidy</code>, <code>mod update</code>, and <code>mod vendor</code> reject them: remove replacements before these commands create or use a reproducible Git lock. This is command validation, not a CI rule rejecting commits.
 
-<Callout type="warn">
-Active `replace` directives are strictly intended for local development. EasyP CI workflows will flag and reject any commit containing an active `replace` directive.
-</Callout>
+For nested Git modules, require each identity declared by its manifest. Versionless requirements need no tags. Version <code>v1.2.3</code> of a module in <code>proto/user</code> uses tag <code>proto/user/v1.2.3</code>.
 
----
+## Locks and immutable published versions
 
-## 4. Hermetic `protobuf.lock` Mechanism
+<code>protobuf.lock</code> records the source, selected tag or SHA, exact commit, and content hash. It is created by <code>get</code>, <code>mod tidy</code>, and <code>mod update</code>. <code>mod download</code> uses exact locked commits. The example below illustrates the format, not actual repository data.
 
-The `protobuf.lock` file is an auto-generated artifact created and maintained by EasyP commands (`easyp mod tidy` and `easyp mod update`).
-
-```yaml
-# protobuf.lock - GENERATED FILE, DO NOT EDIT MANUALLY
+~~~yaml
 version: 1
 modules:
-  - source: github.com/googleapis/googleapis
-    version: v1.5.0
-    commit: 8f3a1c94b2e10a84e
-    hash: h1:a9F8zK...
-  - source: github.com/acme/weather
-    version: v1.2.3
-    commit: 51d2e071c89f33b11
-    hash: h1:x7B3mL...
-  - source: github.com/grpc-ecosystem/grpc-gateway
-    version: v2.19.0
-    commit: c4f88aa91024e12c4
-    hash: h1:p0Q1wK...
-```
+  - source: github.com/acme/common
+    version: v1.3.0
+    commit: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+    hash: h1:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
+~~~
 
-### Guaranteed Hermetic Builds
+During <code>tidy</code>, <code>get</code>, and <code>update</code>, a fetched previously locked SemVer must match its recorded commit and hash. A mismatch raises <code>ErrLockedVersionChanged</code> before installing the new graph or writing the manifest or lock, including for transitive requirements and warm caches. A new version may be selected; unconstrained versionless requirements still refresh to HEAD, while explicit SHAs stay pinned.
 
-1. **Strict Locking**: CI pipelines execute `easyp mod download` against `protobuf.lock`. Neither network fluctuations nor registry state can change the downloaded schema versions.
-2. **Digest Verification**: The `hash` attribute validates content integrity against cache tampering or force-pushed Git tags.
-3. **Explicit Lifecycle**: `protobuf.lock` is only updated via explicit developer execution of `easyp mod tidy` or `easyp mod update`.
+<code>mod download</code> can retrieve the old commit after a tag moves if that commit remains available. The Go <code>dirhash.Hash1</code> digest covers Git-tracked regular files with repository-relative paths. Both newly downloaded and installed cached files are verified.
 
----
+## Git object reuse
 
-## 5. Architectural Comparison
+A shared object store is used per remote. Known exact commits can be reused without remote access. The first attempt fetches the requested commit at depth one. If a server rejects a historical SHA, EasyP fetches advertised reachable history and still requires the original commit; HEAD is never substituted. A cold fetch is therefore not always shallow. Tag lookups are refreshed separately so cache reuse cannot hide republishing.
 
-| Feature / Model | EasyP MVS | Go Modules (MVS) | Cargo / Rust (PubGrub SAT) | Buf v2 (Workspace SVS) |
-| --- | --- | --- | --- | --- |
-| **Algorithm** | Minimal Version Selection | Minimal Version Selection | SAT Solver (PubGrub) | Workspace Single Version |
-| **Selection Rule** | `max(minimums)` | `max(minimums)` | Complex SemVer Ranges (`^1.2.3`) | Global Single Version |
-| **Dependency Scope** | Per-module | Per-module | Per-crate | Entire Workspace |
-| **Multiple Versions in Binary** | Forbidden (FQN collision) | Allowed across major versions | Allowed across major versions | Forbidden |
-| **Lockfile** | `protobuf.lock` | `go.sum` | `Cargo.lock` | `buf.lock` |
-| **Local Override** | `replace` directive | `replace` directive | `[patch]` / `path` | Local workspace module |
+Reproducibility depends on pinned commits remaining available and hashes matching. Breaking checks use each revision's own manifests and locks; the baseline is read from an isolated Git snapshot rather than the current working tree.
 
-### Why MVS Fits Protobuf Schemas Best
-
-Protobuf schemas enforce strict package name and message Fully Qualified Name (FQN) uniqueness within a compilation unit. Unlike Rust (where Cargo can rename crates under the hood) or Go (where `v2` uses a distinct import path), compiling two versions of `user.v1.User` into the same protoc descriptor set causes immediate FQN collision errors.
-
-EasyP's per-module MVS provides the exact balance required for Protobuf: deterministic single-version resolution within each module graph, paired with complete version independence between separate service modules.
+See [protobuf.mod](/docs/reference/protobuf-mod), [protobuf.lock](/docs/reference/protobuf-lock), and [generation](/docs/cli/generator) for details.

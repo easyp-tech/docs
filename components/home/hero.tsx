@@ -22,7 +22,7 @@ export function Hero({ version = 'vX.X.X' }: { version?: string }) {
   const installOptions: InstallOption[] = [
     { id: 'brew', label: 'brew', fullLabel: 'macOS (homebrew)', cmd: 'brew install easyp-tech/tap/easyp' },
     { id: 'go', label: 'go', fullLabel: 'go Install (any OS)', cmd: 'go install github.com/easyp-tech/easyp/cmd/easyp@latest' },
-    { id: 'docker', label: 'docker', fullLabel: 'docker', cmd: 'docker pull easyp/easyp:latest' },
+    { id: 'docker', label: 'docker', fullLabel: 'docker', cmd: 'docker pull ghcr.io/easyp-tech/easyp:latest' },
   ]
 
   const activeOption = installOptions.find((o) => o.id === installMethod) || installOptions[0]

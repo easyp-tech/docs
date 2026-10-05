@@ -3,7 +3,7 @@ title: "protobuf.mod Reference"
 description: "Specification for protobuf.mod, the tool-neutral DSL for defining Protocol Buffer module identities, roots, requirements, and local replace directives."
 ---
 
-The `protobuf.mod` file resides at the root of a Protocol Buffer module. Designed as a **tool-neutral standard**, it contains zero tool-specific settings (no linter flags, generator plugins, or vendor extensions). It is strictly focused on module identity, inner root directories, dependency requirements, and local source overrides.
+The <code>protobuf.mod</code> file resides at the root of a Protocol Buffer module. Designed as a **tool-neutral standard**, it contains zero tool-specific settings (no linter flags, generator plugins, or vendor extensions). It is strictly focused on module identity, inner root directories, dependency requirements, and local source overrides.
 
 ---
 
@@ -12,23 +12,23 @@ The `protobuf.mod` file resides at the root of a Protocol Buffer module. Designe
 <TypeTable
   type={{
     module: {
-      description: "Canonical module identity URL or path (e.g. github.com/acme/user). Reserved for vanity paths & registry publishing.",
+      description: "Canonical Git module identity, for example github.com/acme/user.",
       type: "directive"
     },
     roots: {
-      description: "List of internal repository subdirectories containing .proto schema files. Defaults to '.'.",
+      description: "Directories containing .proto files, relative to the directory of this protobuf.mod. Defaults to '.'.",
       type: "directive"
     },
     require: {
-      description: "Block declaring direct and transitive dependency module bounds with explicit SemVer version tags.",
+      description: "Block declaring dependencies by module identity, optionally with a SemVer tag or full Git commit hash.",
       type: "directive block"
     },
     "require // indirect": {
-      description: "Transitive dependency marker automatically managed by 'easyp mod tidy'.",
+      description: "Transitive dependency marker written by 'easyp get' and 'easyp mod tidy'.",
       type: "annotation"
     },
     replace: {
-      description: "Local source replacement directive mapping a module URL to a local filesystem path or alternate repo.",
+      description: "Local module replacement: absolute paths are used directly; relative paths are resolved from this protobuf.mod directory.",
       type: "directive"
     }
   }}
@@ -38,7 +38,7 @@ The `protobuf.mod` file resides at the root of a Protocol Buffer module. Designe
 
 ## Example Specification
 
-```protobuf
+~~~protobuf
 // proto/user/protobuf.mod
 
 module github.com/acme/user
@@ -50,17 +50,53 @@ roots (
 require (
     github.com/googleapis/googleapis v1.5.0
     github.com/acme/weather v1.2.3
-    github.com/grpc-ecosystem/grpc-gateway v2.19.0 // indirect
+    github.com/acme/gateway/v2 v2.19.0 // indirect
 )
 
 // Local debug replacement
 replace github.com/acme/weather => ../weather-fork
-```
+~~~
 
 ---
 
 ## Behavior Rules
 
-1. **Git-Native Identity**: The canonical identity of a module is its Git URL (e.g., `github.com/acme/weather`).
-2. **Per-Module Bounds**: Every module maintains its own independent `protobuf.mod`. MVS operates per-module rather than forcing global monorepo single-version constraints.
-3. **Replace Guardrail**: Active `replace` directives are permitted during local development, but cause CI validation to fail.
+1. **Git-Native Identity**: The canonical identity of a module is its Git URL (e.g., <code>github.com/acme/weather</code>).
+2. **Per-Module Bounds**: Every module maintains its own independent <code>protobuf.mod</code>. MVS operates per-module rather than forcing global monorepo single-version constraints.
+3. **Local replacements**: Only main-module directives apply, including to transitive requirements; dependency-owned replacements are ignored. A replacement alone does not introduce a module. With <code>replace</code>, commands use a local effective graph and preserve <code>protobuf.lock</code> byte-for-byte; a missing lock is not created. <code>mod tidy</code> also leaves the manifest unchanged. <code>get</code> and <code>mod update</code> may edit explicit requirements without adding fork-only transitives. <code>mod download</code> installs only needed unreplaced snapshots. Remove replacements and run <code>mod tidy</code> to produce a publishable lock. See [local replacements](/docs/guides/debugging-replace).
+
+For multiple modules, place a <code>protobuf.mod</code> in each module directory. Module commands and <code>get</code> select the nearest ancestor manifest within the workspace; each module keeps its own <code>protobuf.lock</code>. <code>generate.modules</code> selects local modules by identity or workspace-relative path. A consumer declares each nested Git module separately by its manifest identity.
+
+A version may be omitted, for example <code>require github.com/acme/contracts/proto/user</code>. This adds no constraint if the graph already supplies a SemVer or exact commit. Only a still-unconstrained requirement uses the existing lock pin during <code>tidy</code>, or current HEAD without a pin; <code>mod update</code> refreshes it to HEAD. An explicit full 40- or 64-hex-character commit remains an exact constraint.
+
+SemVer requirements select the maximum requested minimum. SemVer and SHA requirements are compatible only when the selected tag points to that exact commit. Different explicit commits or a selected tag at another commit conflict; SHA values, dates, and commit ancestry are not given a semantic version order. For a nested module in <code>proto/user</code>, version <code>v1.2.3</code> uses tag <code>proto/user/v1.2.3</code>. Each module has its own lock entry and roots.
+
+A local <code>replace</code> may target a nested module directory. Its native manifest must declare the replaced identity, and its requirements participate in the effective graph. Relative paths always use the main manifest directory, even at transitive depths; absolute paths are used directly. Historical breaking comparisons map in-repository replacements to the corresponding revision snapshot and reject external local paths. Preserving the lock is an explicit EasyP invariant, not a claim that Go never changes <code>go.sum</code>.
+
+For example, with <code>repo/foo/protobuf.mod</code> containing <code>roots proto</code>, EasyP reads files under the physical repository path <code>repo/foo/proto</code>. A file at <code>repo/foo/proto/user/v1/user.proto</code> has the protobuf import path <code>user/v1/user.proto</code>: import paths are relative to the resolved root, so the module directory and the root directory are not repeated in imports. With <code>roots .</code>, the physical root is <code>repo/foo</code>.
+
+## Major version identities
+
+v0 and v1 use the same unsuffixed module path. v2 and later require a final <code>/vN</code> component matching the SemVer major, with no leading zeros: <code>require github.com/acme/weather/v2 v2.1.0</code>. <code>/v0</code>, <code>/v1</code>, <code>/v01</code> and <code>/v2.0</code> are invalid module suffixes. Ordinary components such as <code>/2024</code> and <code>/v2beta</code> are not suffixes. This does not restrict package directories or protobuf import paths. Go's special <code>gopkg.in/name.vN</code> spelling is recognized by the same suffix helpers.
+
+The rule applies to declared module identities, requirements, replacement source identities, fetched native metadata and lock entries. Full commits and omitted versions still require the exact requested native identity. Absolute local Git paths and explicit URLs are supported; the logical URL host/path is checked separately from transport credentials and ports. EasyP preserves the original identity spelling.
+
+| Identity | Physical directory containing <code>protobuf.mod</code> | Tag for the example release |
+|---|---|---|
+| <code>repo</code> | repository root | <code>v1.2.0</code> |
+| <code>repo/v2</code> | root or <code>v2/</code> | <code>v2.0.0</code> |
+| <code>repo/sub/v2</code> | <code>sub/</code> or <code>sub/v2/</code> | <code>sub/v2.0.0</code> |
+
+The major suffix is logical and is not included in the tag prefix: <code>v2/v2.0.0</code> is not the release tag for <code>repo/v2</code>. Both lightweight and annotated tags work. The manifest at an allowed location must declare the exact requested identity; finding a tag alone is insufficient.
+
+<code>repo</code> and <code>repo/v2</code> can coexist as distinct module, lock and replacement identities. MVS chooses the highest requested minimum per identity. You must provide distinct protobuf import paths yourself: EasyP never renames packages or imports, and duplicate import paths still fail. Same-major updates, exact SHA/tag agreement, immutable tags, local replacement lock preservation and frozen verification continue to apply.
+
+The pre-module <code>+incompatible</code> exception is supported only for unsuffixed v2+ revisions without a native <code>protobuf.mod</code>. EasyP reads the underlying tag without the suffix and verifies metadata on the exact fetched or cached commit before accepting the lock entry. It rejects native manifests even when the marker is present. Legacy updates retain the marker; local replacements remain unversioned overlays and never publish their graph to the lock. Migration never silently renames a source or changes its version.
+
+See [Go major version suffixes](https://go.dev/ref/mod#major-version-suffixes) and [mapping versions to commits](https://go.dev/ref/mod#vcs-version).
+
+As in Go, an unversioned local replacement may contain a native manifest with the same unsuffixed identity while replacing an explicit legacy <code>+incompatible</code> requirement. This does not certify the published revision: the overlay preserves the shared lock, and frozen mode rejects replacements. Published fetches and both cold and warm locked installations still enforce the pre-native metadata check.
+
+## MCP reference
+
+<code>easyp_config_describe</code> describes this format without reading local files. Use <code>file: protobuf.mod</code> and <code>path: require[].version</code>. See [configuration reference via MCP](/docs/cli/configuration).

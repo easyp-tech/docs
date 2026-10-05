@@ -1,79 +1,82 @@
 ---
-title: "Organizational Lint Policy Sharing"
-description: "How to centralize linter rules using extends, and handle legacy directories via cascading configurations."
+title: "Organizational Lint Policies"
+description: "Share producer policies through local files or verified, pinned Git modules."
 ---
 
-Maintaining consistent Protobuf linting rules across hundreds of microservice repositories is a common challenge. This guide demonstrates how to share organizational base policies using `linters.extends` and manage exceptions cleanly.
+Each section of <code>easyp.yaml</code> first comes from its nearest definition in the directory tree. That section may explicitly extend a base. Lint and breaking inheritance are independent; a lint base does not import its breaking or issues section.
 
----
+## Local base
 
-## 1. Defining a Shared Base Policy
+Create <code>.policies/lint.yaml</code> inside the workspace:
 
-Platform engineering teams can publish a centralized linting policy repository (e.g. `github.com/uzum/proto-policy/lint-base`).
-
-```yaml
-# Shared policy repo: github.com/uzum/proto-policy/lint-base/easyp.yaml
+~~~yaml
 version: v1
-
 linters:
   default: STANDARD
-  enable:
-    - ENUM_VALUE_PREFIX
-    - RPC_REQUEST_RESPONSE_UNIQUE
-  disable:
-    - PACKAGE_VERSION_SUFFIX
-
+  disable: [PACKAGE_VERSION_SUFFIX]
 linters-settings:
-  ENUM_ZERO_VALUE_SUFFIX:
-    suffix: UNSPECIFIED
-```
+  SERVICE_SUFFIX:
+    suffix: Service
+~~~
 
----
+Then use it from the repository's <code>easyp.yaml</code>:
 
-## 2. Inheriting Policies via `extends`
-
-Individual service repositories inherit the central policy using `linters.extends`. They can also override individual rules locally:
-
-```yaml
-# Service repo: proto/easyp.yaml
+~~~yaml
 version: v1
-
 linters:
-  extends: github.com/uzum/proto-policy/lint-base
-  disable:
-    - PACKAGE_VERSION_SUFFIX # Local exception to shared policy
+  extends: ./.policies/lint.yaml
+  enable: [PACKAGE_VERSION_SUFFIX]
+  disable: [RPC_REQUEST_RESPONSE_UNIQUE]
+~~~
 
+A local reference begins with <code>./</code> or <code>../</code> and resolves from the file containing it. A directory means its <code>easyp.yaml</code>. References cannot escape the workspace, including through symlinks. Recursive bases are supported, with cycle detection and a limit of 16 base policies.
+
+## Pinned shared module
+
+Declare the policy module as an ordinary dependency. The following organization identity is illustrative; substitute a published module you control.
+
+~~~text
+module github.com/acme/service
+require github.com/acme/proto-policy v1.2.3
+~~~
+
+Resolve and review its lock with <code>easyp mod tidy</code>. Reference the policy without duplicating the version:
+
+~~~yaml
+version: v1
+linters:
+  extends: github.com/acme/proto-policy#lint/base.yaml
 breaking:
-  baseline: git:main
-  categories:
-    - WIRE
-```
+  extends: github.com/acme/proto-policy#breaking/easyp.yaml
+  ignore: []
+~~~
 
----
+The explicit form is <code>declared-module#policy-path</code>. An exact module identity selects its <code>easyp.yaml</code>. The form <code>declared-module/path</code> uses the longest matching identity already present in the consumer graph; it does not discover a new repository. A nested or major-version module resolves paths from its actual manifest directory, not its proto import roots.
 
-## 3. Handling Legacy Subtrees via Directory Cascading
+Execution may download an exact missing locked commit, but does not re-resolve a tag, choose HEAD, add dependencies or write the lock. A moved tag cannot silently change an existing base. Relative references made by a dependency policy stay inside that module. The main module's local replacement can supply a policy in normal mode; all remote edges still require existing pins. <code>--frozen</code> rejects replacements and verifies the complete locked graph.
 
-If your repository contains legacy Protobuf files that cannot yet adhere to corporate standards, create a targeted `easyp.yaml` inside the legacy directory:
+## Precedence
 
-```text
-proto/
-├── easyp.yaml          # Standard corporate policy for active services
-├── user/v1/user.proto
-└── legacy/
-    ├── easyp.yaml      # MINIMAL policy override strictly for legacy/
-    └── old.proto
-```
+The resolved base is applied before explicit local values. A local preset replaces the base preset without discarding inherited explicit rule adjustments. A local enable can undo a base disable, including one supplied by a group. Disable wins over enable in the same layer; repeated rules do not duplicate diagnostics.
 
-`proto/legacy/easyp.yaml`:
+Linter settings merge by rule and key. An explicit empty <code>linters-settings</code> map clears inherited settings; an empty rule map clears that rule. Explicit false and empty breaking lists remain overrides. YAML aliases and merge keys preserve these distinctions.
 
-```yaml
-version: v1
+Nearest-directory cascading is unchanged: a child section without <code>extends</code> replaces its ancestor section, rather than partially merging with it. Only explicit inheritance merges base and local adjustments.
 
-linters:
-  default: MINIMAL
-  disable:
-    - FIELD_LOWER_SNAKE_CASE
-    - ENUM_VALUE_PREFIX
-```
+## Consumer-relative breaking behavior
 
-Due to EasyP's nearest-file cascading rule, the relaxed policy applies exclusively to `.proto` files under `proto/legacy/`, while the rest of the repository adheres to corporate standards.
+The inherited baseline is a Git reference in the consuming repository. Inherited ignore paths are relative to the consuming policy file, never to the Git cache. Local ignore lists replace the inherited list, including an explicitly empty list. An explicit <code>--against</code> still overrides the effective baseline.
+
+A common ancestor policy is resolved independently for each checked module, using that module's dependency graph. Different modules can therefore use different pinned versions or local replacements of the same policy. Deleted modules are checked against historical snapshots. For a wholly deleted module whose base exists only in its old dependency graph, pass <code>--against</code> to identify the historical revision.
+
+## Validation
+
+~~~bash
+easyp validate-config --cfg easyp.yaml
+easyp lint
+easyp breaking --against main
+~~~
+
+The parser validates reference syntax without network access. The CLI additionally follows local references and verifies already cached dependency content. Missing cached policies produce an actionable error: run <code>easyp mod download</code>, then validate again. Validation itself does not download dependencies. Invalid bases, cycles and boundary violations include the consuming field and the reference chain.
+
+Loading policies never runs generation plugins or imports a base's <code>issues.exclude-rules</code>. Environment variables are expanded once in each original file, not again after merging. See the [policy reference](/docs/reference/easyp-yaml).

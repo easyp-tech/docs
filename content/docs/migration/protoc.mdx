@@ -1,5 +1,64 @@
 ---
-title: "Protoc"
+title: "Moving from protoc to EasyP v1"
 ---
 
-## Work in progress
+Map the existing source roots, plugins and checks to v1 explicitly. The <code>easyp migrate</code> command accepts EasyP v0 configuration, not arbitrary scripts or another tool's configuration. Keep the original inputs and generated output for comparison.
+
+## Module and source roots
+
+<code>protobuf.mod</code>:
+
+~~~text
+module github.com/acme/contracts
+roots proto
+~~~
+
+A file at <code>proto/hello/v1/hello.proto</code> has the import name <code>hello/v1/hello.proto</code>. If the previous invocation selected only part of a root, do not silently broaden it: v1 generates complete selected modules.
+
+## Generation
+
+<code>easyp.gen.yaml</code>:
+
+~~~yaml
+version: v1
+plugins:
+  - name: go
+    out: gen/go
+    opts: [paths=source_relative]
+  - name: go-grpc
+    out: gen/go
+    opts: [paths=source_relative]
+~~~
+
+Pin the actual plugin executables in the environment. Preserve existing <code>go_package</code> values and align them with the physical output. Set <code>with_imports: true</code> per plugin when imported contracts also need generated code; this is independent of descriptor export.
+
+## Check policy
+
+<code>easyp.yaml</code>:
+
+~~~yaml
+version: v1
+linters:
+  default: BASIC
+breaking:
+  baseline: git:main
+  categories: [FILE]
+~~~
+
+Map individual checks by their actual identifiers and results; similarly named presets in different tools do not prove equivalence. <code>breaking.ignore</code> contains paths, not rule names.
+
+## Dependencies and result verification
+
+Declare external dependencies with <code>easyp get</code> or manifest <code>require</code> directives. An arbitrary proto import does not uniquely identify a Git source. Run <code>mod tidy</code> for initial resolution and commit the lock; subsequent checks use <code>mod download</code>, not an implicit version update.
+
+~~~bash
+easyp validate-config
+easyp mod tidy
+easyp lint
+easyp breaking --against main
+easyp generate
+~~~
+
+The selected baseline must exist locally. Compare filenames, import paths and contents with the old generator, then build and test the consumer. Keep the old scripts until this comparison succeeds. Multiple projects require repeated <code>--project</code> or explicit <code>--all</code>.
+
+For an existing EasyP v0 project, start with the [migration preview](/docs/migration/easyp-v0).

@@ -1,6 +1,7 @@
 {
   "title": "Migration",
   "pages": [
+    "easyp-v0",
     "buf-cli",
     "protoc",
     "protolock",

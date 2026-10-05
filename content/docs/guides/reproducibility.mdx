@@ -1,38 +1,55 @@
 ---
-title: "Hermetic Build Reproducibility"
-description: "Achieving 100% bit-for-bit reproducible Protobuf builds with lockfiles, pinned plugin versions, and prohibition of floating latest tags."
+title: "Build Reproducibility"
+description: "Control schema dependencies, generator executables, and build inputs without assuming byte-identical output."
 ---
 
-Build reproducibility ensures that checking out a commit today produces the exact same generated output as building it months or years later. This guide explains how EasyP guarantees hermetic, reproducible builds.
+Reproducible generation requires control over schema sources, dependency versions, generator executables, options, and the build environment. EasyP's lockfile verifies dependency inputs; it does not by itself guarantee hermetic or byte-for-byte reproducible output.
 
----
+## Three Inputs to Control
 
-## 3 Pillars of EasyP Reproducibility
-
-1. **`protobuf.lock`**: Locks transitive dependency Git commit SHAs and cryptographic content hashes (`h1:...`).
-2. **Pinned Plugin Versions**: Generator plugins in `easyp.gen.yaml` require explicit semantic version tags. Floating `:latest` tags are prohibited.
-3. **WASM / Remote Executors**: Eliminates system environment dependencies (such as locally installed `protoc` or plugin binaries) by running plugins inside deterministic WASM sandboxes or remote generation environments.
-
----
+1. **Schema dependencies:** <code>protobuf.lock</code> records selected dependency versions, Git commits, and <code>h1:</code> content hashes. Commit it together with <code>protobuf.mod</code> and your own schemas.
+2. **Generator versions:** Remote plugins require a pinned semantic <code>version</code>. Local and bundled plugins reject that field: pin local executables in your build environment and pin the EasyP binary that contains bundled generators.
+3. **Execution environment:** Keep plugin options and relevant environment variables consistent. A named built-in plugin can use an executable on <code>PATH</code> instead of the bundled WASM implementation. WASM and remote execution do not independently prove output determinism.
 
 ## Workflow for Clean Repositories
 
-When cloning a repository on a fresh machine or CI runner:
+After preparing the same EasyP and plugin versions used by the project, run from a fresh checkout with a root module and generator file:
 
-```bash
-# 1. Download exact schema versions locked in protobuf.lock
+~~~bash
 easyp mod download
+easyp generate --project .
+~~~
 
-# 2. Execute code generation using pinned plugin versions
-easyp generate
-```
+<code>mod download</code> installs and verifies the locked dependencies without selecting newer versions or rewriting the lock. Missing dependencies may require downloads. If locked content cannot be retrieved or verified, the command fails; it cannot guarantee that remote repositories remain available forever.
 
-Because `easyp mod download` reads strictly from `protobuf.lock`, remote registry updates or force-pushed Git tags cannot alter your build output.
+For multiple consumer projects, select them with repeated <code>--project</code> flags or explicitly use <code>--all</code>. Compare generated output in CI and run tests against it. When generated files are committed, a simple check is:
 
----
+~~~bash
+git diff --exit-code -- gen
+test -z "$(git ls-files --others --exclude-standard -- gen)"
+~~~
 
-## Prohibited Patterns in CI
+Adapt <code>gen</code> to your tracked output directories. The second command catches new untracked files; ignored output is outside this check.
 
-- ❌ Running `easyp mod update` inside CI pipelines (updates should only occur locally via PRs).
-- ❌ Using floating plugin tags like `version: latest`.
-- ❌ Leaving uncommitted `replace` directives in `protobuf.mod`.
+## Local Replacements and Network Access
+
+A local <code>replace</code> redirects one dependency to disk. It avoids dependency downloads only when the whole dependency graph is local or already present in verified cache. Unreplaced dependencies can still require downloads, and a remote generator still needs network access.
+
+Local replacement contents are editable and are not pinned by the published dependency lock. With replacements, <code>mod tidy</code> validates an ephemeral effective graph and leaves the shared manifest/lock unchanged; <code>get</code>/<code>mod update</code> may edit explicit requirements but never write a local-graph lock. Remove replacements and publish the intended versions, then run <code>mod tidy</code> to resolve a release lock.
+
+## CI Practices
+
+- Resolve intended dependency changes in a reviewed update, then use <code>easyp mod download</code> in verification jobs. <code>tidy</code> and <code>update</code> are mutating commands, not a frozen verification mode.
+- Pin the EasyP binary, local plugin executables, and remote plugin versions using the mechanisms appropriate to each source.
+- Keep generated-output checks and consumer tests: valid locks and semantic versions do not prove schema compatibility or identical output bytes.
+
+See [local replacement debugging](/docs/guides/debugging-replace) and [GitHub Actions](/docs/ci-cd/github-actions).
+
+## Explicit frozen verification
+
+~~~bash
+easyp mod download --frozen
+easyp generate --frozen
+~~~
+
+Frozen mode validates existing manifests and locks, refuses all main-module local replacements, and never resolves new dependency versions or writes either file. It may fetch exact locked commits into the cache. It is not enabled by the CI environment. Mutating commands such as tidy/update refuse frozen execution; prepare the published graph first. See [frozen configuration](/docs/cli/configuration#explicit-frozen-mode).

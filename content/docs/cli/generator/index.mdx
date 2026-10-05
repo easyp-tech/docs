@@ -1,136 +1,98 @@
 ---
 title: "Generator"
+description: "Select consumer projects, generate protobuf code, and export descriptor sets in EasyP v1."
 ---
 
-EasyP includes a powerful generator that simplifies the process of generating code from proto files. By using YAML configurations, EasyP makes this process more user-friendly and intuitive compared to using the protoc command directly.
+<code>easyp generate</code> selects the closest <code>easyp.gen.yaml</code> in the current directory or an ancestor within the workspace. It compiles the selected modules and runs that project's plugins. Module identities, roots, and dependency versions come from <code>protobuf.mod</code> and <code>protobuf.lock</code>.
 
-## Key Features of the Generator
+## Configure a module
 
-1. **Simplified Code Generation**:
-    - Generate code from proto files using a `YAML` configuration.
-    - Avoid the need to write long and complex protoc commands.
+~~~text
+# protobuf.mod
+module github.com/acme/contracts
+roots proto
+require github.com/acme/shared v1.2.0
+~~~
 
-2. **Wrapper around protoc**:
-    - EasyP functions as a wrapper around protoc, providing a more convenient API through configuration files.
-    - Supports all options and plugins available in protoc.
+~~~yaml
+# easyp.gen.yaml
+version: v1
+plugins:
+  - name: go
+    out: ./gen/go
+    opts:
+      paths: source_relative
+  - name: go-grpc
+    out: ./gen/go
+    opts:
+      paths: source_relative
+options:
+  go:
+    package_prefix: github.com/acme/contracts/gen/go
+~~~
 
-3. **Flexibility and Customization**:
-    - Use the same parameters as protoc plugins, directly in the configuration file.
-    - Support for multiple plugins and their parameters in a single configuration.
+~~~bash
+easyp mod tidy
+easyp generate
+~~~
 
-4. **Generate Code from Multiple Sources**:
-    - Generate code from local directories or remote repositories.
-    - Easily integrate with existing projects and repositories.
+If <code>generate.modules</code> is omitted, EasyP selects the nearest <code>protobuf.mod</code> beside or above the generator file within the workspace; without a manifest, the project directory is the source root. Explicit entries select local module identities, workspace-relative module paths, or dependencies resolved through the consumer manifest and lock. <code>generate.packages</code> optionally selects exact protobuf package names; empty selects all module sources.
 
-5. **Remote Generation**:
-    - Generate code from remote Git repositories without local checkout.
+## Select projects
 
-6. **Package Manager Integration**:
-    - Seamless integration with EasyP's package manager for dependency management.
-    - Automatic resolution and inclusion of proto dependencies.
+~~~bash
+# Closest project only
+easyp generate
+# Exactly these two projects
+easyp generate --project backend --project frontend
+# Explicit recursive selection beneath the invocation directory
+easyp generate --all
+# Explicit workspace boundary, useful in a non-Git tree
+easyp generate --workspace ../.. --project ..
+~~~
 
-## Configuration Reference
+<code>--project</code> is repeatable and cannot be combined with <code>--all</code>. Recursive discovery skips hidden directories, <code>easyp_vendor</code>, <code>node_modules</code>, and nested Git repositories. Select a project in a skipped directory explicitly. Automatic selection rejects a symlink configuration file; an explicit project selection is required to use it. Choosing <code>--all</code> authorizes plugins in the discovered projects, including command plugins.
 
-### Generator Configuration Comparison
+The nearest Git repository, including a worktree with a <code>.git</code> file, supplies the workspace boundary. Without Git, enclosing EasyP configuration and manifest files establish the boundary; <code>--workspace</code> sets it explicitly. Project paths and descriptor destinations are relative to the invocation directory. Plugin output paths are relative to their <code>easyp.gen.yaml</code>. The command has no <code>--path</code> or <code>--root</code> flag.
 
-<Tabs items={["easyp.gen.yaml", "buf.gen.yaml"]}>
-  <Tab value="easyp.gen.yaml">
-    ```yaml
-    # Package manager dependencies
-    deps:
-      - github.com/googleapis/googleapis@common-protos-1_3_1
-      - github.com/grpc-ecosystem/grpc-gateway@v2.19.1
-      - github.com/bufbuild/protoc-gen-validate@v0.10.1
+## Frozen generation
 
-    # Code generation configuration
-    generate:
-      plugins:
-        - name: go
-          out: ./gen/go
-          opts:
-            paths: source_relative
-            module: github.com/mycompany/myproject
-          with_imports: true
+~~~bash
+easyp generate --frozen --project backend --project frontend
+easyp --frozen generate --all --descriptor_set_out_dir build/descriptors
+~~~
 
-        - name: go-grpc
-          out: ./gen/go
-          opts:
-            paths: source_relative
-            require_unimplemented_servers: false
-    ```
-  </Tab>
-  <Tab value="buf.gen.yaml">
-    ```yaml
-    version: v2
-    plugins:
-      - remote: buf.build/protocolbuffers/go
-        out: gen/go
-        opt:
-          - paths=source_relative
-          - module=github.com/mycompany/myproject
-      - remote: buf.build/grpc/go
-        out: gen/go
-        opt:
-          - paths=source_relative
-          - require_unimplemented_servers=false
-    ```
-  </Tab>
-</Tabs>
+Each selected local native module must have <code>protobuf.mod</code> and <code>protobuf.lock</code>, including an empty lock without dependencies. An explicit workspace-relative path uses the selected module's files: <code>backend/easyp.gen.yaml</code> with <code>generate.modules: [proto/user]</code> validates <code>proto/user/protobuf.mod</code> and <code>proto/user/protobuf.lock</code>. The generator-only <code>backend</code> directory needs neither file. Frozen rejects all root replacements, even unused ones, and validates the locked direct and transitive graph before any plugin executes. A failure in a later selected project therefore prevents plugins in earlier projects from running. The same preflight applies to both descriptor export modes and pluginless exports.
 
-### Multi-Language Plugin Examples
+A dependency selected by identity through <code>generate.modules</code> requires its consumer's manifest and lock; the downloaded dependency does not need its own lock. Unselected projects are ignored. <code>--frozen</code> does not change the existing <code>--project</code>/<code>--all</code> selection and plugin authorization rules.
 
-<Tabs items={["Go", "TypeScript", "Python"]}>
-  <Tab value="Go">
-    ```yaml
-    plugins:
-      - name: go
-        out: ./gen/go
-        opts:
-          paths: source_relative
-      - name: go-grpc
-        out: ./gen/go
-        opts:
-          paths: source_relative
-          require_unimplemented_servers: false
-    ```
-  </Tab>
-  <Tab value="TypeScript">
-    ```yaml
-    plugins:
-      - name: ts
-        out: ./src/gen
-        opts:
-          declaration: true
-          target: es2017
-      - name: grpc-web
-        out: ./src/gen
-        opts:
-          import_style: typescript
-          mode: grpcweb
-    ```
-  </Tab>
-  <Tab value="Python">
-    ```yaml
-    plugins:
-      - name: python
-        out: ./gen/python
-      - name: grpc_python
-        out: ./gen/python
-    ```
-  </Tab>
-</Tabs>
+Exact locked commits may be downloaded into the cache and are hash-verified, including on cache reuse. Manifest and lock files are never rewritten, and dependency HEAD/tags are never resolved. Frozen is explicit, not inferred from CI, and does not make remote plugins offline or pin local plugin executables. See [frozen builds](/docs/cli/package-manager#frozen-builds).
 
-## Execution Commands
+## Export descriptors
 
-<Tabs items={["CLI", "Configuration"]}>
-  <Tab value="CLI">
-    ```bash
-    easyp generate
-    ```
-  </Tab>
-  <Tab value="Configuration">
-    ```bash
-    easyp --cfg custom-easyp.yaml generate
-    ```
-  </Tab>
-</Tabs>
+~~~bash
+easyp generate --project backend --descriptor_set_out build/backend.pb --include_imports
+easyp generate --all --descriptor_set_out_dir build/descriptors --include_imports
+~~~
+
+<code>--descriptor_set_out</code> combines the selected graphs into one binary <code>FileDescriptorSet</code>. Identical descriptors are deduplicated; conflicting definitions under one import path or conflicting symbols cause an error. Managed options remain part of compatibility checks.
+
+<code>--descriptor_set_out_dir</code> writes an independent descriptor set for each selected project/module pair, so different consumers can retain different options or dependency versions. Project paths are mirrored below the destination; filenames contain a sanitized module basename and the first 12 hex digits of the full module identity's SHA-256. External projects use an <code>_external</code> namespace. Existing unrelated files are retained.
+
+The two destination flags are mutually exclusive. <code>--include_imports</code> defaults to false and includes transitive imports in exported files only. Compilation and compatibility validation always use the complete graph.
+
+All requested graphs and export destinations pass preflight before any plugin runs. Configured plugins still run; a pluginless project can also export descriptors. Descriptor files are written after all selected plugin executions succeed, with atomic replacement per file. This does not provide a transaction across arbitrary plugin side effects or filesystem failures.
+
+## Plugins and managed options
+
+Each plugin sets exactly one source: <code>name</code>, <code>path</code>, <code>command</code>, or <code>remote</code>. Local binaries and commands run from the invocation directory. Remote plugins require a pinned semantic <code>version</code>; local and bundled plugins reject a separate version field.
+
+Bundled names such as <code>go</code> and <code>go-grpc</code> use a matching <code>protoc-gen-*</code> on <code>PATH</code> when available, otherwise their bundled WASM plugin.
+
+<code>plugins[].with_imports</code> defaults to false. Set it to true for a particular plugin to generate code for transitive imports as well as the selected files. Other plugins still receive dependency descriptors for linking. This setting is independent of descriptor export's <code>--include_imports</code>. Keep Go import paths and output directories aligned: different Go packages must not share one generated directory. Identical shared outputs are deduplicated; conflicting file contents or Go package declarations fail before generated files are written.
+
+<code>options.go.package_prefix</code> changes Go options only. Defaults for other languages and field-option transformations require explicit <code>generate.managed.enabled: true</code>. An inherited Go prefix precedes explicit managed Go overrides; a prefix in the current file has the highest priority. Go disable selectors still apply. See the full [configuration reference](/docs/reference/easyp-gen-yaml).
+
+A plain prefix maps a multi-component protobuf package such as <code>common.v1</code> to <code>&lt;prefix&gt;/common/v1</code>. With explicit <code>paths: source_relative</code>, Go output directories follow the plugin's effective import path under that prefix, including its <code>Mfile.proto</code> mappings. Insertion-point outputs follow the producer's output file. See [Go output paths and plugin mappings](/docs/reference/easyp-gen-yaml#go-output-paths-and-plugin-mappings) for marker templates and precedence.
+
+Dependency repositories may use v1 EasyP, older EasyP, Buf v1, or Buf v2 metadata. EasyP reads dependency metadata without executing dependency plugins. Buf source includes/excludes also apply when selecting a dependency or its packages for generation; excluded files cannot be reintroduced as imports. See [dependency metadata and filters](/docs/cli/package-manager#dependencies-using-buf-or-older-easyp).

@@ -1,932 +1,140 @@
 ---
-title: "EasyP Configuration Reference"
+title: "Конфигурация EasyP v1 Pilot"
+description: "Файлы и команды CLI пилотной версии EasyP v1."
 ---
 
-EasyP can be configured through CLI flags, environment variables, and configuration files. This guide covers all configuration options available in EasyP.
+В пилотной версии v1 зависимости, генерация и правила проверки находятся в разных файлах:
 
-## CLI Flags
+| Файл | Назначение |
+|------|------------|
+| [<code>protobuf.mod</code>](/ru/docs/reference/protobuf-mod) | Имя модуля, корни исходников, зависимости и локальные замены |
+| [<code>protobuf.lock</code>](/ru/docs/reference/protobuf-lock) | Зафиксированные Git-коммиты и хеши содержимого; создаётся командой <code>easyp mod tidy</code> |
+| [<code>easyp.gen.yaml</code>](/ru/docs/reference/easyp-gen-yaml) | Модули для генерации, плагины, выходные каталоги и managed mode |
+| [<code>easyp.yaml</code>](/ru/docs/reference/easyp-yaml) | Правила линтинга и проверки совместимости |
 
-### Global Flags
+Команды CLI читают формат v1 напрямую и не переходят на старую логику генерации, линтинга, проверки совместимости или управления модулями. Зависимость в Git при этом может использовать старый формат EasyP или Buf: адаптер извлекает её требования и корни <code>.proto</code> для разрешения импортов.
 
-Available for all commands:
+Для интерактивного перехода с v0 выполните <code>easyp migrate</code> в терминале. Явный <code>--interactive</code> включает мастер с уже заданными параметрами, <code>--interactive=false</code> отключает его. Вызов с <code>--module</code> без включения мастера сохраняет прежний предварительный просмотр. См. [миграцию v0](/ru/docs/migration/easyp-v0).
 
-| Flag | Short | Environment | Description | Default |
-|------|-------|-------------|-------------|---------|
-| `--cfg` | `-c` | `EASYP_CFG` | Configuration file path | `easyp.yaml` |
-| `--config` | | `EASYP_CFG` | Alias for `--cfg` | `easyp.yaml` |
-| `--debug` | `-d` | `EASYP_DEBUG` | Enable debug mode | `false` |
-| `--format` | `-f` | `EASYP_FORMAT` | Формат вывода для команд с поддержкой нескольких форматов (`text`/`json`) | значение по умолчанию зависит от команды |
+## Обычный порядок работы
 
-**Examples:**
-```bash
-# Use custom config file
-easyp --cfg production.easyp.yaml lint
-
-# Enable debug logging
-easyp --debug lint
-
-# Short form
-easyp -c custom.yaml -d lint
-```
-
-### Command-Specific Flags
-
-**Lint command:**
-```bash
-easyp lint [flags]
-```
-
-| Flag | Short | Environment | Description | Default |
-|------|-------|-------------|-------------|---------|
-| `--path` | `-p` | | Directory path to lint | `.` |
-| `--root` | `-r` | | Базовая директория для поиска файлов | Текущая рабочая директория |
-| `--format` | `-f` | `EASYP_FORMAT` | Использует глобальный флаг формата (`text`/`json`) | Использует глобальное значение по умолчанию |
-
-**Examples:**
-```bash
-# Lint specific directory
-easyp lint --path proto/
-
-# Lint из поддиректории с правильным разрешением импортов
-easyp lint --root src/IPC/Contracts --path .
-
-# JSON output format
-easyp --format json lint   # глобальный флаг
-
-# Combined flags
-easyp -f json lint -p proto/
-```
-
-**Generate command:**
-```bash
-easyp generate [flags]
-```
-
-| Flag | Short | Environment | Description | Default |
-|------|-------|-------------|-------------|---------|
-| `--path` | `-p` | `EASYP_ROOT_GENERATE_PATH` | Путь к директории с proto файлами для генерации | `.` |
-| `--root` | `-r` | | Базовая директория для поиска файлов | Текущая рабочая директория |
-
-**Examples:**
-```bash
-# Generate from specific path
-easyp generate --path api/
-
-# Generate из поддиректории с правильным разрешением импортов
-easyp generate --root src/IPC/Contracts --path .
-
-# Using environment variable
-EASYP_ROOT_GENERATE_PATH=proto/ easyp generate
-```
-
-**Breaking command:**
-```bash
-easyp breaking [flags]
-```
-
-| Flag | Short | Environment | Description | Default |
-|------|-------|-------------|-------------|---------|
-| `--against` | | | Git ref to compare against | `master` |
-| `--path` | `-p` | | Directory path to check | `.` |
-| `--format` | `-f` | `EASYP_FORMAT` | Использует глобальный флаг формата (`text`/`json`) | Использует глобальное значение по умолчанию |
-
-**Examples:**
-```bash
-# Check against main branch
-easyp breaking --against main
-
-# Check specific directory against develop branch
-easyp breaking --against develop --path proto/
-
-# JSON output
-easyp --format json breaking --against main   # глобальный флаг
-```
-
-**Init command:**
-```bash
-easyp init [flags]
-```
-
-| Flag | Short | Environment | Description | Default |
-|------|-------|-------------|-------------|---------|
-| `--dir` | `-d` | `EASYP_INIT_DIR` | Directory to initialize | `.` |
-
-**Examples:**
-```bash
-# Initialize current directory
-easyp init
-
-# Initialize specific directory
-easyp init --dir proto-project/
-```
-
-`easyp init` работает интерактивно:
-- Если в корне целевой директории есть `buf.yml`/`buf.yaml`, команда предложит миграцию из Buf.
-- Если `easyp.yaml` уже существует, команда запросит подтверждение на перезапись.
-
-**Validate-config command:**
-```bash
-easyp validate-config [flags]
-```
-
-| Flag | Short | Environment | Description | Default |
-|------|-------|-------------|-------------|---------|
-| `--config` | `-c` | `EASYP_CFG` | Путь до файла конфигурации | `easyp.yaml` |
-| `--format` (global) | `-f` | `EASYP_FORMAT` | Глобальный формат вывода для команд с несколькими форматами (`json` или `text`) | зависит от команды (`json` для `validate-config`) |
-
-**Examples:**
-```bash
-# Проверить конфиг по умолчанию с JSON выводом (статус 0 если ошибок нет)
-easyp validate-config
-
-# Проверить другой файл и вывести в текстовом формате (глобальный --format)
-easyp --format text validate-config --config example.easyp.yaml
-```
-
-**Package management commands:**
-
-#### `easyp mod download`
-Downloads dependencies based on lock file priority:
-
-1. **If `easyp.lock` exists** - downloads exact versions from lock file
-2. **If `easyp.lock` is missing** - downloads versions from `easyp.yaml` and creates `easyp.lock`
-
-```bash
-# Download exact versions (recommended for production)
+~~~bash
+easyp init --module github.com/acme/contracts
+easyp mod tidy
 easyp mod download
-```
-
-#### `easyp mod update`  
-Always downloads dependencies from `easyp.yaml`, ignoring existing lock file:
-
-1. **Ignores `easyp.lock`** completely
-2. **Downloads versions from `easyp.yaml`**
-3. **Creates/updates `easyp.lock`** with new versions
-
-```bash
-# Update dependencies and lock file
-easyp mod update
-```
-
-#### `easyp mod vendor`
-Copies proto files from dependencies to local `vendor/` directory (similar to `go mod vendor`).
-
-```bash
-# Create local vendor directory with dependencies
-easyp mod vendor
-```
-
-No additional flags. Uses global `--cfg` flag for configuration.
-
-## Environment Variables
-
-EasyP supports environment variables for configuration:
-
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `EASYP_CFG` | Path to configuration file | `easyp.yaml` |
-| `EASYP_DEBUG` | Enable debug logging | `false` |
-| `EASYPPATH` | Cache and modules storage directory | `$HOME/.easyp` |
-| `EASYP_FORMAT` | Формат вывода для поддерживаемых команд (`text`/`json`). Если не указан, каждая команда использует своё значение по умолчанию. | значение по умолчанию зависит от команды |
-| `EASYP_ROOT_GENERATE_PATH` | Root path for generate command | `.` |
-| `EASYP_INIT_DIR` | Directory for init command | `.` |
-
-**Examples:**
-```bash
-# Custom cache directory
-export EASYPPATH=/tmp/easyp-cache
-easyp mod download
-
-# Debug mode via environment
-export EASYP_DEBUG=true
-easyp lint
-
-# Custom config file
-export EASYP_CFG=config/easyp.yaml
 easyp generate
-```
+easyp lint --path proto
+easyp breaking --path proto --against main
+~~~
 
-## Configuration File
+Без замен <code>mod tidy</code> записывает lock, <code>mod download</code> устанавливает зафиксированные коммиты, а <code>mod update</code> обновляет требования в пределах текущей мажорной версии и lock. При наличии <code>replace</code> команды работают с локальным эффективным графом и сохраняют <code>protobuf.lock</code> побайтно; отсутствующий lock не создаётся. <code>mod tidy</code> также не меняет манифест. <code>get</code> и <code>mod update</code> могут менять явные требования, но не добавляют транзитивные зависимости только из форка. <code>mod download</code> устанавливает только нужные незаменённые снимки. Для публикуемого lock удалите замены и выполните <code>mod tidy</code>. Подробнее: [локальные замены](/ru/docs/guides/debugging-replace).
 
-The `easyp.yaml` file is the main configuration file for EasyP, defining how your proto files are linted, generated, and managed. This file is typically placed at the root of your project alongside your proto files.
+## Явный режим frozen
 
-### File Structure Overview
+Используйте <code>--frozen</code>, когда сборка должна опираться на сохранённый граф зависимостей. По умолчанию флаг выключен; <code>CI=true</code> его не включает. Каждому выбранному native-модулю, чей граф зависимостей используется, нужны <code>protobuf.mod</code> и <code>protobuf.lock</code>, в том числе пустой lock при отсутствии зависимостей. Явный путь от workspace в <code>generate.modules</code> использует манифест и lock выбранного модуля; каталогу только с <code>easyp.gen.yaml</code> отдельная пара не нужна. Выбор зависимости по идентификатору по-прежнему требует манифест и lock потребителя. Описанный ниже запуск исходников без манифеста доступен только без frozen.
 
-```
-.
-├── easyp.yaml
-├── easyp.lock
-├── proto/
-│   ├── user/
-│   │   └── user.proto
-│   └── order/
-│       └── order.proto
-└── vendor/
-```
+~~~bash
+easyp --frozen generate
+easyp lint --frozen --path proto
+easyp breaking --frozen --against main
+easyp mod --frozen download
+easyp mod vendor --frozen
+~~~
 
-### Configuration Format
+Флаг принимается глобально перед командой; локально у <code>generate</code>, <code>lint</code>, <code>breaking</code>, <code>ls-files</code>, <code>get</code>, <code>init</code> и <code>migrate</code>; у родительской команды <code>mod</code> и каждой из четырёх её подкоманд. Значение true на любом уровне включает режим. Дочерний <code>--frozen=false</code> не отменяет true у родителя.
 
-EasyP supports both YAML and JSON configuration formats:
+Frozen отклоняет все корневые <code>replace</code>, даже неиспользуемые, до обращения к путям замен или скачивания зависимостей. Проверяются прямые и транзитивные требования относительно lock и содержимое кеша. Режим не разрешает версии заново, не ищет HEAD/теги зависимостей и не записывает манифест или lock. Отсутствующий или устаревший lock вызывает ошибку. Точные коммиты из lock могут загружаться в кеш: frozen не означает автономную работу без сети.
 
-#### YAML Format (Recommended)
-```yaml
-lint:
-  use:
-    - BASIC
-    - COMMENT_SERVICE
-deps:
-  - github.com/googleapis/googleapis@v1.0.0
+<code>mod tidy</code>, <code>get</code>, <code>mod update</code>, <code>init</code> и <code>migrate</code> отклоняют запуск в frozen; предварительный просмотр и интерактивная миграция тоже запрещены. Подготовьте файлы вне frozen. Генерация проверяет все выбранные графы до запуска любого плагина. Lint сохраняет действующую область политик; breaking использует собственные манифест и lock базовой ревизии. Даже <code>ls-files --include-imports=false</code> проверяет frozen-граф. Подробнее — в [менеджере пакетов](/ru/docs/cli/package-manager).
+
+## Флаги команд
+
+| Команда | Основные флаги |
+|---------|----------------|
+| <code>generate</code> | <code>--project</code> (повторяемый), <code>--all</code>, <code>--workspace</code>, <code>--descriptor_set_out</code>, <code>--descriptor_set_out_dir</code>, <code>--include_imports</code> |
+| <code>lint</code> | <code>--path</code> (<code>-p</code>), <code>--root</code> (<code>-r</code>) |
+| <code>breaking</code> | <code>--path</code> (<code>-p</code>), <code>--root</code> (<code>-r</code>), <code>--against</code> |
+| <code>init</code> | <code>--dir</code> (<code>-d</code>), <code>--module</code> |
+| <code>validate-config</code> | <code>--config</code> (псевдоним <code>--cfg</code>), <code>--format</code> |
+| <code>mod download/tidy/vendor/update</code> | <code>--frozen</code> |
+| <code>ls-files</code> | <code>--include-imports</code> (по умолчанию <code>true</code>), <code>--format</code> (<code>json</code> или <code>text</code>) |
+| <code>schema-gen</code> | <code>--out-dir</code> (по умолчанию <code>schemas</code>) |
+
+Общие флаги: <code>--cfg</code> (псевдоним <code>--config</code>, по умолчанию <code>easyp.yaml</code>), <code>--debug</code> (<code>-d</code>), <code>--format</code> (<code>-f</code>, <code>text</code> или <code>json</code>) и <code>--frozen</code>. Переменные <code>EASYP_CFG</code>, <code>EASYP_DEBUG</code> и <code>EASYP_FORMAT</code> задают значения по умолчанию. Кеш модулей находится в <code>EASYPPATH</code> или <code>$HOME/.easyp</code>.
+
+По умолчанию <code>generate</code> выбирает ближайший <code>easyp.gen.yaml</code> в текущем или родительском каталоге workspace. <code>--project</code> можно повторять для нескольких явных потребителей. <code>--all</code> отдельно включает рекурсивный выбор внутри каталога запуска и несовместим с <code>--project</code>. <code>--workspace</code> задаёт границу для путей модулей и наследования; по умолчанию используется ближайший Git-репозиторий или охватывающие файлы EasyP. Модули и корни исходников берутся из <code>protobuf.mod</code>; <code>generate.packages</code> выбирает точные имена protobuf-пакетов среди выбранных модулей. Флагов <code>generate --path</code> и <code>generate --root</code> нет.
+
+<code>--descriptor_set_out</code> объединяет совместимые графы в один файл; <code>--descriptor_set_out_dir</code> создаёт независимый файл для каждой пары проект/модуль. Флаги взаимоисключающие, пути считаются от каталога запуска. <code>--include_imports</code> по умолчанию равен false и влияет только на экспорт. <code>plugins[].with_imports</code> также по умолчанию равен false, но отдельно включает генерацию импортов для конкретного плагина. <code>options.go.package_prefix</code> меняет только Go; полный managed mode требует явного <code>generate.managed.enabled: true</code>.
+
+<code>lint</code> и <code>breaking</code> читают <code>easyp.yaml</code> версии v1. Для импортов они используют корни ближайшего модуля и его зафиксированных или локальных зависимостей. Политика может существовать без <code>protobuf.mod</code>; тогда используются проверяемые файлы и встроенные импорты.
+
+<code>generate</code> и <code>ls-files</code> тоже работают без <code>protobuf.mod</code>, если у проекта нет модульных зависимостей: текущий каталог проекта считается корнем исходников.
+
+Перед разбором и проверкой <code>easyp.yaml</code> и <code>easyp.gen.yaml</code> EasyP подставляет переменные окружения. <code>$&#123;NAME&#125;</code> берёт значение переменной, <code>$&#123;NAME:-default&#125;</code> задаёт запасное значение, а <code>$$&#123;NAME&#125;</code> оставляет буквальную строку <code>$&#123;NAME&#125;</code>. Отсутствующая переменная без запасного значения превращается в пустую строку. Подстановки в комментариях YAML игнорируются. В <code>protobuf.mod</code> и <code>protobuf.lock</code> такой подстановки нет.
+
+В <code>breaking</code> явный <code>--against</code> перекрывает <code>breaking.baseline</code>, затем применяется значение по умолчанию <code>master</code>. Каждая ревизия использует собственные корни, манифесты и lock; база читается из изолированного Git-снимка. Политики берутся из текущей конфигурации, секции наследуются целиком. Поддерживается дополнительная категория <code>FILE</code>; пакетные и другие категории зарезервированы и не принимаются. <code>breaking.ignore_unstable</code> по умолчанию равен false; точные формы нестабильных суффиксов описаны в [справочнике](/ru/docs/reference/easyp-yaml#нестабильные-пакеты).
+
+Пути <code>issues.exclude-rules.path</code> считаются от файла, предоставляющего секцию issues, и поддерживают <code>&#42;</code>, <code>?</code>, <code>[]</code> и полные сегменты <code>&#42;&#42;</code>. Буквальный каталог охватывает поддерево. Пустое правило <code>&#123;&#125;</code> явно исключает все файлы. <code>linters.allow_comment_ignores</code> по умолчанию равен true для каждой политики. <code>linters.extends</code> и <code>breaking.extends</code> подключают базы отдельных секций из локальных путей или существующих закреплённых модулей; см. [общие политики](/ru/docs/guides/organization-lint-style).
+
+<code>validate-config</code> рекурсивно проверяет все <code>easyp.yaml</code>, <code>easyp.gen.yaml</code>, <code>protobuf.mod</code> и <code>protobuf.lock</code> внутри текущего каталога. Передайте <code>--cfg &lt;файл&gt;</code>, чтобы проверить один файл, или <code>--cfg &lt;каталог&gt;</code>, чтобы проверить другой каталог. В JSON-ошибках указан файл, а для ошибок структуры YAML — строка и столбец. Некорректная версия lock-файла, неполные записи и неверные хеши выдаются как ошибки проверки.
+
+~~~bash
+easyp validate-config
+easyp validate-config --cfg ./services --format json
+easyp validate-config --cfg ./services/api/easyp.gen.yaml
+~~~
+
+<code>mod vendor</code> проверяет зафиксированные Git-зависимости и копирует их <code>.proto</code> в <code>easyp_vendor</code> по import path. Старый каталог заменяется только после успешного копирования всех файлов. Совпадающие import path вызывают ошибку. При наличии локальных <code>replace</code> копируется эффективный граф локальных и проверенных удалённых исходников без изменения опубликованного lock.
+
+<code>ls-files</code> показывает локальные <code>.proto</code> из корней <code>protobuf.mod</code>. По умолчанию команда также включает достижимые импорты из зависимостей и встроенных well-known proto, разрешая зависимости через v1 lock или локальные замены. <code>--include-imports=false</code> показывает только локальные файлы; вне frozen это пропускает разрешение зависимостей. В JSON есть поля <code>files</code>, <code>roots</code> и, при проблемах с импортами, <code>errors</code>.
+
+<code>schema-gen --out-dir schemas</code> создаёт отдельные JSON Schema для <code>easyp.yaml</code>, <code>easyp.gen.yaml</code> и <code>protobuf.lock</code>: файлы с суффиксом <code>-v1.schema.json</code> и псевдонимы без версии. <code>protobuf.mod</code> — текстовый манифест; проверяйте его командой <code>validate-config</code>. CLI также проверяет семантические правила, не выраженные в JSON Schema.
+
+Экспортируемый пакет <code>github.com/easyp-tech/easyp/mcp/easypconfig</code> регистрирует <code>easyp_config_describe</code> через <code>easypconfig.RegisterTool(server)</code>. Инструмент описывает <code>easyp.yaml</code>, <code>easyp.gen.yaml</code>, <code>protobuf.lock</code> и <code>protobuf.mod</code>. YAML-справка использует те же JSON Schema, что и <code>schema-gen</code>; для текстового manifest возвращается грамматика, а не вымышленная YAML/JSON Schema.
+
+~~~json
+{"file":"protobuf.mod","path":"require[].version"}
+~~~
+
+~~~json
+{"file":"protobuf.lock","path":"modules[0].commit"}
+~~~
+
+<code>file</code> выбирает известный формат, а не путь для чтения. В ответе есть <code>format</code>; YAML-примеры сохраняют поле <code>yaml</code>, а примеры manifest содержат <code>format: text</code> и <code>text</code>. Объект <code>grammar</code> описывает директивы и правила блоков. Все флаги детализации по умолчанию включены; <code>include_schema=false</code> убирает YAML-схему или текстовую грамматику. <code>examples_limit</code> по умолчанию равен 10 и должен быть от 1 до 50; неверные границы вызывают ошибку. Справочник не читает файлы проекта, не обращается к сети, не запускает плагины и не раскрывает переменные. Commit и hash в примерах синтетические, а не проверенные данные репозитория.
+
+## Минимальный пример
+
+~~~text
+module github.com/acme/contracts
+roots proto
+require github.com/acme/shared v1.2.0
+~~~
+
+~~~yaml
+# easyp.gen.yaml
+version: v1
 generate:
-  inputs:
-    - directory: "proto"
-  plugins:
-    - name: go
-      out: .
-      opts:
-        paths: source_relative
+  modules: [github.com/acme/contracts]
+plugins:
+  - name: go
+    out: ./gen/go
+~~~
+
+~~~yaml
+# easyp.yaml
+version: v1
+linters:
+  default: STANDARD
 breaking:
-  ignore:
-    - proto/experimental/
-  against_git_ref: main
-```
+  baseline: git:main
+~~~
 
-#### JSON Format
-```json
-{
-  "lint": {
-    "use": ["BASIC", "COMMENT_SERVICE"]
-  },
-  "deps": [
-    "github.com/googleapis/googleapis@v1.0.0"
-  ],
-  "generate": {
-    "inputs": [
-      {"directory": "proto"}
-    ],
-    "plugins": [
-      {
-        "name": "go",
-        "out": ".",
-        "opts": {
-          "paths": "source_relative"
-        }
-      }
-    ]
-  },
-  "breaking": {
-    "ignore": ["proto/experimental/"],
-    "against_git_ref": "main"
-  }
-}
-```
+Точные поля и текущие ограничения описаны в справочниках по ссылкам выше.
 
-### Переменные окружения в конфигурации
+## Ошибки и неинтерактивный запуск
 
-EasyP поддерживает расширение переменных окружения непосредственно в файле конфигурации `easyp.yaml`. Это позволяет использовать переменные окружения для динамических значений конфигурации.
+<code>ls-files</code> сначала выводит полный JSON или текстовый результат, затем возвращает ненулевой код, если при обходе импортов обнаружена ошибка. Наличие массива <code>errors</code> не означает успешную проверку. <code>--include-imports=false</code> намеренно перечисляет только локальные файлы и не проверяет целостность импортов.
 
-**Пример со всеми поддерживаемыми возможностями:**
-```yaml
-deps:
-  # Базовое расширение: ${VAR} - расширяется в значение переменной VAR
-  - ${GOOGLEAPIS_REPO}@${GOOGLEAPIS_VERSION}
-  
-  # Значение по умолчанию: ${VAR:-default} - использует default, если VAR не установлена или пустая
-  - ${GNOSTIC_REPO:-github.com/google/gnostic}@${GNOSTIC_VERSION:-v0.7.0}
+<code>init</code> не открывает скрытый управляющий терминал при перенаправленных вводе или выводе. Укажите <code>--module</code>, если идентификатор невозможно получить локально. Идентификатор по origin берётся из объявленного Git URL до транспортной подстановки <code>insteadOf</code>. Перезапись отличающегося существующего конфига требует подтверждения в терминале; ответ из pipe не принимается.
 
-generate:
-  inputs:
-    # Значение по умолчанию, если INPUT_DIR не установлена
-    - directory: ${INPUT_DIR:-proto}
-  plugins:
-    - name: go
-      # Базовое расширение
-      out: ${OUTPUT_DIR}
-      opts:
-        # Значение по умолчанию
-        module: ${MODULE_NAME:-github.com/example/project}
-        timeout: ${TIMEOUT:-30}
-        
-        # Экранирование: $$ становится буквальным $, $${VAR} становится буквальным ${VAR}
-        path: "${BASE_DIR}/$${TEMP}/file"         # Результат: "/tmp/${TEMP}/file" (если BASE_DIR=/tmp)
-        literal: "$$"                             # Результат: "$"
-```
-
-**Поддерживаемый синтаксис:**
-- `${VAR}` - расширяется в значение переменной `VAR`
-- `${VAR:-default}` - использует `default`, если `VAR` не установлена или пустая
-- `${VAR:=default}` - использует `default`, если `VAR` не установлена или пустая
-- `${VAR-default}` - использует `default`, если `VAR` не установлена (пустая строка сохраняется)
-- `$${VAR}` или `$$VAR` - экранирует в буквальную строку `${VAR}` или `$VAR`
-- `$$` - экранирует в буквальный символ `$`
-
-**Примечание:** Переменные окружения расширяются до парсинга YAML, поэтому любой паттерн `${STRING}` будет обработан. Используйте `$$` для экранирования символов доллара, когда нужны буквальные значения.
-
-## Configuration Fields
-
-### `version`
-
-**Опционально (legacy-совместимость).** Поле поддерживается для обратной совместимости и может быть опущено в новых конфигурациях.
-
-**Type:** `string`
-**Default:** не задано
-**Рекомендация:** если сохраняете поле, используйте `v1alpha`
-
-```yaml
-# Опциональное поле для совместимости (можно опустить)
-version: v1alpha
-```
-
-На поведение рантайма это поле не влияет.
-
-### `lint`
-
-**Optional.** Configures proto file linting rules and behavior.
-
-**Type:** `object`
-**Default:** Empty (no linting rules applied)
-
-```yaml
-lint:
-  use:
-    - BASIC
-    - COMMENT_SERVICE
-  enum_zero_value_suffix: "UNSPECIFIED"
-  service_suffix: "Service"
-  ignore:
-    - vendor/
-    - proto/legacy/
-  except:
-    - COMMENT_FIELD
-  allow_comment_ignores: true
-  ignore_only:
-    COMMENT_SERVICE:
-      - proto/experimental/
-```
-
-#### `lint.use`
-
-**Optional.** Specifies which linter rules or rule categories to apply.
-
-**Type:** `[]string`
-**Default:** `[]` (no rules)
-
-**Available categories:**
-- `MINIMAL` - Essential package consistency checks
-- `BASIC` - Naming conventions and common patterns
-- `DEFAULT` - Additional recommended rules
-- `COMMENTS` - Comment requirements
-- `UNARY_RPC` - Streaming RPC restrictions
-
-**Individual rules:** Any specific rule name (e.g., `ENUM_PASCAL_CASE`, `FIELD_LOWER_SNAKE_CASE`)
-
-```yaml
-lint:
-  use:
-    - MINIMAL           # Use all minimal rules
-    - BASIC             # Use all basic rules
-    - COMMENT_SERVICE   # Require service comments
-    - ENUM_PASCAL_CASE  # Specific rule
-```
-
-**Rule Categories:**
-
-**MINIMAL:**
-- `DIRECTORY_SAME_PACKAGE`
-- `PACKAGE_DEFINED`
-- `PACKAGE_DIRECTORY_MATCH`
-- `PACKAGE_SAME_DIRECTORY`
-
-**BASIC:**
-- `ENUM_FIRST_VALUE_ZERO`
-- `ENUM_NO_ALLOW_ALIAS`
-- `ENUM_PASCAL_CASE`
-- `ENUM_VALUE_UPPER_SNAKE_CASE`
-- `FIELD_LOWER_SNAKE_CASE`
-- `IMPORT_NO_PUBLIC`
-- `IMPORT_NO_WEAK`
-- `IMPORT_USED`
-- `MESSAGE_PASCAL_CASE`
-- `ONEOF_LOWER_SNAKE_CASE`
-- `PACKAGE_LOWER_SNAKE_CASE`
-- `PACKAGE_SAME_CSHARP_NAMESPACE`
-- `PACKAGE_SAME_GO_PACKAGE`
-- `PACKAGE_SAME_JAVA_MULTIPLE_FILES`
-- `PACKAGE_SAME_JAVA_PACKAGE`
-- `PACKAGE_SAME_PHP_NAMESPACE`
-- `PACKAGE_SAME_RUBY_PACKAGE`
-- `PACKAGE_SAME_SWIFT_PREFIX`
-- `RPC_PASCAL_CASE`
-- `SERVICE_PASCAL_CASE`
-
-**DEFAULT:**
-- `ENUM_VALUE_PREFIX`
-- `ENUM_ZERO_VALUE_SUFFIX`
-- `FILE_LOWER_SNAKE_CASE`
-- `RPC_REQUEST_RESPONSE_UNIQUE`
-- `RPC_REQUEST_STANDARD_NAME`
-- `RPC_RESPONSE_STANDARD_NAME`
-- `PACKAGE_VERSION_SUFFIX`
-- `SERVICE_SUFFIX`
-
-**COMMENTS:**
-- `COMMENT_ENUM`
-- `COMMENT_ENUM_VALUE`
-- `COMMENT_FIELD`
-- `COMMENT_MESSAGE`
-- `COMMENT_ONEOF`
-- `COMMENT_RPC`
-- `COMMENT_SERVICE`
-
-**UNARY_RPC:**
-- `RPC_NO_CLIENT_STREAMING`
-- `RPC_NO_SERVER_STREAMING`
-
-#### `lint.enum_zero_value_suffix`
-
-**Optional.** Specifies the required suffix for enum zero values.
-
-**Type:** `string`
-**Default:** `""` (no suffix required)
-**Common values:** `"UNSPECIFIED"`, `"UNKNOWN"`, `"DEFAULT"`
-
-```yaml
-lint:
-  enum_zero_value_suffix: "UNSPECIFIED"
-```
-
-This enforces enum zero values like:
-```proto
-enum Status {
-  STATUS_UNSPECIFIED = 0;  // Required suffix
-  STATUS_ACTIVE = 1;
-  STATUS_INACTIVE = 2;
-}
-```
-
-#### `lint.service_suffix`
-
-**Optional.** Specifies the required suffix for service names.
-
-**Type:** `string`
-**Default:** `""` (no suffix required)
-**Common values:** `"Service"`, `"API"`, `"Svc"`
-
-```yaml
-lint:
-  service_suffix: "Service"
-```
-
-This enforces service names like:
-```proto
-service UserService {    // Required "Service" suffix
-  rpc GetUser(...) returns (...);
-}
-```
-
-#### `lint.ignore`
-
-**Optional.** Directories or files to exclude from all linting rules.
-
-**Type:** `[]string`
-**Default:** `[]`
-
-```yaml
-lint:
-  ignore:
-    - vendor/
-    - proto/legacy/
-    - testdata/
-    - "**/*_test.proto"
-```
-
-Paths are relative to the `easyp.yaml` file location. Supports glob patterns.
-
-#### `lint.except`
-
-**Optional.** Disables specific rules globally across the entire project.
-
-**Type:** `[]string`
-**Default:** `[]`
-
-```yaml
-lint:
-  except:
-    - COMMENT_FIELD
-    - COMMENT_MESSAGE
-    - SERVICE_SUFFIX
-```
-
-#### `lint.allow_comment_ignores`
-
-**Optional.** Enables inline comment-based rule ignoring within proto files.
-
-**Type:** `boolean`
-**Default:** `false`
-
-```yaml
-lint:
-  allow_comment_ignores: true
-```
-
-When enabled, allows comments like:
-```proto
-// buf:lint:ignore COMMENT_SERVICE
-service LegacyAPI {
-  // nolint:COMMENT_RPC
-  rpc GetData(...) returns (...);
-}
-```
-
-#### `lint.ignore_only`
-
-**Optional.** Disables specific rules only for certain files or directories.
-
-**Type:** `map[string][]string`
-**Default:** `{}`
-
-```yaml
-lint:
-  ignore_only:
-    COMMENT_SERVICE:
-      - proto/legacy/
-      - vendor/
-    SERVICE_SUFFIX:
-      - proto/external/
-```
-
-**Key:** Rule name or category
-**Value:** Array of file paths or directories
-
-### `deps`
-
-**Optional.** Lists external proto dependencies to download and manage.
-
-**Type:** `[]string`  
-**Default:** `[]`
-
-#### Dependency Format
-
-Dependencies follow the format: `$GIT_LINK@$VERSION`
-
-**Components:**
-- `$GIT_LINK` - Git repository URL (GitHub, GitLab, etc.)
-- `$VERSION` - Git tag or full commit hash (optional)
-
-**Format variations:**
-- `owner/repo` - Latest commit from default branch
-- `owner/repo@v1.0.0` - Specific git tag
-- `owner/repo@47b927cbb41c4fdea1292baf` - Full commit hash
-- `github.com/owner/repo@version` - Full URL with version
-- `gitlab.com/group/repo@tag` - GitLab repository
-
-```yaml
-deps:
-  # Latest commit from default branch
-  - googleapis/googleapis
-  
-  # Specific tag (recommended for production)
-  - googleapis/googleapis@v1.0.0
-  
-  # Full commit hash (most precise)
-  - googleapis/googleapis@47b927cbb41c4fdea1292bafadb8976f
-  
-  # Different Git hosting
-  - gitlab.com/acme/proto@v2.1.0
-```
-
-**Note:** If `@$VERSION` is omitted, EasyP downloads the latest commit from the repository's default branch.
-
-### `generate`
-
-**Optional.** Configures code generation from proto files.
-
-**Type:** `object`
-**Default:** `{}`
-
-```yaml
-generate:
-  inputs:
-    - directory: "proto"
-    - git_repo:
-        url: "github.com/acme/common@v1.0.0"
-        sub_directory: "proto"
-  plugins:
-    - name: go
-      out: .
-      opts:
-        paths: source_relative
-    - name: go-grpc
-      out: .
-      opts:
-        paths: source_relative
-        require_unimplemented_servers: false
-```
-
-#### `generate.inputs`
-
-**Required when `generate` is set.** Specifies sources of proto files for generation.
-
-**Type:** `[]object` (minimum 1 item)
-**Default:** not set
-
-```yaml
-generate:
-  inputs:
-    # Local directory
-    - directory: "proto"
-
-    # Local directory with advanced options
-    - directory:
-        path: "api/proto"
-        root: "."
-
-    # Remote git repository
-    - git_repo:
-        url: "github.com/acme/common@v1.0.0"
-        sub_directory: "proto"
-        root: "."
-```
-
-**Directory input fields:**
-- `directory` (string or object) - Local directory path
-- `directory.path` (string) - Directory path
-- `directory.root` (string) - Root path for import resolution (default: ".")
-
-**Git repository input fields:**
-- `git_repo.url` (string) - Repository URL with optional version
-- `git_repo.sub_directory` (string) - Subdirectory within the repository
-- `git_repo.root` (string) - Root path used for import resolution
-
-#### `generate.plugins`
-
-**Required when `generate` is set.** Configures protoc plugins for code generation.
-
-**Type:** `[]object` (minimum 1 item)
-**Default:** not set
-
-```yaml
-generate:
-  plugins:
-    # Local plugin
-    - name: go
-      out: .
-      opts:
-        paths: source_relative
-
-    # Remote plugin
-    - remote: "buf.build/bufbuild/protovalidate-go:v0.4.0"
-      out: gen/go
-      opts:
-        paths: source_relative
-
-    # Plugin with import dependencies
-    - name: grpc-gateway
-      out: .
-      with_imports: true
-      opts:
-        paths: source_relative
-```
-
-**Plugin fields:**
-- `name` (string, optional) - Plugin name (omit `protoc-gen-` prefix)
-- `remote` (string, optional) - Remote plugin URL for execution
-- `path` (string, optional) - Path to plugin executable file
-- `command` ([]string, optional) - Command to execute plugin
-- `out` (string, optional) - Output directory for generated files; defaults to the resolved generate root
-- `opts` (map[string](string | number | boolean | array&lt;string | number | boolean&gt;), optional) - Plugin-specific options; each key can be a single scalar value or an array of scalar values
-- `with_imports` (boolean, optional) - Include imported dependencies
-
-Plugin source is `one-of`: exactly one of `name`, `remote`, `path`, or `command` must be set.
-
-**Common plugin options:**
-```yaml
-# Go plugin options
-opts:
-  paths: source_relative              # Generate files relative to input
-  module: github.com/acme/api        # Go module path
-
-# gRPC Gateway options
-opts:
-  paths: source_relative
-  grpc_api_configuration: api.yaml   # gRPC API configuration
-
-# OpenAPI v2 options
-opts:
-  simple_operation_ids: true         # Use simple operation IDs
-  generate_unbound_methods: false    # Skip unbound methods
-
-# ts-proto options with repeated key values
-opts:
-  env: node
-  outputServices:
-    - grpc-js
-    - generic-definitions
-```
-
-When an `opts` value is a list, EasyP serializes it as repeated plugin params, e.g. `outputServices=grpc-js,outputServices=generic-definitions`.
-
-### `breaking`
-
-**Optional.** Configures backward compatibility checking.
-
-**Type:** `object`
-**Default:** `{}`
-
-```yaml
-breaking:
-  ignore:
-    - proto/experimental/
-    - proto/internal/
-  against_git_ref: main
-```
-
-#### `breaking.ignore`
-
-**Optional.** Directories or files to exclude from breaking change detection.
-
-**Type:** `[]string`
-**Default:** `[]`
-
-```yaml
-breaking:
-  ignore:
-    - proto/experimental/
-    - proto/alpha/
-    - testdata/
-```
-
-#### `breaking.against_git_ref`
-
-**Optional.** Git reference (branch, tag, or commit) to compare against for breaking changes.
-
-**Type:** `string`
-**Default:** `""` (falls back to CLI `--against` default: `master`)
-
-```yaml
-breaking:
-  against_git_ref: main
-```
-
-Can be overridden by the `--against` CLI flag.
-
-
-
-## Configuration Examples
-
-### Minimal Configuration
-
-```yaml
-lint:
-  use:
-    - MINIMAL
-```
-
-### Development Configuration
-
-```yaml
-lint:
-  use:
-    - BASIC
-    - COMMENT_SERVICE
-    - COMMENT_RPC
-  allow_comment_ignores: true
-  ignore:
-    - vendor/
-    - testdata/
-deps:
-  - github.com/googleapis/googleapis@v1.0.0
-generate:
-  inputs:
-    - directory: "proto"
-  plugins:
-    - name: go
-      out: .
-      opts:
-        paths: source_relative
-    - name: go-grpc
-      out: .
-      opts:
-        paths: source_relative
-```
-
-### Production Configuration
-
-```yaml
-lint:
-  use:
-    - MINIMAL
-    - BASIC
-    - DEFAULT
-    - COMMENTS
-  enum_zero_value_suffix: "UNSPECIFIED"
-  service_suffix: "Service"
-  ignore:
-    - vendor/
-  except: []
-  allow_comment_ignores: false
-deps:
-  - github.com/googleapis/googleapis@v1.56.0
-  - github.com/grpc-ecosystem/grpc-gateway@v2.18.0
-generate:
-  inputs:
-    - directory: "proto"
-  plugins:
-    - name: go
-      out: gen/go
-      opts:
-        paths: source_relative
-        module: github.com/acme/api/gen/go
-    - name: go-grpc
-      out: gen/go
-      opts:
-        paths: source_relative
-        require_unimplemented_servers: false
-    - name: grpc-gateway
-      out: gen/go
-      opts:
-        paths: source_relative
-    - name: openapiv2
-      out: gen/openapi
-      opts:
-        simple_operation_ids: true
-breaking:
-  ignore:
-    - proto/experimental/
-  against_git_ref: main
-```
-
-### Multi-Service Configuration
-
-```yaml
-lint:
-  use:
-    - BASIC
-    - COMMENT_SERVICE
-    - COMMENT_RPC
-  service_suffix: "Service"
-  ignore_only:
-    COMMENT_FIELD:
-      - proto/internal/
-    SERVICE_SUFFIX:
-      - proto/legacy/
-deps:
-  - github.com/googleapis/googleapis@v1.0.0
-  - github.com/acme/common-proto@v2.1.0
-generate:
-  inputs:
-    - directory: "proto/public"
-    - directory: "proto/internal"
-    - git_repo:
-        url: "github.com/acme/shared-proto@v1.0.0"
-        sub_directory: "proto"
-  plugins:
-    - name: go
-      out: gen/go
-      opts:
-        paths: source_relative
-    - name: go-grpc
-      out: gen/go
-      opts:
-        paths: source_relative
-    - name: grpc-gateway
-      out: gen/go
-      opts:
-        paths: source_relative
-    - remote: "buf.build/bufbuild/protovalidate-go:v0.4.0"
-      out: gen/go
-      opts:
-        paths: source_relative
-breaking:
-  ignore:
-    - proto/internal/
-    - proto/experimental/
-  against_git_ref: develop
-```
-
-## Configuration Validation
-
-EasyP validates configuration files on startup and provides helpful error messages:
-
-```bash
-# Invalid rule name
-Error: invalid rule: INVALID_RULE_NAME
-
-# Missing required field in generate section
-Error: required field "plugins" is missing (path: generate.plugins)
-
-# Invalid dependency format
-Error: invalid dependency format: invalid-repo-url
-```
-
-Use `easyp --debug` for detailed validation information.
-
-## Migration from Buf
-
-EasyP is fully compatible with Buf configurations. To migrate:
-
-1. Place `buf.yaml` or `buf.yml` in the project root
-2. Run `easyp init` and confirm migration when prompted
-3. Update `deps` format if using BSR modules
-4. Review migrated lint/breaking settings and adjust as needed
-
-Most Buf configurations work without changes in EasyP.
+Синтаксис политики и поддерживаемые настройки проверяются и при исполнении команды, и в <code>validate-config</code>. Непустой breaking baseline должен начинаться с <code>git:</code>. Lint группирует файлы по действующей политике и модулю, сохраняя исключения отдельных файлов и порядок диагностики.
