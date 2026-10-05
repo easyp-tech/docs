@@ -51,7 +51,28 @@ Modified legacy policy and manifest files receive byte-identical <code>.v0.bak</
 
 The converter preserves the effective selected lint rules, exceptions, rule settings, and explicit legacy comment-suppression setting. It converts literal ignores and rule-specific prefix ignores to the corresponding v1 exclusions. Generation preserves plugin sources, argv, options, <code>with_imports</code>, and supported managed settings. Relative paths remain relative to the configuration directory.
 
-Legacy <code>direct</code> and <code>indirect</code> requirements are converted to native <code>require</code> directives. The tool checks that whole v1 source roots would select the same local protobuf files with the same import paths. It does not silently expand a sliced input into an entire module.
+Legacy <code>direct</code> and <code>indirect</code> requirements are converted to native <code>require</code> directives. The tool proves that local generation keeps the same protobuf files and import paths, using whole roots or exact package selectors.
+
+## Keep default roots and source locations
+
+An omitted or empty legacy root means <code>.</code>. Native <code>protobuf.mod</code> has the same default when <code>roots</code> is omitted; there is no need to move proto files into a new directory.
+
+For example, an input selecting <code>mcp</code> under root <code>.</code> can become the following generation selection when all files in the package are selected:
+
+~~~yaml
+version: v1
+generate:
+  packages: [mcp.options.v1]
+plugins:
+  - name: go
+    out: .
+    opts:
+      paths: source_relative
+~~~
+
+Import roots stay unchanged and generated files keep their source-relative paths. The wizard first tries whole-root equality, then infers nonempty package selectors only if they select exactly the same physical files with the same import names. Selecting part of a package, crossing hidden/vendor/nested-module boundaries, or combining an inferred filter with whole-module Git generation inputs remains blocked. The selected sources and fixed selectors are checked again before apply.
+
+The preview warns that future files declaring a selected package also participate in generation, even outside the old input directory. This support requires an updated v1 nightly; the initial <code>v1.0.0-nightly.20261005.1</code> rejects directory subsets that need package inference.
 
 Variable placeholders are not expanded into saved values. If a placeholder or selector prevents safe analysis, conversion fails rather than persisting credentials or guessing its meaning.
 
@@ -59,11 +80,15 @@ Variable placeholders are not expanded into saved values. If a placeholder or se
 
 A full commit SHA is preserved, including a full SHA embedded in an old pseudo-version. For a legacy lock entry containing a tag but no SHA, conversion resolves that tag and verifies the historical installed-tree hash before accepting the revision. A moved tag or mismatched historical hash is an error.
 
+Git's annotated-tag spelling, such as `v0.4.0^{}`, is accepted for a full SemVer tag in the historical lock. The tag, commit and original hash are still verified, and the old lock stays byte-identical. Peeled branches, abbreviated refs, repeated suffixes and pseudo-version-shaped peeled tags are rejected.
+
+Released v0 installers archived Git's <code>*.proto</code> pathspec and stripped legacy root prefixes before hashing. Migration reproduces that archive at the pinned revision; it also retains verification of the existing whole-tree hash format. Git archive attributes that omit or alter proto files require manual migration because a native checkout would change the contract.
+
 The v1 content hash is then calculated independently over the tracked repository files. Old and new hashes cover different path layouts and cannot be copied or compared as interchangeable values. A missing historical dependency pin is not replaced with current HEAD.
 
 ## Explicit limitations
 
-Unknown fields, invalid or multi-document YAML, ambiguous source selection, unsupported references, and conflicting native outputs are rejected. Custom Git-input roots/subdirectories, external or sliced local inputs whose exact selection cannot be preserved, unsafe managed selectors, and full lock conversion with local replacements may require manual migration. Buf configurations are not inputs to this v0 converter.
+Invalid known fields, invalid or multi-document YAML, ambiguous source selection, unsupported references, and conflicting native outputs are rejected. Keys ignored by v0 are omitted with warnings and remain in the legacy backup. Custom Git-input roots/subdirectories, external or sliced local inputs whose exact selection cannot be preserved, unsafe managed selectors, and full lock conversion with local replacements may require manual migration. Buf configurations are not inputs to this v0 converter.
 
 The command stages all outputs and checks observed inputs again before applying. Ordinary application failures are rolled back. Several file replacements are not one process-crash-atomic transaction: after a machine or process failure, inspect the preserved backups and Git state before continuing. Uncooperative concurrent writers cannot be made safe by this command.
 
