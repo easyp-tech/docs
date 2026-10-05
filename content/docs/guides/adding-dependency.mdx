@@ -1,21 +1,39 @@
 ---
 title: "Adding a Dependency"
-description: "Step-by-step guide on adding Protobuf module dependencies, resolving transitive dependencies via easyp mod tidy, and committing lockfiles."
+description: "Add Protobuf module dependencies with easyp get and commit the resolved lockfile."
 ---
 
 This guide demonstrates how to add a third-party or shared Protobuf module dependency to your EasyP project.
 
 ---
 
+## Add a module with `easyp get`
+
+From the directory containing your `protobuf.mod`, run:
+
+```bash
+easyp get github.com/acme/weather
+# Or select a tag or full Git commit:
+easyp get github.com/acme/weather@v1.2.3
+```
+
+`get` adds the selected module as a direct `require`, writes its transitive dependencies as `// indirect`, and updates `protobuf.lock` with exact commits and content hashes. A module inside a Git repository can be named by its full module path, such as `github.com/acme/contracts/proto/user`. A tag is optional; without one, EasyP locks the repository's current HEAD. Run the command separately in each local module directory that has its own `protobuf.mod`.
+
+Add the required protobuf `import` to your `.proto` file, then review and commit both `protobuf.mod` and `protobuf.lock`.
+
+The steps below show the equivalent manual manifest workflow.
+
+---
+
 ## Workflow Overview
 
-1. **Declare Dependency**: Add the target module repository URL and version tag to `protobuf.mod` or reference it directly via `import` statements in your `.proto` schema files.
-2. **Run Resolution**: Execute `easyp mod tidy` to compute the transitive dependency graph.
+1. **Declare Dependency**: Add the target Git module identity to `protobuf.mod`. Use `import` statements to reference files from that declared dependency.
+2. **Run Resolution**: Execute `easyp mod tidy` to compute the transitive dependency graph after editing the manifest manually.
 3. **Commit Lockfile**: Review the updated `protobuf.mod` and `protobuf.lock` files and commit them to version control.
 
 ---
 
-## Step 1: Declare the Dependency
+## Step 1: Declare the Dependency Manually
 
 Open your module's `protobuf.mod` file and add the required module under the `require` block:
 
@@ -28,7 +46,7 @@ require (
 )
 ```
 
-Alternatively, you can write an `import` statement directly in your Protobuf source file:
+Then import a file provided by that dependency in your Protobuf source:
 
 ```protobuf
 // proto/user/v1/user.proto
@@ -55,6 +73,18 @@ easyp mod tidy
 - Computes Minimal Version Selection (MVS) for transitive dependencies.
 - Appends transitive dependencies to `protobuf.mod` marked with `// indirect`.
 - Generates or updates `protobuf.lock` with Git commit hashes and cryptographic content digests.
+
+### Git repositories using Buf or older EasyP configs
+
+The consuming project still declares a Git source with `require`. The dependency repository may use another configuration format:
+
+- EasyP v1 `protobuf.mod`: reads `roots` and `require`.
+- Buf v2 `buf.yaml`: reads `modules[].path` as import roots.
+- Buf v1 `buf.work.yaml`: reads `directories`; a single-module v1 `buf.yaml` uses `.`.
+- Buf v1beta1 `buf.yaml`: reads `build.roots`, defaulting to `.`.
+- Older EasyP: reads `direct` dependencies from the old `protobuf.mod` and local `generate.inputs[].directory.root` plus Git inputs from `easyp.yaml`.
+
+For an old EasyP dependency without a version on one of its Git requirements, `mod tidy` resolves the Git repository's HEAD and pins its commit in the v1 lock. No tag is required. The old EasyP `source@<commit>` form is also read transitively. Buf Registry `deps` are not Git sources, so declare an appropriate Git module in the consuming `protobuf.mod` when those imports are needed. Buf `includes`/`excludes` filters are not yet supported for Git dependency import roots and produce an explicit error.
 
 Updated `protobuf.mod`:
 

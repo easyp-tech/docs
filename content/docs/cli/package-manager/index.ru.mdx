@@ -1,460 +1,107 @@
 ---
 title: "Менеджер пакетов"
+description: "Разрешение и фиксация Git-зависимостей protobuf в EasyP v1."
 ---
 
-[[toc]]
+Менеджер пакетов v1 читает <code>protobuf.mod</code> и записывает <code>protobuf.lock</code>. Для каждого выбранного модуля lock содержит точный Git-коммит и хеш содержимого <code>h1:</code>. Хеш проверяется при скачивании и повторном использовании кеша.
 
-EasyP предоставляет мощный менеджер пакетов для protobuf‑зависимостей, упрощающий их управление за счёт децентрализованного подхода на базе Git. В отличие от централизованных решений, EasyP работает напрямую с Git‑репозиториями, давая вам полный контроль.
+## Объявление зависимостей
 
-## Обзор
+~~~text
+module github.com/acme/contracts
+roots proto
 
-Менеджер пакетов EasyP следует философии **Go modules** — любой Git‑репозиторий может быть источником. Это даёт преимущества:
+require (
+    github.com/acme/shared v1.2.0
+    github.com/acme/weather/v2 v2.1.0
+)
+~~~
 
-- **Децентрализация** — нет единой точки отказа или контроля
-- **Безопасность** — прямой доступ к исходникам
-- **Гибкость** — публичные, приватные и корпоративные репозитории
-- **Воспроизводимость** — lock‑файлы обеспечивают одинаковые сборки
-- **Производительность** — локальный кеш сокращает сетевые запросы
+Если <code>roots</code> не указан, используется <code>.</code>. SemVer-требования выбирают максимум запрошенных минимумов. Полный хеш коммита из 40 или 64 hex-символов задаёт точную ревизию. Тег и SHA совместимы, если выбранный тег разрешается в этот же коммит; разные коммиты конфликтуют. SHA не получает SemVer-порядка по дате или истории Git.
 
-### Основные возможности
+Требование без версии не ограничивает выбор, если в графе есть SemVer или точный коммит. Только оставшееся неограниченным требование использует текущий HEAD при первом <code>mod tidy</code>; следующие <code>tidy</code> сохраняют lock, а <code>mod update</code> освежает HEAD. Явные коммиты остаются закреплёнными.
 
-| Возможность | Описание |
-|-------------|----------|
-| **Git-Native** | Любой Git репозиторий, не нужен спец‑сервер |
-| **Множество форматов версий** | Теги, коммиты, псевдо‑версии, latest |
-| **Lock Files** | Воспроизводимые сборки через `easyp.lock` |
-| **Локальный кеш** | Архитектура как у Go modules |
-| **Vendoring** | Локальное копирование для оффлайн сборок |
-| **YAML конфигурация** | Простые и читаемые декларации |
+<code>replace module =&gt; ../local-copy</code> применяется только из главного <code>protobuf.mod</code>, в том числе к транзитивным требованиям. Все относительные пути замены считаются от главного манифеста; абсолютные используются напрямую. При наличии <code>replace</code> команды работают с локальным эффективным графом и сохраняют <code>protobuf.lock</code> побайтно; отсутствующий lock не создаётся. <code>mod tidy</code> также не меняет манифест. <code>get</code> и <code>mod update</code> могут менять явные требования, но не добавляют транзитивные зависимости только из форка. <code>mod download</code> устанавливает только нужные незаменённые снимки. Для публикуемого lock удалите замены и выполните <code>mod tidy</code>. Подробнее: [локальные замены](/ru/docs/guides/debugging-replace).
 
-## Архитектура
+Замена применяется, только если модуль достижим через прямые или транзитивные требования. Неиспользуемая замена не читается и не скачивается и не может скрыть исходники потребителя от lint или breaking. При проверке потребителя достижимые деревья замен предоставляют импорты; явно выберите замену через <code>--path</code>, чтобы проверить её собственную политику. Frozen по-прежнему отклоняет все замены, включая неиспользуемые.
 
-EasyP использует двухуровневый кеш, вдохновлённый Go modules:
+Если в Git-репозитории несколько манифестов, объявляйте каждый вложенный модуль отдельно по его имени. Например, <code>require repo/foo</code> и <code>require repo/bar</code> не требуют отдельных тегов, если HEAD подходит. Для релиза <code>v1.2.3</code> модуля в <code>foo/</code> используется тег <code>foo/v1.2.3</code>. Корни каждого модуля разрешаются независимо.
 
-```
-~/.easyp/
-├── cache/
-│   ├── download/              # Архивы + контрольные суммы
-│   │   └── github.com/
-│   │       └── googleapis/
-│   │           └── googleapis/
-│   │               ├── v1.2.3.zip       # Архив
-│   │               ├── v1.2.3.ziphash   # Checksum
-│   │               └── v1.2.3.info      # Метаданные
-│   └── {git-hash}/            # Bare репозитории Git (внутренне)
-└── mod/                       # Распакованные готовые модули
-    └── github.com/
-        └── googleapis/
-            └── googleapis/
-                ├── v1.2.3/           # Тегированная версия
-                │   ├── google/
-                │   │   ├── api/
-                │   │   └── rpc/
-                │   └── ...
-                └── v0.0.0-20250101123456-abc123def/  # Псевдо‑версия
-                    ├── google/
-                    └── ...
-```
+Для выбранного тега или коммита идентичность модуля, корни и требования читаются из этой ревизии. Вложенный модуль остаётся доступным, даже если на текущем HEAD его каталог удалён или заменён обычным файлом. Нативный манифест в выбранной ревизии должен соответствовать запрошенному модулю; некорректные native-метаданные не заменяются Buf или старым EasyP, а вместо закреплённой ревизии никогда не используется HEAD.
 
-### Расположение кеша
+Команды <code>mod</code> и <code>get</code> находят ближайший <code>protobuf.mod</code> в предках в пределах workspace. <code>easyp get &lt;модуль&gt;</code> добавляет прямое требование; <code>@v1.2.3</code> или <code>@&lt;полный-коммит&gt;</code> задаёт версию. Без суффикса применяется описанное выше неограниченное требование. Транзитивные требования дописываются с <code>// indirect</code>, повторный вызов не создаёт дубликаты. При ошибке разрешения манифест и lock не меняются.
 
-| Окружение | Путь | Как задать |
-|-----------|------|-----------|
-| **По умолчанию** | `$HOME/.easyp` | Автоматически |
-| **Свое** | Любая директория | Переменная `EASYPPATH` |
-| **CI/CD** | В каталоге проекта | `export EASYPPATH=$CI_PROJECT_DIR/.easyp` |
-
-## Конфигурация
-
-### Базовая конфигурация
-
-Зависимости описываются в `easyp.yaml`:
-
-```yaml
-deps:
-  - github.com/googleapis/googleapis@common-protos-1_3_1
-  - github.com/grpc-ecosystem/grpc-gateway@v2.19.1
-  - github.com/bufbuild/protoc-gen-validate
-```
-
-### Расширенные примеры
-
-#### Multi-Environment Setup
-```yaml
-# development.easyp.yaml
-deps:
-  - github.com/googleapis/googleapis              # Последнее для разработки
-  - github.com/mycompany/internal-protos          # Внутренние изменения
-  - github.com/bufbuild/protoc-gen-validate       # Новые фичи
-
-# production.easyp.yaml
-deps:
-  - github.com/googleapis/googleapis@common-protos-1_3_1       # Зафиксировано
-  - github.com/mycompany/internal-protos@v2.1.0                # Стабильно
-  - github.com/bufbuild/protoc-gen-validate@v0.10.1            # Проверено
-```
-
-#### Приватные репозитории
-```yaml
-deps:
-  # Публичное
-  - github.com/googleapis/googleapis@common-protos-1_3_1
-
-  # Частные
-  - github.com/mycompany/auth-protos@v1.5.0
-  - github.com/mycompany/common-types@v2.0.1
-
-  # Внутренний GitLab
-  - gitlab.company.com/platform/messaging-protos@v0.3.0
-```
-
-## Стратегии версионирования
-
-Поддерживаются разные способы фиксации версий:
-
-### 1. Семантические теги (для продакшена)
-
-```yaml
-deps:
-  - github.com/grpc-ecosystem/grpc-gateway@v2.19.1
-  - github.com/googleapis/googleapis@common-protos-1_3_1
-```
-
-**Используйте когда:**
-- Продакшен
-- Стабильное потребление API
-- Нужна воспроизводимость
-
-### 2. Последний тег (development)
-
-```yaml
-deps:
-  - github.com/googleapis/googleapis
-  - github.com/bufbuild/protoc-gen-validate
-```
-
-**Подходит для:**
-- Активной разработки
-- Получения свежих возможностей
-- Тестирования совместимости
-
-### 3. Хеш коммита (Bleeding Edge)
-
-```yaml
-deps:
-  - github.com/bufbuild/protoc-gen-validate@abc123def456789abcdef123456789abcdef1234
-```
-
-**Когда нужно:**
-- Нерелизные фичи
-- Тест конкретного фикса
-- Вклад в upstream
-
-### 4. Псевдо‑версии (автоматически)
-
-Если нет подходящего тега — создаётся псевдо‑версия:
-
-```
-Формат: v0.0.0-{timestamp}-{short-commit-hash}
-Пример: v0.0.0-20250908104020-660ec2d64e07f2fa8947527443af058b3d7169df
-```
+Мажорные версии используют идентичность как в Go: v0/v1 — без суффикса, v2+ — с соответствующим <code>/vN</code>. Исключение <code>+incompatible</code> требует проверки домодульных метаданных и не обходит нативный manifest. См. [точную грамматику и Git mapping](/ru/docs/reference/protobuf-mod).
 
 ## Команды
 
-### `easyp mod download`
+| Команда | Поведение |
+|---------|-----------|
+| <code>easyp get &lt;модуль&gt;[@версия&#124;@коммит]</code> | Добавляет или делает прямой зависимостью модуль, разрешает транзитивные зависимости и записывает <code>protobuf.lock</code> |
+| <code>easyp mod tidy</code> | Разрешает прямые и транзитивные требования и записывает <code>protobuf.lock</code> |
+| <code>easyp mod download</code> | Скачивает точные коммиты из lock и проверяет хеши |
+| <code>easyp mod update</code> | Обновляет требования в пределах текущих мажорных версий и пересоздаёт lock |
+| <code>easyp mod vendor</code> | Проверяет зафиксированные зависимости и копирует их <code>.proto</code> в <code>easyp_vendor</code> |
 
-Скачивает и устанавливает все объявленные зависимости.
-
-**Что делает:**
-1. Разрешает версии (теги → коммиты)
-2. Скачивает архивы в `cache/download`
-3. Проверяет контрольные суммы
-4. Распаковывает в `cache/mod`
-5. Обновляет `easyp.lock`
-
-**Пример:**
-```bash
-easyp mod download
-easyp --cfg production.easyp.yaml mod download
-EASYPPATH=/tmp/easyp-cache easyp mod download
-```
-
-### `easyp mod vendor`
-
-Копирует все proto зависимости в локальный `easyp_vendor/` для оффлайна.
-
-**Сценарии:**
-- Docker сборки
-- Air-gapped окружения
-- Воспроизводимость
-- Ускорение
-
-```bash
-easyp mod vendor
-```
-
-Структура:
-```
-easyp_vendor/
-├── github.com/
-│   ├── googleapis/
-│   │   └── googleapis/
-│   │       ├── google/
-│   │       │   ├── api/
-│   │       │   │   ├── annotations.proto
-│   │       │   │   └── http.proto
-│   │       │   └── rpc/
-│   │       │       └── status.proto
-│   │       └── ...
-│   └── grpc-ecosystem/
-│       └── grpc-gateway/
-│           └── protoc-gen-openapiv2/
-│               └── options/
-│                   └── annotations.proto
-```
-
-### `easyp mod update`
-
-Обновляет версии согласно `easyp.yaml`, пересоздаёт lock.
-
-```bash
-easyp mod update
-```
-
-## Lock файл
-
-`easyp.lock` фиксирует точные версии и хеш содержимого:
-
-```
-github.com/bufbuild/protoc-gen-validate v0.0.0-20250908104020-660ec2d64e07f2fa8947527443af058b3d7169df h1:ZZ5JyUkmrj9OBHM+gOCzeL5L/pAKVbsUl051yhhJTjU=
-github.com/googleapis/googleapis v0.0.0-20250909114430-8727b5ba7f23fbbfddda58239e8bc6b547e05878 h1:eI+XYpPio3fxl9H5/VjW2PxlxM/7yqPjEq3oQ6jUkj4=
-github.com/grpc-ecosystem/grpc-gateway v2.19.1 h1:01NNlCezvwUQ07ZvblXH0kelWq8hNl2qb44bOMcaSTQ=
-```
-
-**Формат строки:**
-- Путь модуля
-- Версия (тег или псевдо)
-- Хеш содержимого (`h1:`)
-
-**Практики:**
-✅ Коммитить `easyp.lock`  
-✅ Осознанно обновлять `mod update`  
-✅ Ревью изменений версий  
-❌ Не редактировать вручную  
-
-## Аутентификация
-
-### Публичные репозитории
-
-Работают без настроек:
-
-```yaml
-deps:
-  - github.com/googleapis/googleapis
-  - github.com/bufbuild/protoc-gen-validate
-```
-
-### Приватные репозитории
-
-#### SSH ключи (рекомендуется)
-
-```bash
-git config --global url."git@github.com:".insteadOf "https://github.com/"
-git config --global url."git@gitlab.com:".insteadOf "https://gitlab.com/"
-git config --global url."git@gitlab.company.com:".insteadOf "https://gitlab.company.com/"
-```
-
-Конфиг остаётся с HTTPS URL:
-
-```yaml
-deps:
-  - github.com/mycompany/private-protos@v1.0.0
-  - gitlab.company.com/platform/shared-types@v2.1.0
-```
-
-#### Personal Access Tokens
-
-```bash
-git config --global credential.helper store
-echo "https://username:token@github.com" >> ~/.git-credentials
-
-git config --global url."https://username:token@github.com/mycompany".insteadOf "https://github.com/mycompany"
-```
-
-#### Корпоративная среда
-
-```bash
-git config --global http.proxy http://proxy.company.com:8080
-git config --global https.proxy https://proxy.company.com:8080
-git config --global http.sslCAInfo /path/to/certificate.pem
-```
-
-## Типовые workflows
-
-### Инициализация проекта
-
-```bash
-cat > easyp.yaml << EOF
-deps:
-  - github.com/googleapis/googleapis
-  - github.com/grpc-ecosystem/grpc-gateway@v2.19.1
-EOF
-
-easyp mod download
-ls ~/.easyp/mod/github.com/googleapis/googleapis/
-```
-
-### Добавление зависимости
-
-```bash
-echo "  - github.com/bufbuild/protoc-gen-validate@v0.10.1" >> easyp.yaml
-easyp mod download
-git add easyp.lock
-git commit -m "Add protoc-gen-validate dependency"
-```
-
-### Обновление
-
-```bash
-easyp mod update
-git diff easyp.lock
-easyp generate
-easyp lint
-git add easyp.lock
-git commit -m "Update dependencies"
-```
-
-### Оффлайн режим
-
-```bash
+~~~bash
+easyp get github.com/acme/contracts/proto/user
 easyp mod vendor
 easyp generate
-```
+~~~
 
-## Troubleshooting
+Храните <code>protobuf.mod</code> и <code>protobuf.lock</code> в репозитории для воспроизводимой сборки. Кеш по умолчанию расположен в <code>$HOME/.easyp/v1/git</code>; переменная <code>EASYPPATH</code> меняет его родительский каталог. Без замен <code>mod vendor</code> использует опубликованный lock. С заменами он копирует эффективный граф без изменения lock. Повторяющиеся import path отклоняются. Каталог <code>easyp_vendor</code> — копия исходников зависимостей, а не замена lock-файла.
 
-### Частые проблемы
+## Неизменность тегов и повторное использование кеша
 
-#### "Repository not found" / "Authentication failed"
+<code>tidy</code>, <code>get</code> и <code>update</code> сверяют каждый повторно полученный зафиксированный SemVer с записанными коммитом и хешем. Перепубликованный тег вызывает <code>ErrLockedVersionChanged</code> до установки нового графа и записи манифеста или lock, в том числе для транзитивных зависимостей и прогретого кеша. Выбор новой версии и обновление неограниченных HEAD-требований остаются доступны.
 
-```bash
-git ls-remote https://github.com/mycompany/private-repo
-git config --list | grep url
-```
+<code>mod download</code> получает коммит из lock даже после переноса тега, если он доступен. Кеш повторно использует Git-объекты: известный точный коммит не требует обращения к remote. Холодный запрос сначала пробует загрузку точного коммита с глубиной один, затем при необходимости доступную историю; HEAD вместо коммита не подставляется. Проверки тегов обновляются отдельно, а установленные файлы по-прежнему проверяются по хешу.
 
-#### "Version not found"
+## Зависимости на Buf или старом EasyP
 
-```bash
-git ls-remote --tags https://github.com/googleapis/googleapis
-# Проверить корректный тег
-deps:
-  - github.com/googleapis/googleapis@common-protos-1_3_1
-```
+Git-зависимость может объявлять корни <code>.proto</code> через <code>buf.work.yaml</code>, Buf v1/v2 <code>buf.yaml</code> или старый EasyP <code>easyp.yaml</code>. Транзитивные требования из старого EasyP <code>protobuf.mod</code> также читаются. Если ни одного такого файла нет, корнем считается каталог репозитория. Совместимость относится к метаданным зависимости; проект-потребитель использует v1 <code>protobuf.mod</code>.
 
-#### "Cache corruption" / "Checksum mismatch"
+При адаптации старого <code>easyp.yaml</code> требования берутся и из <code>deps</code>, и из Git-входов генерации. Точные дубликаты источник/версия удаляются, разные минимумы сохраняются для MVS; некорректные deps вызывают ошибку. Совпадающий нативный <code>protobuf.mod</code> имеет приоритет. Читаются только метаданные, плагины зависимости не запускаются.
 
-```bash
-rm -rf ~/.easyp
-rm -rf ~/.easyp/cache/download
-easyp mod download
-```
+EasyP читает <code>deps</code> Buf v1, v1beta1 и v2, включая объявления в модулях, выбранных через <code>buf.work.yaml</code>. Текущий resolver совместимости сопоставляет известные BSR-модули с фиксированными Git-снимками: Googleapis, grpc-gateway, grpc-federation, protoc-gen-validate и protovalidate. Неизвестный BSR-модуль вызывает явную ошибку; EasyP не угадывает Git-репозиторий по имени. Нативный <code>protobuf.mod</code> имеет приоритет; прямые BSR-требования в манифесте потребителя не поддерживаются.
 
-#### Тайм-ауты сети
+Lock сохраняет исходную BSR-ссылку и pin вместе с Git-привязкой. Разрешение сообщает <code>compatibility_snapshot</code>: хеш Git-исходников проверяется, но это не доказательство эквивалентности произвольной BSR-ревизии и не проверка её BSR digest. Frozen использует сохранённые привязки. Старые lock-файлы для зависимостей с BSR-объявлениями пересоздайте через <code>mod tidy</code> вне frozen.
 
-```bash
-git config --global http.lowSpeedLimit 1000
-git config --global http.lowSpeedTime 300
-git config --global http.proxy http://proxy.company.com:8080
-```
+Buf v1/v1beta1 <code>build.excludes</code> и v2 <code>modules[].includes/excludes</code> выбирают файлы без изменения import path. Пути считаются от объявляющего <code>buf.yaml</code>; вложенные конфиги workspace сохраняют эту базу. Пересекающиеся корни одного Buf-конфига выбирают объединение разрешённых файлов.
 
-### Оптимизация
+Тот же отбор действует для импортов, генерации зависимостей и выбора пакетов, списка файлов, контекстов lint и breaking, проверки коллизий и vendoring. Исключённый файл нельзя вернуть через symlink или широкий корень потребителя: учитывается как путь ссылки, так и её физическая цель. Исключённый файл зависимости не конфликтует с разрешённым файлом потребителя по тому же import path.
 
-#### Для больших команд
+Форматы полей описаны в справочниках [<code>protobuf.mod</code>](/ru/docs/reference/protobuf-mod) и [<code>protobuf.lock</code>](/ru/docs/reference/protobuf-lock).
 
-```bash
-export EASYPPATH=/shared/easyp-cache
-export EASYPPATH=/team-cache/easyp
-```
+## Достижимые импорты и прямые зависимости
 
-#### Для CI/CD
+Перед записью manifest и lock команда <code>mod tidy</code> проверяет цепочку импортов, достижимых из локального модуля, включая импорты внутри файлов зависимостей. Отсутствующие файлы и некорректный синтаксис достижимого protobuf останавливают операцию. Неиспользуемые файлы зависимости не компилируются и не проходят lint целиком. Импорт из <code>google/protobuf/</code> должен действительно существовать: одного префикса недостаточно.
 
-```bash
-export EASYPPATH=$CI_PROJECT_DIR/.easyp
-# Пример кеширования (GitLab CI)
-cache:
-  key: easyp-$CI_COMMIT_REF_SLUG
-  paths:
-    - .easyp/
-```
+Когда локальный исходник начинает импортировать ранее косвенную зависимость, <code>tidy</code> удаляет существующую пометку <code>// indirect</code>, сохраняя версию и остальные комментарии. Это не поиск произвольного Git-репозитория по неизвестному proto-пути. Идентификаторам зависимостей реестра Buf по-прежнему нужно явное соответствие Git-модулям; они не преобразуются в URL репозитория автоматически.
 
-#### Управление размером кеша
+## Сборки в режиме frozen
 
-```bash
-du -sh ~/.easyp
-du -sh ~/.easyp/cache/download
-du -sh ~/.easyp/mod
-find ~/.easyp/mod -type d -name "v0.0.0-*" -mtime +30 -exec rm -rf {} \;
-```
+Сохраните <code>protobuf.mod</code> и <code>protobuf.lock</code> в репозитории, затем явно включите <code>--frozen</code>. Даже модулю без зависимостей нужен пустой lock; каталог исходников без native-манифеста отклоняется. <code>CI=true</code> не включает этот режим.
 
-## Примеры интеграции
+~~~bash
+# Подготовьте и проверьте lock вне frozen
+easyp mod tidy
+# Используйте сохранённый граф; загрузка точных коммитов в кеш разрешена
+easyp mod download --frozen
+easyp --frozen generate
+easyp mod --frozen vendor
+~~~
 
-### Docker multi-stage
+Флаг можно поставить глобально, на уровне <code>mod</code> или конечной подкоманды. Значение true на любом уровне остаётся включённым, даже если дочерняя команда получила <code>--frozen=false</code>. Все варианты размещения описаны в [конфигурации](/ru/docs/cli/configuration).
 
-```dockerfile
-FROM ghcr.io/easyp-tech/easyp:latest AS deps
-WORKDIR /workspace
-COPY easyp.yaml easyp.lock ./
-RUN easyp mod vendor
+Frozen отклоняет все корневые <code>replace</code> до обращения к их путям или скачивания зависимостей, в том числе неиспользуемые замены. Проверяются прямые требования манифеста и транзитивные требования зафиксированных модулей; отсутствующий, некорректный, неполный или устаревший lock вызывает ошибку вместо исправления. Зависимости, выбранные по идентификатору, используют манифест и lock потребителя и не обязаны иметь собственные lock-файлы. Явный путь от workspace при выборе модуля для генерации использует манифест и lock выбранного native-модуля; каталогу только с настройками генератора отдельная пара не нужна. Замены из манифестов зависимостей по-прежнему игнорируются.
 
-FROM alpine:latest AS build
-WORKDIR /app
-COPY --from=deps /workspace/easyp_vendor ./easyp_vendor
-COPY . .
-RUN easyp generate
-```
+Режим не разрешает зависимости заново, не ищет HEAD/теги, не создаёт и не переписывает манифест или lock. Недостающий кеш может загружаться по точным коммитам из lock. Хеши проверяются при холодном и прогретом кеше; повреждённое содержимое вызывает ошибку, а не незаметную замену сохранённого хеша. Frozen не означает работу без сети; удалённым плагинам также может понадобиться сетевой доступ.
 
-### Monorepo
+<code>mod download</code> устанавливает проверенный граф. <code>mod vendor</code> проверяет его перед записью <code>easyp_vendor</code>. <code>mod tidy</code>, <code>get</code>, <code>mod update</code>, <code>init</code> и <code>migrate</code> отклоняют запуск в frozen, включая предварительный просмотр миграции. Удалите замены и подготовьте манифест/lock вне frozen. Обычное поведение локальных замен и vendor, описанное выше, не меняется.
 
-```
-my-monorepo/
-├── services/
-│   ├── auth-service/
-│   │   └── easyp.yaml
-│   └── user-service/
-│       └── easyp.yaml
-├── shared/
-│   └── common-protos/
-└── easyp.yaml
-```
+## Ошибки кэша и доступа к ревизии
 
-Каждый `easyp.yaml` может иметь свой набор зависимостей.
+При несовпадении хеша установленного модуля ошибка указывает точный каталог кэша. Сначала сохраните его для расследования или изолируйте только эту запись, затем повторите <code>easyp mod download</code>. Не переписывайте <code>protobuf.lock</code>, чтобы скрыть несовпадение; команда сама не удаляет и не исправляет повреждённый кэш.
 
-## Лучшие практики
-
-### Workflow разработки
-- ✅ Latest теги в активной разработке
-- ✅ Фиксация версий в продакшене
-- ✅ Коммит lock файла
-- ✅ Ревью обновлений
-- ✅ Тест после обновления
-
-### Безопасность
-- ✅ Фиксируйте версии
-- ✅ Используйте SSH ключи
-- ✅ Оценивайте новые зависимости
-- ✅ Следите за уязвимостями
-- ❌ Не храните секреты в конфиге
-
-### Производительность
-- ✅ Агрессивное кеширование в CI
-- ✅ Vendoring для частых сборок
-- ✅ Чистка старого кеша
-- ✅ Общий кеш для команды
-
-### Командная работа
-- ✅ Документация по аутентификации
-- ✅ Единые инструменты
-- ✅ Автоматизация обновлений с тестами
-- ✅ Общий кеш при возможности
-
-Менеджер пакетов EasyP — масштабируемое децентрализованное решение от одиночных проектов до enterprise, сохраняя простоту и надёжность.
+Недоступность Git-репозитория не означает, что тег отсутствует. Когда история получена, но закреплённого коммита в ней нет, восстановите доступ к исходной ревизии вместо замены на HEAD. Проверка тегов и защита от изменения их содержимого сохраняются; автоматического перехода на офлайн-разрешение нет.

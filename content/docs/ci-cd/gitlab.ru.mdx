@@ -2,60 +2,27 @@
 title: "GitLab CI"
 ---
 
-## В процессе разработки
+Для примера ниже задайте <code>EASYP_CI_IMAGE</code>: закреплённый образ с проверенной сборкой EasyP v1, Git и нужными плагинами. Конфиги и lock должны быть закоммичены. Здесь показан один модуль с generation-конфигом в корне; в монорепозитории команды модулей запускаются для каждого модуля, а генерация выбирается явно.
 
-Документация по интеграции EasyP с GitLab CI находится в процессе подготовки.  
-Планируемые разделы:
-
-- Быстрый старт (пример `.gitlab-ci.yml` для линтинга и проверки несовместимых изменений)
-- Кэширование зависимостей и ускорение сборок
-- Генерация кода и проверка актуальности артефактов
-- Работа с приватными Git-репозиториями в `deps`
-- Матрицы (parallel jobs) для разных языков и плагинов
-- Автоматизация релизов по тегам
-
-Если вам нужен пример прямо сейчас, базовый минимальный вариант может выглядеть так:
-
-```yaml
-stages:
-  - validate
-  - generate
+~~~yaml
+image: $EASYP_CI_IMAGE
 
 variables:
-  GO_VERSION: "1.22"
+  GIT_DEPTH: "0"
 
-validate:
+stages: [validate]
+
+contracts:
   stage: validate
-  image: golang:${GO_VERSION}
-  before_script:
-    - go install github.com/easyp-tech/easyp/cmd/easyp@latest
-    - echo "EasyP version:"
-    - easyp --version
-    # При необходимости: git fetch --all --tags
   script:
+    - easyp validate-config
+    - easyp mod download
     - easyp lint
-    - easyp breaking --against git-ref=origin/main
-  only:
-    changes:
-      - "**/*.proto"
-      - "easyp.yaml"
-
-generate:
-  stage: generate
-  image: golang:${GO_VERSION}
-  before_script:
-    - go install github.com/easyp-tech/easyp/cmd/easyp@latest
-  script:
+    - git fetch origin +refs/heads/main:refs/remotes/origin/main
+    - easyp breaking --against refs/remotes/origin/main
     - easyp generate
-    - |
-      if [ -n "$(git status --porcelain)" ]; then
-        echo "Сгенерированный код не актуален. Закоммитьте изменения локально."
-        git diff --name-only
-        exit 1
-      fi
-  only:
-    - main
+    - git diff --exit-code
+    - test -z "$(git status --porcelain --untracked-files=normal -- gen)"
+~~~
 
-```
-
-Дополнительные рекомендации будут добавлены позже.
+Замените <code>main</code> и <code>gen</code> на baseline и каталог результатов проекта. Последняя проверка учитывает новые неотслеживаемые generated-файлы. Не маскируйте ошибку breaking через <code>|| echo</code>. Доступ к приватным Git-источникам настраивается средствами runner; секреты не записываются в YAML-конфиги EasyP.

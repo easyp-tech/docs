@@ -1,5 +1,28 @@
 ---
-title: "Gitlab"
+title: "GitLab CI"
 ---
 
-## Work in progress
+Set <code>EASYP_CI_IMAGE</code> to a pinned image containing a reviewed EasyP v1 build, Git and the required plugins. Commit configs and the lock. This example has one module and a root generation config; in a monorepo run module commands per module and explicitly select generation projects.
+
+~~~yaml
+image: $EASYP_CI_IMAGE
+
+variables:
+  GIT_DEPTH: "0"
+
+stages: [validate]
+
+contracts:
+  stage: validate
+  script:
+    - easyp validate-config
+    - easyp mod download
+    - easyp lint
+    - git fetch origin +refs/heads/main:refs/remotes/origin/main
+    - easyp breaking --against refs/remotes/origin/main
+    - easyp generate
+    - git diff --exit-code
+    - test -z "$(git status --porcelain --untracked-files=normal -- gen)"
+~~~
+
+Adjust <code>main</code> and <code>gen</code> to the project baseline and output directory. The last assertion catches newly generated untracked files. Do not mask breaking failures with <code>|| echo</code>. Configure private Git access through the runner; do not put credentials into EasyP YAML.

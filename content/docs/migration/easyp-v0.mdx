@@ -1,0 +1,83 @@
+---
+title: "EasyP v0 to v1"
+description: "Preview-first migration that preserves configuration and verifies historical dependency pins."
+---
+
+The v1 CLI does not execute the old combined configuration. Use the explicit migration command for supported, unambiguous v0 projects. Keep the project in version control and stop other writers before applying changes.
+
+## Interactive terminal wizard
+
+~~~bash
+# Starts the wizard when both input and output are terminals.
+easyp migrate
+
+# Explicit wizard with prefilled values.
+easyp migrate --interactive --dir . --module github.com/acme/contracts
+~~~
+
+The wizard asks for the project directory and module identity when those flags are omitted. An existing native manifest or the current directory's local Git origin can supply an identity suggestion; accepting a suggestion is still an explicit input step. This lookup does not contact a server or display Git credentials.
+
+It shows the actual candidate files before asking to proceed. When dependencies need verification, it asks separately for permission to resolve them and write their cache. After verification, it shows the complete plan, including the lock, and asks whether to apply it and create backups. Enter means **no** at both confirmations. Even prefilled <code>--write</code> and <code>--resolve-lock</code> do not bypass wizard confirmations. No plugin is executed.
+
+Declining, Ctrl+C or EOF before application leaves project files unchanged. Cache entries from previously authorized resolution may remain. A change to the project during the prompts is detected instead of silently overwriting it. The existing restrictions and multi-file crash boundary still apply.
+
+For compatibility, supplying <code>--module</code> without <code>--interactive</code> keeps the existing flag-only behavior, including in a terminal. <code>--interactive=false</code> explicitly disables prompting. Redirected input or output never triggers the wizard, and forced <code>--interactive</code> requires both streams to be terminals; a pipe of yes answers is not accepted as interactive consent. Scripts must supply <code>--module</code> and the relevant explicit flags.
+
+## Preview first
+
+~~~bash
+easyp migrate --dir . --module github.com/acme/contracts
+~~~
+
+In flag-only mode, without <code>--write</code>, the command prints actual candidate files and warnings. It does not change the project or execute plugins. A plain preview does not resolve dependencies or write their cache.
+
+The candidate files are <code>easyp.yaml</code> for policies, <code>easyp.gen.yaml</code> for generation, <code>protobuf.mod</code> for module metadata, and a verified <code>protobuf.lock</code> when dependency conversion is required. The supplied module identity is literal and must match the intended local module.
+
+## Verify dependencies and apply
+
+~~~bash
+# Explicitly permit dependency access/cache writes while still previewing.
+easyp migrate --dir . --module github.com/acme/contracts --resolve-lock
+
+# Apply only after the complete candidate set passes validation.
+easyp migrate --dir . --module github.com/acme/contracts --resolve-lock --write
+~~~
+
+For a dependency-free project, <code>--resolve-lock</code> is unnecessary. With dependencies, <code>--write</code> without completed lock verification fails before writing the candidate configuration. No generation plugin is run by either command.
+
+Modified legacy policy and manifest files receive byte-identical <code>.v0.bak</code> backups. Existing conflicting v1 files or backups are not overwritten. Original permissions are preserved when replacing a legacy file. The old <code>easyp.lock</code> remains unchanged as a historical record. A repeated migration of a validated v1 project is a no-op; it does not update dependencies.
+
+## What is preserved
+
+The converter preserves the effective selected lint rules, exceptions, rule settings, and explicit legacy comment-suppression setting. It converts literal ignores and rule-specific prefix ignores to the corresponding v1 exclusions. Generation preserves plugin sources, argv, options, <code>with_imports</code>, and supported managed settings. Relative paths remain relative to the configuration directory.
+
+Legacy <code>direct</code> and <code>indirect</code> requirements are converted to native <code>require</code> directives. The tool checks that whole v1 source roots would select the same local protobuf files with the same import paths. It does not silently expand a sliced input into an entire module.
+
+Variable placeholders are not expanded into saved values. If a placeholder or selector prevents safe analysis, conversion fails rather than persisting credentials or guessing its meaning.
+
+## Historical lock integrity
+
+A full commit SHA is preserved, including a full SHA embedded in an old pseudo-version. For a legacy lock entry containing a tag but no SHA, conversion resolves that tag and verifies the historical installed-tree hash before accepting the revision. A moved tag or mismatched historical hash is an error.
+
+The v1 content hash is then calculated independently over the tracked repository files. Old and new hashes cover different path layouts and cannot be copied or compared as interchangeable values. A missing historical dependency pin is not replaced with current HEAD.
+
+## Explicit limitations
+
+Unknown fields, invalid or multi-document YAML, ambiguous source selection, unsupported references, and conflicting native outputs are rejected. Custom Git-input roots/subdirectories, external or sliced local inputs whose exact selection cannot be preserved, unsafe managed selectors, and full lock conversion with local replacements may require manual migration. Buf configurations are not inputs to this v0 converter.
+
+The command stages all outputs and checks observed inputs again before applying. Ordinary application failures are rolled back. Several file replacements are not one process-crash-atomic transaction: after a machine or process failure, inspect the preserved backups and Git state before continuing. Uncooperative concurrent writers cannot be made safe by this command.
+
+## Verify the result
+
+~~~bash
+easyp validate-config
+easyp mod download
+easyp lint
+easyp generate
+~~~
+
+Run <code>mod download</code> when the migrated project has a lock. Check real generated code, not only the exit status of configuration validation. Recursive multi-project generation now requires explicit <code>--all</code> or repeated <code>--project</code>; migration does not authorize unrelated projects.
+
+Command plugins now receive literal argv rather than an implicitly assembled shell command. Review legacy commands that relied on shell operators; use an explicit shell invocation only when that is intentional. Migration does not prove equivalence of arbitrary plugin side effects.
+
+An unsuffixed native v2+ dependency cannot be converted automatically. Select a published <code>/vN</code> identity and matching version, or a valid v0/v1 release; migration never renames dependencies or substitutes versions. An explicit <code>+incompatible</code> requirement is eligible only when the exact revision has no native manifest; migration does not add the marker speculatively. Requirements from older metadata are also checked when used at the native source boundary. See [major version identities](/docs/reference/protobuf-mod).

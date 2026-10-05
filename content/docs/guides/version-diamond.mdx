@@ -1,21 +1,21 @@
 ---
 title: "Resolving Diamond Dependencies"
-description: "How Minimal Version Selection (MVS) deterministically resolves diamond version conflicts across direct and indirect requirements without manual intervention."
+description: "How Minimal Version Selection (MVS) chooses a version in a dependency diamond, and what still needs compatibility testing."
 ---
 
-A common conflict in module package management is the **Diamond Dependency Problem**. This guide explains how EasyP's MVS algorithm resolves version discrepancies deterministically without human intervention or SAT solver backtracking.
+The **diamond dependency problem** occurs when direct and transitive requirements request different versions of the same module. EasyP uses MVS to select a version within each module's dependency graph.
 
 ---
 
 ## Scenario Description
 
-Consider a service module `user` that relies on two dependencies: `common` and `weather`.
+Consider a service module <code>user</code> that relies on two dependencies: <code>common</code> and <code>weather</code>.
 
-- `user` explicitly requires `common v1.2.0`.
-- `user` explicitly requires `weather v2.1.0`.
-- `weather v2.1.0` transitively requires `common v1.3.0`.
+- <code>user</code> explicitly requires <code>common v1.2.0</code>.
+- <code>user</code> explicitly requires <code>weather v2.1.0</code>.
+- <code>weather v2.1.0</code> transitively requires <code>common v1.3.0</code>.
 
-```text
+~~~text
                +-------------------+
                |    proto/user     |
                +---------+---------+
@@ -33,26 +33,26 @@ Consider a service module `user` that relies on two dependencies: `common` and `
                             | github.com/acme/    |
                             | common v1.3.0       |
                             +---------------------+
-```
+~~~
 
 ---
 
 ## The MVS Resolution Rule
 
-Unlike traditional resolvers that attempt complex range matching or halt with a manual version conflict error, MVS applies a simple high-water mark rule:
+For semantic-version requirements on the same module, MVS selects the highest requested minimum:
 
-`Resolved Version = max(Requested Minimums)`
+<code>Resolved Version = max(Requested Minimums)</code>
 
-1. **Collect requested minimums**: `[ v1.2.0 (from user), v1.3.0 (from weather) ]`
-2. **Select maximum**: $\max(v1.2.0, v1.3.0) = v1.3.0$
-3. **Outcome**: `common v1.3.0` is selected for the module resolution graph.
+1. **Collect requested minimums**: <code>[ v1.2.0 (from user), v1.3.0 (from weather) ]</code>
+2. **Select maximum**: <code>max(v1.2.0, v1.3.0) = v1.3.0</code>
+3. **Outcome**: <code>common v1.3.0</code> is selected for the module resolution graph.
 
-Because `v1.3.0` is backwards-compatible with `v1.2.0` under Semantic Versioning guidelines, both `user` and `weather` compile successfully against `v1.3.0`.
+MVS selects <code>v1.3.0</code> from these requirements; it does not test whether either consumer compiles. Semantic version labels express maintainer intent and do not prove schema or generated-code compatibility. Separate root modules resolve independently and can select different versions.
 
 ---
 
 ## What If Breaking Changes Occur?
 
-If `v1.3.0` introduced an incompatible schema modification, this represents a semantic versioning violation on the part of `common`'s maintainers.
+If the selected version is incompatible, the graph can resolve successfully while generation or consumer tests fail. Run <code>easyp breaking</code> against an appropriate available baseline before release, then test generated clients. The checker covers its implemented rules and configured scope; it cannot guarantee every consumer remains compatible.
 
-EasyP catches such violations on the producer side via `easyp breaking` checks before release, ensuring that minor version upgrades remain 100% backwards-compatible.
+This maximum-of-minimums example applies to semantic versions. Different exact commit requirements conflict. An exact commit can coexist with semantic-version requirements only when the selected tag resolves to that same commit. See [dependency resolution](/docs/architecture/mvs-dependency-resolution).

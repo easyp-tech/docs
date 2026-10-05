@@ -89,35 +89,11 @@ Unlike other tools, EasyP doesn't rely on a centralized server for package distr
 - **Version Control**: Full Git history and branching for your proto dependencies
 - **Enterprise-Friendly**: Works with private repositories and corporate Git infrastructure
 
-## Seamless Migration from Buf
+## Using Buf-configured dependencies
 
-EasyP is designed with buf compatibility in mind:
+An EasyP v1 project declares Git dependencies in `protobuf.mod`. When a Git dependency uses Buf v1 or v2 configuration, EasyP reads its declared proto roots for imports. Older EasyP dependency configuration is supported in the same way. The consuming project still uses separate `protobuf.mod`, `easyp.gen.yaml`, and `easyp.yaml` files.
 
-- **Compatible rule sets**: Uses the same linting rules as buf
-- **Familiar configuration**: Similar YAML structure with enhanced features
-- **Drop-in replacement**: Can often replace buf with minimal configuration changes
-- **Gradual migration**: Adopt EasyP features incrementally without disrupting existing workflows
-
-### EasyP vs buf.build Comparison
-
-| Feature | EasyP | buf.build |
-|---------|--------|-----------|
-| **Dependency Management** | Git-based repositories | Buf Schema Registry (BSR) |
-| **Vendor Lock-in** | None - works with any Git hosting | Tied to BSR for full features |
-| **Plugin Execution** | Local + Remote plugins | Local + BSR plugins |
-| **Private Dependencies** | Any Git provider (GitHub, GitLab, etc.) | BSR or manual management |
-| **Offline Development** | Full support with `mod vendor` | Limited without BSR access |
-| **Enterprise Integration** | Works with existing Git infrastructure | Requires BSR setup |
-| **Breaking Change Detection** | Against any Git reference | Against any Git reference |
-| **Package Distribution** | Any Git repository | BSR required for publishing |
-| **License** | Apache 2.0 | Apache 2.0 |
-| **Community** | Growing | Established |
-
-**Migration Benefits:**
-- **No infrastructure changes**: Continue using your existing Git repositories
-- **Gradual adoption**: Start with EasyP while keeping existing buf configurations
-- **Enhanced flexibility**: Access to both local and remote plugin execution
-- **Simplified workflows**: Single configuration file for all protobuf operations
+See [Buf-configured Git dependencies](/docs/cli/package-manager/easyp-vs-buf) for supported formats and limits.
 
 ## Our Goals for Protobuf
 

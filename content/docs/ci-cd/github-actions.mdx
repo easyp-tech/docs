@@ -1,5 +1,117 @@
 ---
-title: "Github Actions"
+title: "GitHub Actions"
+description: "Verify v1 dependency locks, lint schemas, compare a Git baseline, and check generated output in CI."
 ---
 
-## Work in progress
+Run dependency verification, linting, breaking checks, and generation as separate steps so failures identify the stage that needs attention.
+
+## Prerequisites and Toolchain
+
+This example assumes a root <code>protobuf.mod</code> and committed <code>protobuf.lock</code>, a root <code>easyp.yaml</code>, schemas in <code>proto</code>, and a root <code>easyp.gen.yaml</code> writing to tracked files under <code>gen</code>.
+
+The workflow uses a prepared self-hosted Linux runner with the custom label <code>easyp-v1</code>. Assign that label only after provisioning your chosen v1-capable EasyP binary and required local plugins on <code>PATH</code>. For a hosted runner, supply your project's pinned toolchain setup before the EasyP steps. The example does not assume a particular published v1 release artifact.
+
+Local and bundled plugins cannot use a YAML <code>version</code> pin; their versions are controlled by the installed executables and EasyP binary. Remote plugins require a separate pinned semantic <code>version</code> in <code>easyp.gen.yaml</code>.
+
+## Pull Request Workflow
+
+~~~yaml
+name: protobuf-ci
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: [self-hosted, linux, x64, easyp-v1]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Verify toolchain
+        run: easyp --version
+
+      - name: Verify locked dependencies
+        run: easyp mod download
+
+      - name: Lint schemas
+        run: easyp lint --path proto
+
+      - name: Check compatibility
+        env:
+          BASE_REF: ${{ github.event.pull_request.base.sha }}
+        run: easyp breaking --path proto --against "$BASE_REF"
+
+      - name: Generate code
+        run: easyp generate --project .
+
+      - name: Check committed generated files
+        run: |
+          git diff --exit-code -- gen
+          test -z "$(git ls-files --others --exclude-standard -- gen)"
+~~~
+
+The final step detects tracked changes and new untracked files under <code>gen</code>. Adapt the paths for your project; ignored generated files are outside this check. Also run your normal consumer tests after generation.
+
+## Lint and Breaking Policies
+
+A simple root <code>easyp.yaml</code> is:
+
+~~~yaml
+version: v1
+linters:
+  default: STANDARD
+breaking:
+  baseline: git:main
+  categories: [FILE]
+  ignore_unstable: false
+  ignore: [proto/experimental]
+~~~
+
+The workflow's explicit <code>--against</code> overrides this baseline with the PR base SHA. Use a ref directly, without <code>git-ref=</code> or <code>git:</code> in the flag. Branches, lightweight and annotated tags, full SHAs, and locally resolvable Git revisions are supported; the required refs and objects must exist locally. A bare branch name wins over an identically named tag.
+
+For a release comparison, select an existing release tag explicitly:
+
+~~~bash
+easyp breaking --path proto --against refs/tags/v1.2.0
+~~~
+
+Choose the intended previous release rather than assuming tag creation order defines compatibility history. Each revision uses its own module manifests, locks, and dependencies, so a breaking check can fetch dependencies beyond those needed by the current checkout.
+
+<code>FILE</code> is the only supported additional category. <code>ignore_unstable</code> works for the supported package suffixes. Ignore paths are relative to the policy file defining the <code>breaking</code> section: here <code>proto/experimental</code> is relative to the root policy. Nested sections replace whole sections; <code>extends</code> explicitly loads a section base from a local file or an existing locked module.
+
+## Selecting Generation Projects
+
+With backend and frontend generator files, use:
+
+~~~bash
+easyp generate --project ./backend --project ./frontend
+~~~
+
+Use <code>easyp generate --all</code> for explicit recursive selection. A plain <code>easyp generate</code> selects the nearest enclosing generator file. <code>--project</code> and <code>--all</code> cannot be combined.
+
+To split generation into matrix jobs, set the matrix to project directories and pass the selected directory to <code>--project</code>. Each job needs the relevant plugins and output checks; language names alone do not select a generation configuration.
+
+## Dependency Cache and Private Sources
+
+Dependencies belong in <code>protobuf.mod</code>, with resolved commits and hashes in <code>protobuf.lock</code>. <code>easyp mod download</code> verifies that lock without updating it. Do dependency updates in a reviewed change before the verification job.
+
+EasyP storage defaults to <code>~/.easyp</code> and can be relocated with <code>EASYPPATH</code>. If you cache it, include the OS, EasyP toolchain version, and relevant lockfile hashes in the cache key. A restored cache is an optimization; dependency verification still runs.
+
+For private dependencies, provision the Git authentication required by your sources before the dependency step. Keep credentials in the runner's approved secret mechanism and out of logs. A local replacement does not eliminate downloads unless the entire dependency graph is local or already verified in cache; remote plugins still need the network. <code>tidy</code> and <code>update</code> reject active local replacements and are not read-only verification commands.
+
+## Troubleshooting
+
+| Symptom | Check |
+| --- | --- |
+| Baseline cannot be resolved | Fetch the intended ref and its objects; use full history or an explicit fetch. |
+| Unknown policy field or rule | Match configuration to the installed v1 binary and supported schema. |
+| Plugin is missing or output differs | Verify the executable selected from PATH and the pinned toolchain. |
+| Dependency verification fails | Check the committed manifest, lock, source access, and reported hash mismatch. |
+| Generated-output check fails | Regenerate with the same project selection and toolchain, review the diff, and commit intended changes. |
+
+For diagnostics, record <code>easyp --version</code>, the failing command, and the relevant Git ref. See [breaking checks in CI](/docs/guides/breaking-checks-ci) and [build reproducibility](/docs/guides/reproducibility).

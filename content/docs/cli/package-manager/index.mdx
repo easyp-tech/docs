@@ -1,554 +1,107 @@
 ---
 title: "Package Manager"
+description: "Resolve and lock Git-based protobuf dependencies in EasyP v1."
 ---
 
-[[toc]]
+The v1 package manager reads <code>protobuf.mod</code> and writes <code>protobuf.lock</code>. It records each selected Git commit and an <code>h1:</code> content hash, then verifies the hash when downloading or reusing a cached module.
 
-EasyP provides a powerful package manager for protobuf dependencies that simplifies dependency management through a decentralized, Git-based approach. Unlike centralized solutions, EasyP works directly with Git repositories, giving you complete control over your dependencies.
+## Declare dependencies
 
-## Overview
+~~~text
+module github.com/acme/contracts
+roots proto
 
-The EasyP package manager follows the **Go modules philosophy** - any Git repository can serve as a package source. This approach provides several key advantages:
+require (
+    github.com/acme/shared v1.2.0
+    github.com/acme/weather/v2 v2.1.0
+)
+~~~
 
-- **Decentralized**: No single point of failure or control
-- **Security**: Direct access to source repositories
-- **Flexibility**: Support for public, private, and enterprise repositories
-- **Reproducibility**: Lock files ensure consistent builds across environments
-- **Performance**: Local caching minimizes network requests
+<code>roots</code> defaults to <code>.</code>. SemVer requirements select the maximum requested minimum. A full 40- or 64-hex-character commit specifies an exact revision. A tag and SHA are compatible when the selected tag resolves to that same commit; different commits conflict. SHA values are not ordered as SemVer by date or Git ancestry.
 
-### Key Features
+A versionless requirement adds no constraint when the graph supplies a SemVer or exact commit. Only a still-unconstrained requirement uses current HEAD on the first <code>mod tidy</code>; subsequent tidy runs preserve the lock pin, while <code>mod update</code> refreshes HEAD. Explicit commits stay pinned.
 
-| Feature | Description |
-|---------|-------------|
-| **Git-Native** | Works with any Git repository - no special server required |
-| **Multiple Version Formats** | Tags, commits, pseudo-versions, latest |
-| **Lock Files** | Reproducible builds with `easyp.lock` |
-| **Local Caching** | Go modules-style cache architecture |
-| **Vendoring Support** | Copy dependencies locally for offline builds |
-| **YAML Configuration** | Simple, readable dependency declarations |
+<code>replace module =&gt; ../local-copy</code> applies only from the main <code>protobuf.mod</code>, including to transitive requirements. All relative replacement paths use the main manifest directory; absolute paths are used directly. With <code>replace</code>, commands use a local effective graph and preserve <code>protobuf.lock</code> byte-for-byte; a missing lock is not created. <code>mod tidy</code> also leaves the manifest unchanged. <code>get</code> and <code>mod update</code> may edit explicit requirements without adding fork-only transitives. <code>mod download</code> installs only needed unreplaced snapshots. Remove replacements and run <code>mod tidy</code> to produce a publishable lock. See [local replacements](/docs/guides/debugging-replace).
 
-## Architecture
+A replacement applies only when its module is reached through direct or transitive requirements. An unused replacement is not read or fetched and cannot hide the consumer's sources from lint or breaking checks. Reached replacement trees supply imports during consumer checks; select one explicitly with <code>--path</code> to check its own policy. Frozen still rejects every replacement, including unused ones.
 
-EasyP uses a two-tier caching system inspired by Go modules:
+For a Git repository with several manifests, require each nested module separately by its identity. For example, <code>require repo/foo</code> and <code>require repo/bar</code> need no module-specific tags if HEAD is suitable. A <code>v1.2.3</code> release of the module in <code>foo/</code> uses tag <code>foo/v1.2.3</code>. Each module's roots are resolved independently.
 
-```
-~/.easyp/
-├── cache/
-│   ├── download/              # Downloaded archives + checksums
-│   │   └── github.com/
-│   │       └── googleapis/
-│   │           └── googleapis/
-│   │               ├── v1.2.3.zip       # Archive
-│   │               ├── v1.2.3.ziphash   # Checksum
-│   │               └── v1.2.3.info      # Metadata
-│   └── {git-hash}/            # Git bare repositories (internal)
-└── mod/                       # Extracted, ready-to-use modules
-    └── github.com/
-        └── googleapis/
-            └── googleapis/
-                ├── v1.2.3/           # Tagged version
-                │   ├── google/
-                │   │   ├── api/
-                │   │   └── rpc/
-                │   └── ...
-                └── v0.0.0-20250101123456-abc123def/  # Pseudo-version
-                    ├── google/
-                    └── ...
-```
+For a selected tag or commit, module identity, roots, and requirements come from that revision. A nested module remains usable even if its directory was deleted or replaced by a regular file at current HEAD. Native manifests must match the requested identity at the selected revision; invalid native metadata does not fall back to Buf or legacy EasyP, and a pinned revision is never replaced with HEAD.
 
-### Cache Location
+Module commands and <code>get</code> find the nearest ancestor <code>protobuf.mod</code> within the workspace. <code>easyp get &lt;module&gt;</code> adds a direct requirement; <code>@v1.2.3</code> or <code>@&lt;full-commit&gt;</code> selects a version. Without a suffix, the unconstrained-requirement rules above apply. Transitive requirements are added with <code>// indirect</code>, and repeated calls do not duplicate entries. Resolution errors leave the manifest and lock unchanged.
 
-| Environment | Location | How to Set |
-|-------------|----------|------------|
-| **Default** | `$HOME/.easyp` | Automatic |
-| **Custom** | Any directory | Set `EASYPPATH` environment variable |
-| **CI/CD** | Project-relative | `export EASYPPATH=$CI_PROJECT_DIR/.easyp` |
-
-## Configuration
-
-### Basic Configuration
-
-Configure dependencies in your `easyp.yaml` file:
-
-```yaml
-deps:
-  - github.com/googleapis/googleapis@common-protos-1_3_1
-  - github.com/grpc-ecosystem/grpc-gateway@v2.19.1
-  - github.com/bufbuild/protoc-gen-validate
-```
-
-### Advanced Configuration Examples
-
-#### Multi-Environment Setup
-```yaml
-# development.easyp.yaml
-deps:
-  - github.com/googleapis/googleapis              # Latest for development
-  - github.com/mycompany/internal-protos          # Latest internal changes
-  - github.com/bufbuild/protoc-gen-validate       # Latest features
-
-# production.easyp.yaml
-deps:
-  - github.com/googleapis/googleapis@common-protos-1_3_1       # Pinned
-  - github.com/mycompany/internal-protos@v2.1.0                # Stable release
-  - github.com/bufbuild/protoc-gen-validate@v0.10.1           # Tested version
-```
-
-#### Private Repository Setup
-```yaml
-deps:
-  # Public dependencies
-  - github.com/googleapis/googleapis@common-protos-1_3_1
-
-  # Private company repositories
-  - github.com/mycompany/auth-protos@v1.5.0
-  - github.com/mycompany/common-types@v2.0.1
-
-  # Internal GitLab
-  - gitlab.company.com/platform/messaging-protos@v0.3.0
-```
-
-## Versioning Strategies
-
-EasyP supports multiple versioning approaches to fit different development workflows:
-
-### 1. Semantic Version Tags (Recommended for Production)
-
-```yaml
-deps:
-  - github.com/grpc-ecosystem/grpc-gateway@v2.19.1
-  - github.com/googleapis/googleapis@common-protos-1_3_1
-```
-
-**Use when:**
-- Production deployments
-- Stable API consumption
-- Reproducible builds required
-
-### 2. Latest Tag (Development)
-
-```yaml
-deps:
-  - github.com/googleapis/googleapis    # Uses latest available tag
-  - github.com/bufbuild/protoc-gen-validate
-```
-
-**Use when:**
-- Active development
-- Want latest features
-- Compatibility testing
-
-### 3. Commit Hashes (Bleeding Edge)
-
-```yaml
-deps:
-  - github.com/bufbuild/protoc-gen-validate@abc123def456789abcdef123456789abcdef1234
-```
-
-**Use when:**
-- Need unreleased features
-- Testing specific fixes
-- Contributing to upstream
-
-### 4. Pseudo-Versions (Automatic)
-
-When EasyP can't find a suitable tag, it generates pseudo-versions automatically:
-
-```
-Format: v0.0.0-{timestamp}-{short-commit-hash}
-Example: v0.0.0-20250908104020-660ec2d64e07f2fa8947527443af058b3d7169df
-```
-
-This ensures every commit can be referenced with a version-like identifier.
+Major versions use Go-style identities: v0/v1 are unsuffixed; v2+ requires matching <code>/vN</code>. The <code>+incompatible</code> exception requires verified pre-native metadata; it never bypasses a native manifest. See [exact grammar and Git mapping](/docs/reference/protobuf-mod).
 
 ## Commands
 
-### `easyp mod download`
+| Command | Behavior |
+|---------|----------|
+| <code>easyp get &lt;module&gt;[@version&#124;@commit]</code> | Adds or promotes a direct requirement, resolves transitive requirements, and writes <code>protobuf.lock</code> |
+| <code>easyp mod tidy</code> | Resolves direct and transitive requirements and writes <code>protobuf.lock</code> |
+| <code>easyp mod download</code> | Downloads the exact commits in <code>protobuf.lock</code> and verifies their hashes |
+| <code>easyp mod update</code> | Refreshes requirements within their current major versions, then updates the lock |
+| <code>easyp mod vendor</code> | Verifies locked dependencies and copies their <code>.proto</code> files into <code>easyp_vendor</code> |
 
-Downloads and installs all dependencies declared in your configuration.
-
-**What happens:**
-1. **Resolves versions**: Converts tags/latest to specific commits
-2. **Downloads archives**: Stores `.zip` files in cache/download
-3. **Verifies checksums**: Ensures archive integrity
-4. **Extracts modules**: Unpacks to cache/mod with proper structure
-5. **Updates lock file**: Records exact versions and content hashes
-
-**Usage:**
-```bash
-# Use default easyp.yaml
-easyp mod download
-
-# Use custom config file
-easyp --cfg production.easyp.yaml mod download
-
-# With custom cache location
-EASYPPATH=/tmp/easyp-cache easyp mod download
-```
-
-**Example output:**
-```
-INFO Download package package=github.com/googleapis/googleapis version=v0.0.0-20250909114430 commit=8727b5ba
-INFO Install package package=github.com/googleapis/googleapis version=v0.0.0-20250909114430 commit=8727b5ba
-INFO Download package package=github.com/grpc-ecosystem/grpc-gateway version=v2.19.1 commit=a070de73
-INFO Install package package=github.com/grpc-ecosystem/grpc-gateway version=v2.19.1 commit=a070de73
-```
-
-### `easyp mod vendor`
-
-Copies all installed proto files to a local `easyp_vendor/` directory for offline usage.
-
-**Use cases:**
-- **Docker builds**: Avoid network dependencies in containers
-- **Air-gapped environments**: No internet access during builds
-- **Reproducible builds**: Bundle exact dependency versions
-- **Performance**: Eliminate network latency in repeated builds
-
-**Usage:**
-```bash
+~~~bash
+easyp get github.com/acme/contracts/proto/user
 easyp mod vendor
-```
-
-**Result structure:**
-```
-easyp_vendor/
-├── github.com/
-│   ├── googleapis/
-│   │   └── googleapis/
-│   │       ├── google/
-│   │       │   ├── api/
-│   │       │   │   ├── annotations.proto
-│   │       │   │   └── http.proto
-│   │       │   └── rpc/
-│   │       │       └── status.proto
-│   │       └── ...
-│   └── grpc-ecosystem/
-│       └── grpc-gateway/
-│           └── protoc-gen-openapiv2/
-│               └── options/
-│                   └── annotations.proto
-```
-
-### `easyp mod update`
-
-Updates module versions based on current configuration and writes resolved versions to the lock file.
-
-**Behavior:**
-- Respects version constraints in `easyp.yaml`
-- Updates to latest compatible versions
-- Regenerates `easyp.lock` with new versions and hashes
-
-**Usage:**
-```bash
-easyp mod update
-```
-
-## Lock Files
-
-The `easyp.lock` file ensures reproducible builds by recording exact versions and content hashes:
-
-```
-github.com/bufbuild/protoc-gen-validate v0.0.0-20250908104020-660ec2d64e07f2fa8947527443af058b3d7169df h1:ZZ5JyUkmrj9OBHM+gOCzeL5L/pAKVbsUl051yhhJTjU=
-github.com/googleapis/googleapis v0.0.0-20250909114430-8727b5ba7f23fbbfddda58239e8bc6b547e05878 h1:eI+XYpPio3fxl9H5/VjW2PxlxM/7yqPjEq3oQ6jUkj4=
-github.com/grpc-ecosystem/grpc-gateway v2.19.1 h1:01NNlCezvwUQ07ZvblXH0kelWq8hNl2qb44bOMcaSTQ=
-```
-
-### Lock File Format
-
-Each line contains three components:
-- **Module path**: Full repository path
-- **Exact version**: Resolved version (tag or pseudo-version)
-- **Content hash**: SHA256 of extracted content (`h1:` prefix)
-
-### Best Practices
-
-✅ **Always commit `easyp.lock`** - Ensures team consistency
-✅ **Run `mod update` deliberately** - Don't auto-update in CI
-✅ **Review lock changes** - Understand what's being updated
-❌ **Don't edit manually** - Let EasyP manage the format
-
-## Authentication
-
-### Public Repositories
-
-No setup required - works out of the box:
-
-```yaml
-deps:
-  - github.com/googleapis/googleapis
-  - github.com/bufbuild/protoc-gen-validate
-```
-
-### Private Repositories
-
-#### SSH Keys (Recommended)
-
-Configure Git to use SSH for GitHub/GitLab:
-
-```bash
-# For GitHub
-git config --global url."git@github.com:".insteadOf "https://github.com/"
-
-# For GitLab
-git config --global url."git@gitlab.com:".insteadOf "https://gitlab.com/"
-
-# For custom domains
-git config --global url."git@gitlab.company.com:".insteadOf "https://gitlab.company.com/"
-```
-
-Then use normal HTTPS URLs in your config:
-
-```yaml
-deps:
-  - github.com/mycompany/private-protos@v1.0.0
-  - gitlab.company.com/platform/shared-types@v2.1.0
-```
-
-#### Personal Access Tokens
-
-For HTTPS authentication:
-
-```bash
-# Method 1: Credential helper
-git config --global credential.helper store
-echo "https://username:token@github.com" >> ~/.git-credentials
-
-# Method 2: URL rewriting
-git config --global url."https://username:token@github.com/mycompany".insteadOf "https://github.com/mycompany"
-```
-
-#### Corporate Environments
-
-```bash
-# Configure proxy
-git config --global http.proxy http://proxy.company.com:8080
-git config --global https.proxy https://proxy.company.com:8080
-
-# Configure certificates for internal Git servers
-git config --global http.sslCAInfo /path/to/certificate.pem
-```
-
-## Common Workflows
-
-### Initial Project Setup
-
-```bash
-# 1. Create configuration
-cat > easyp.yaml << EOF
-deps:
-  - github.com/googleapis/googleapis
-  - github.com/grpc-ecosystem/grpc-gateway@v2.19.1
-EOF
-
-# 2. Download dependencies
-easyp mod download
-
-# 3. Verify installation
-ls ~/.easyp/mod/github.com/googleapis/googleapis/
-```
-
-### Adding New Dependencies
-
-```bash
-# 1. Edit easyp.yaml
-echo "  - github.com/bufbuild/protoc-gen-validate@v0.10.1" >> easyp.yaml
-
-# 2. Download new dependency
-easyp mod download
-
-# 3. Commit lock file changes
-git add easyp.lock
-git commit -m "Add protoc-gen-validate dependency"
-```
-
-### Updating Dependencies
-
-```bash
-# Update to latest compatible versions
-easyp mod update
-
-# Review changes
-git diff easyp.lock
-
-# Test with new versions
 easyp generate
-easyp lint
+~~~
 
-# Commit if everything works
-git add easyp.lock
-git commit -m "Update dependencies"
-```
+Commit <code>protobuf.mod</code> and <code>protobuf.lock</code> for repeatable builds. The module cache is under <code>$HOME/.easyp/v1/git</code> by default; set <code>EASYPPATH</code> to change its parent directory. Without replacements, <code>mod vendor</code> uses the published lock. With replacements it snapshots the effective graph without writing that lock. Duplicate import paths are errors. The <code>easyp_vendor</code> directory is a copy of dependency sources, not a replacement for the lock.
 
-### Offline Development
+## Immutable tags and cache reuse
 
-```bash
-# Vendor all dependencies
-easyp mod vendor
+<code>tidy</code>, <code>get</code>, and <code>update</code> verify each fetched previously locked SemVer against its recorded commit and hash. A republished tag raises <code>ErrLockedVersionChanged</code> before installing the new graph or writing the manifest or lock, including for transitive dependencies and warm caches. Selecting a new version and refreshing unconstrained HEAD requirements remain available.
 
-# Now your project works offline
-easyp generate
-```
+<code>mod download</code> retrieves the locked commit even after a tag moves, if that commit remains available. Reused Git objects let known exact commits avoid remote access. A cold request first tries a depth-one fetch of the exact commit and falls back to reachable history when needed; it never substitutes HEAD. Tag lookups are refreshed separately, and installed contents remain hash-verified.
 
-## Troubleshooting
+## Dependencies using Buf or older EasyP
 
-### Common Issues
+A Git dependency may declare its proto roots in <code>buf.work.yaml</code>, Buf v1 or v2 <code>buf.yaml</code>, or an older EasyP <code>easyp.yaml</code>. Older EasyP <code>protobuf.mod</code> requirements are also read transitively. If none of those files exists, its repository root is used. This compatibility applies to dependency metadata; the consuming project uses v1 <code>protobuf.mod</code>.
 
-#### "Repository not found" or "Authentication failed"
+When adapting an older <code>easyp.yaml</code>, both <code>deps</code> and generation Git inputs contribute requirements. Exact source/version duplicates are removed; different minimums remain visible to MVS, and malformed deps fail explicitly. A matching native <code>protobuf.mod</code> takes precedence. Only metadata is read; dependency plugins are never executed.
 
-**Problem**: Can't access private repository
-**Solution**: Check authentication setup
+EasyP reads Buf v1, v1beta1, and v2 <code>deps</code>, including declarations in modules selected through <code>buf.work.yaml</code>. The current compatibility resolver maps known BSR modules to fixed Git snapshots: Googleapis, grpc-gateway, grpc-federation, protoc-gen-validate, and protovalidate. Unknown BSR modules fail explicitly; EasyP does not guess a Git repository from their name. A native <code>protobuf.mod</code> takes precedence, and direct BSR requirements in the consumer's manifest are not supported.
 
-```bash
-# Test Git access
-git ls-remote https://github.com/mycompany/private-repo
+The lock preserves the original BSR reference and pin alongside the Git binding. Resolution reports <code>compatibility_snapshot</code>: the fixed Git source is hash-verified, but this is not proof of equivalence to an arbitrary BSR revision or verification of its BSR digest. Frozen builds reuse the recorded bindings. Regenerate older locks with <code>mod tidy</code> outside frozen when a dependency declares BSR inputs.
 
-# Check Git configuration
-git config --list | grep url
-```
+Buf v1/v1beta1 <code>build.excludes</code> and v2 <code>modules[].includes/excludes</code> select files without changing their import paths. Paths are relative to the declaring <code>buf.yaml</code>; nested workspace configs retain that base. Overlapping roots in one Buf module configuration select the union of their allowed files.
 
-#### "Version not found"
+The same selection applies to imports, dependency generation and package selection, file listing, lint and breaking contexts, collision checks, and vendoring. Excluded files stay unavailable through symlink aliases or a broad consumer root, whether the excluded path is the alias or its physical target. An excluded dependency file does not conflict with an allowed consumer file at the same import path.
 
-**Problem**: Specified tag/version doesn't exist
-**Solution**: Check available tags
+See [<code>protobuf.mod</code>](/docs/reference/protobuf-mod) and [<code>protobuf.lock</code>](/docs/reference/protobuf-lock) for their field-level formats.
 
-```bash
-# List available tags
-git ls-remote --tags https://github.com/googleapis/googleapis
+## Reachable imports and direct requirements
 
-# Use existing tag or commit hash
-deps:
-  - github.com/googleapis/googleapis@common-protos-1_3_1  # Valid tag
-```
+Before writing a new manifest or lock, <code>mod tidy</code> checks the import closure reachable from the local module, including imports inside dependency files. Missing files and invalid reachable protobuf syntax stop the operation. Unrelated files in a dependency are not all compiled or linted. An import under <code>google/protobuf/</code> must actually exist; the prefix alone does not make it a bundled file.
 
-#### "Cache corruption" or "Checksum mismatch"
+When a local source starts importing a previously indirect module, <code>tidy</code> removes the existing <code>// indirect</code> marker while preserving its version and unrelated comments. This does not discover an arbitrary Git repository from an unknown proto path. Registry-specific Buf dependency identities still require explicit Git mapping and are not silently converted into repository URLs.
 
-**Problem**: Corrupted cache files
-**Solution**: Clear cache and re-download
+## Frozen builds
 
-```bash
-# Clear everything
-rm -rf ~/.easyp
+Commit <code>protobuf.mod</code> and <code>protobuf.lock</code>, then opt into <code>--frozen</code> explicitly. Even a module with no dependencies needs an empty lock; a source directory without a native manifest is rejected. <code>CI=true</code> does not enable this mode.
 
-# Or clear just downloads
-rm -rf ~/.easyp/cache/download
+~~~bash
+# Prepare and review the lock outside frozen mode
+easyp mod tidy
+# Use the committed graph; exact-commit cache fills are allowed
+easyp mod download --frozen
+easyp --frozen generate
+easyp mod --frozen vendor
+~~~
 
-# Re-download
-easyp mod download
-```
+Global, <code>mod</code>-level, and leaf-command placement are supported. A true value anywhere in the command lineage stays enabled even if a child passes <code>--frozen=false</code>. See [all supported placements](/docs/cli/configuration#explicit-frozen-mode).
 
-#### Network timeouts
+Frozen rejects every root <code>replace</code> before accessing its path or fetching dependencies, including unused replacements. It verifies the manifest's direct requirements and the locked modules' transitive requirements; missing, invalid, incomplete, or stale locks fail instead of being repaired. Dependencies selected by identity use the consumer's manifest and lock and do not need their own lock files. Explicit workspace-relative generation module paths instead use the selected native module's manifest and lock; a generator-only directory needs no separate pair. Dependency-local replacement directives remain ignored.
 
-**Problem**: Slow or unreliable network
-**Solution**: Configure Git timeouts
+There is no dependency re-resolution, HEAD/tag lookup, or manifest/lock creation or rewriting. Missing cache entries may be fetched at their exact locked commits. Content hashes are verified on cold and warm caches; corrupted installed contents fail rather than silently replacing the recorded hash. Frozen is not offline, and remote plugins can still need network access.
 
-```bash
-# Increase timeout
-git config --global http.lowSpeedLimit 1000
-git config --global http.lowSpeedTime 300
+<code>mod download</code> installs the verified graph. <code>mod vendor</code> validates it before writing <code>easyp_vendor</code>. <code>mod tidy</code>, <code>get</code>, <code>mod update</code>, <code>init</code>, and <code>migrate</code> refuse frozen execution, including migration preview. Remove replacements and prepare the manifest/lock outside frozen mode. The normal local replacement and vendor behavior above is unchanged.
 
-# Use proxy if available
-git config --global http.proxy http://proxy.company.com:8080
-```
+## Cache and revision-access errors
 
-### Performance Optimization
+A hash mismatch in an installed module identifies the exact cache directory. Preserve it for investigation or quarantine only that entry, then retry <code>easyp mod download</code>. Do not rewrite <code>protobuf.lock</code> to hide the mismatch; the command does not automatically delete or repair the cache.
 
-#### For Large Teams
-
-```bash
-# Use shared cache server (if available)
-export EASYPPATH=/shared/easyp-cache
-
-# Or use team-specific cache
-export EASYPPATH=/team-cache/easyp
-```
-
-#### For CI/CD Systems
-
-```bash
-# Use project-relative cache
-export EASYPPATH=$CI_PROJECT_DIR/.easyp
-
-# Cache between builds (GitLab CI example)
-cache:
-  key: easyp-$CI_COMMIT_REF_SLUG
-  paths:
-    - .easyp/
-```
-
-#### Cache Size Management
-
-```bash
-# Check cache usage
-du -sh ~/.easyp
-du -sh ~/.easyp/cache/download    # Archives only
-du -sh ~/.easyp/mod               # Extracted modules
-
-# Clean old versions (manual)
-find ~/.easyp/mod -type d -name "v0.0.0-*" -mtime +30 -exec rm -rf {} \;
-```
-
-## Integration Examples
-
-### Docker Multi-stage Build
-
-```dockerfile
-# Stage 1: Download dependencies
-FROM ghcr.io/easyp-tech/easyp:latest AS deps
-WORKDIR /workspace
-COPY easyp.yaml easyp.lock ./
-RUN easyp mod vendor
-
-# Stage 2: Build application
-FROM alpine:latest AS build
-WORKDIR /app
-COPY --from=deps /workspace/easyp_vendor ./easyp_vendor
-COPY . .
-# Use vendored dependencies for generation
-RUN easyp generate
-```
-
-### Monorepo Structure
-
-```
-my-monorepo/
-├── services/
-│   ├── auth-service/
-│   │   └── easyp.yaml          # Service-specific deps
-│   └── user-service/
-│       └── easyp.yaml          # Different deps
-├── shared/
-│   └── common-protos/          # Internal protos
-└── easyp.yaml                  # Global/shared deps
-```
-
-Each `easyp.yaml` can have different dependencies based on service needs.
-
-## Best Practices
-
-### Development Workflow
-- ✅ Use **latest tags** during active development
-- ✅ **Pin versions** for production deployments
-- ✅ **Commit lock files** to ensure reproducibility
-- ✅ **Review dependency updates** before merging
-- ✅ **Test after updates** to catch compatibility issues
-
-### Security
-- ✅ **Pin to specific versions** in production
-- ✅ **Use SSH keys** for private repositories
-- ✅ **Review new dependencies** for security implications
-- ✅ **Monitor for vulnerabilities** in dependencies
-- ❌ **Don't embed credentials** in configuration files
-
-### Performance
-- ✅ **Cache aggressively** in CI/CD systems
-- ✅ **Use vendoring** for frequently rebuilt projects
-- ✅ **Clean old cache** periodically to save space
-- ✅ **Use shared cache** for team environments
-
-### Team Collaboration
-- ✅ **Document authentication setup** for new team members
-- ✅ **Use consistent tooling** across environments
-- ✅ **Automate dependency updates** with proper testing
-- ✅ **Share cache locations** when possible
-
-The EasyP package manager provides a robust, decentralized solution for protobuf dependency management that scales from individual projects to enterprise environments while maintaining the simplicity and reliability developers expect.
+An inaccessible Git repository is not evidence that a tag is absent. If history was fetched but the pinned commit is unavailable, restore access to the original revision instead of substituting HEAD. Tag revalidation and integrity checks remain enabled; no automatic offline fallback is introduced.

@@ -3,9 +3,9 @@ title: "easyp.gen.yaml Reference"
 description: "Complete specification for easyp.gen.yaml, configuring consumer-side code generation, plugin outputs, WASM/remote execution, and managed package options."
 ---
 
-The `easyp.gen.yaml` file specifies **consumer-side code generation rules**. Residing alongside consuming applications or service projects, it defines which modules or packages to compile, which plugins to invoke, where generated artifacts should be written, and language-specific managed options (such as `package_prefix`).
+The <code>easyp.gen.yaml</code> file specifies **consumer-side code generation rules**. Residing alongside consuming applications or service projects, it defines which modules to compile, which plugins to invoke, where generated artifacts should be written, and managed options.
 
-In accordance with EasyP's zero-duplication principles, `easyp.gen.yaml` **never** contains dependency URLs or version numbers for Protobuf schemas—schema sources and versions are resolved strictly through `protobuf.mod` and `protobuf.lock`.
+<code>generate.modules</code> selects module identities or local paths. Schema version requirements are declared in <code>protobuf.mod</code>; selected commits and hashes are recorded in <code>protobuf.lock</code>.
 
 ---
 
@@ -19,15 +19,15 @@ In accordance with EasyP's zero-duplication principles, `easyp.gen.yaml` **never
       default: "v1"
     },
     generate: {
-      description: "Module and package selection block.",
+      description: "Module and exact protobuf-package selection, with managed descriptor options.",
       type: "object"
     },
     "generate.modules": {
-      description: "List of module names or local paths to generate code for.",
+      description: "Module identities or workspace-relative local module paths. Dependencies use the nearest protobuf.mod beside or above this config within the workspace and its lock. If omitted, that module is selected; without a manifest, the project directory is used.",
       type: "string[]"
     },
     "generate.packages": {
-      description: "Fine-grained package path filters if full module generation is not required.",
+      description: "Exact protobuf package names among selected modules. Empty selects all sources.",
       type: "string[]"
     },
     plugins: {
@@ -38,29 +38,46 @@ In accordance with EasyP's zero-duplication principles, `easyp.gen.yaml` **never
       description: "Local executable binary or WASM plugin identifier.",
       type: "string"
     },
+    "plugins[].path": {
+      description: "Explicit plugin binary path. Relative paths are resolved from the directory where easyp generate runs.",
+      type: "string"
+    },
+    "plugins[].command": {
+      description: "Custom plugin command as an executable followed by its arguments.",
+      type: "string[]"
+    },
     "plugins[].remote": {
-      description: "gRPC or HTTP remote code generation service URL.",
+      description: "Remote plugin URL for gRPC execution; set the version separately.",
       type: "string"
     },
     "plugins[].version": {
-      description: "Strict version tag of the plugin. ':latest' is prohibited for reproducibility.",
+      description: "Required SemVer tag for remote plugins. Local and bundled plugins use the selected executable and reject a separate version field.",
       type: "string"
     },
     "plugins[].out": {
       description: "Destination directory relative to easyp.gen.yaml where generated code is written.",
       type: "string"
     },
+    "plugins[].with_imports": {
+      description: "Generate transitive imports with this plugin only. Independent of descriptor export --include_imports.",
+      type: "boolean",
+      default: "false"
+    },
     "plugins[].opts": {
       description: "Plugin-specific key-value options or flag strings.",
       type: "object | string[]"
     },
     options: {
-      description: "Language-scoped managed options for package prefixes.",
+      description: "Go package-prefix options.",
       type: "object"
     },
     "options.go.package_prefix": {
-      description: "Base Go package prefix automatically prepended to generated go_package imports.",
+      description: "Computes go_package, changing Go options only. Full managed mode requires generate.managed.enabled: true.",
       type: "string"
+    },
+    "generate.managed": {
+      description: "Existing managed descriptor rules: enabled, disable, and override, including module, package, path, and field selectors.",
+      type: "object"
     }
   }}
 />
@@ -69,37 +86,39 @@ In accordance with EasyP's zero-duplication principles, `easyp.gen.yaml` **never
 
 ## Example Configurations
 
-### Project-Level Generator (`backend/easyp.gen.yaml`)
+### Project-Level Generator (<code>backend/easyp.gen.yaml</code>)
 
-```yaml
+~~~yaml
 version: v1
-
 generate:
-  modules:
-    - proto/user
-    - proto/order
-
+  modules: [proto/user, proto/order]
+  managed:
+    enabled: true
+    override:
+      - file_option: go_package_prefix
+        value: github.com/acme/backend/gen
+      - file_option: go_package_prefix
+        module: github.com/acme/user
+        value: github.com/acme/backend/gen/user
+      - file_option: go_package_prefix
+        module: github.com/acme/order
+        value: github.com/acme/backend/gen/order
 plugins:
   - name: go
-    version: v1.34.2
-    out: ./gen/go
-    opts:
-      paths: source_relative
+    out: .
+    with_imports: true
+    opts: [module=github.com/acme/backend]
   - name: go-grpc
-    version: v1.4.0
-    out: ./gen/go
-    opts:
-      paths: source_relative
-      require_unimplemented_servers: false
+    out: .
+    with_imports: true
+    opts: [module=github.com/acme/backend, require_unimplemented_servers=false]
+~~~
 
-options:
-  go:
-    package_prefix: github.com/acme/backend/gen/go
-```
+This example assumes the consumer Go module is <code>github.com/acme/backend</code>. The local modules declare <code>github.com/acme/user</code> and <code>github.com/acme/order</code>, exposing <code>v1/user.proto</code> and <code>v1/order.proto</code>; their shared dependency exposes <code>common/v1/common.proto</code>. Outputs go to separate directories <code>gen/user/v1</code>, <code>gen/order/v1</code>, and <code>gen/common/v1</code>. Different Go packages need different output directories; EasyP does not insert an implicit module-name prefix.
 
-### Remote Web Generator (`frontend/easyp.gen.yaml`)
+### Remote Web Generator (<code>frontend/easyp.gen.yaml</code>)
 
-```yaml
+~~~yaml
 version: v1
 
 generate:
@@ -112,12 +131,89 @@ plugins:
     out: ./src/gen
     opts:
       target: ts
-```
+~~~
 
 ---
 
-## Managed Options (`options`)
+## Managed Options (<code>options</code>)
 
-Instead of requiring explicit file-level options (like `option go_package = "..."`) inside every individual `.proto` schema file, EasyP's managed `options` block groups settings logically by target language.
+Instead of requiring explicit file-level options (like <code>option go_package = "..."</code>) inside every individual <code>.proto</code> schema file, EasyP's managed <code>options</code> block groups settings logically by target language.
 
-For example, setting `options.go.package_prefix: github.com/acme/backend/gen/go` automatically computes import paths based on the module directory layout without mutating source `.proto` files.
+<code>options.go.package_prefix</code> computes <code>go_package</code> without changing the source. A plain prefix uses the hierarchy of a multi-component protobuf package: <code>common.v1</code> with prefix <code>github.com/acme/sdk</code> becomes <code>github.com/acme/sdk/common/v1;commonv1</code>. A single-component package keeps the proto file directory. Templates such as `{{file_path}}` and `{{file_dir}}` use the proto path instead.
+
+The prefix changes Go options even when full managed mode is omitted or disabled. It does not enable Java, C#, PHP, Ruby, Objective-C, or C++ defaults. Full managed mode and field-option transformations require explicit <code>generate.managed.enabled: true</code>. Go disable selectors, including <code>go_package</code>, suppress the prefix.
+
+The existing managed-mode rules remain available under <code>generate.managed</code>. For example, a package-specific override can be written as:
+
+~~~yaml
+version: v1
+generate:
+  managed:
+    enabled: true
+    override:
+      - file_option: go_package_prefix
+        package: user.v1
+        value: github.com/acme/backend/gen/user
+plugins:
+  - name: go
+    out: ./gen/go
+~~~
+
+A repository-root <code>easyp.gen.yaml</code> may provide <code>options.go.package_prefix</code> as a default for nested generator files. Nested <code>generate.managed</code> rules take precedence over that inherited default. A prefix declared in the same generator file has the highest priority. Plugin lists stay local to each generator file.
+
+### Go output paths and plugin mappings
+
+With a Go prefix and explicit <code>paths: source_relative</code>, generated Go directories follow the effective import path relative to that prefix. In the <code>common.v1</code> example, <code>out: gen/go</code> writes <code>gen/go/common/v1/*.go</code>, regardless of the proto file's directory. Marker templates use the complete parent path before the first marker as their output base. Imports outside that base keep the plugin's output path. Default <code>paths</code>, <code>paths: import</code>, and the plugin's <code>module</code> option retain plugin-controlled layouts.
+
+A plugin's <code>Mfile.proto=import/path</code> option overrides the effective import path for that plugin. The last nonempty import mapping wins; alias-only or empty mappings do not erase the descriptor import or a preceding import mapping. These plugin parameters do not change exported descriptors or other plugins' options.
+
+Insertion-point responses follow the output file created by their producer, even when the inserting plugin has different path or mapping options. An ambiguous producer is an error. Comments copied from a proto source do not change which Go or gRPC file receives the generated output.
+
+The generator selects module sources by default. Nonempty <code>generate.packages</code> filters them by exact protobuf package name. Unknown names fail before plugins; required imports remain in the compilation graph.
+
+Remote plugins require a <code>version</code> such as <code>v2.0.0</code>. EasyP sends that exact version to the remote generator. For local <code>protoc-gen-&#42;</code> executables and bundled WASM plugins, the executable selected at runtime determines the version; the separate <code>version</code> field is rejected because EasyP cannot verify it.
+
+For bundled names such as <code>go</code> and <code>go-grpc</code>, a matching <code>protoc-gen-*</code> executable on <code>PATH</code> takes precedence. Otherwise EasyP uses the bundled WASM plugin. Use <code>path</code> or <code>command</code> to select an explicit executable.
+
+Each plugin declares exactly one source: <code>name</code>, <code>path</code>, <code>command</code>, or <code>remote</code>. Use <code>path</code> for a specific binary and <code>command</code> for an executable plus arguments. Both run from the directory where <code>easyp generate</code> starts and, like any Protobuf plugin, must read a <code>CodeGeneratorRequest</code> from stdin and write a <code>CodeGeneratorResponse</code> to stdout.
+
+~~~yaml
+version: v1
+plugins:
+  - path: ./tools/protoc-gen-custom
+    out: ./gen/custom
+  - command: [sh, ./tools/protoc-plugin.sh]
+    out: ./gen/script
+~~~
+
+The separate <code>version</code> field is also unavailable for <code>path</code> and <code>command</code>.
+
+## Project selection and imports
+
+By default, <code>easyp generate</code> selects the closest config in the current directory or a workspace ancestor. Repeat <code>--project</code> to choose multiple consumers explicitly; <code>--all</code> separately opts into recursive selection. <code>--workspace</code> sets the boundary for module paths and inheritance.
+
+<code>plugins[].with_imports</code> defaults to false. True adds transitive imports to that plugin's files to generate. Import descriptors remain available for linking when false. The <code>--descriptor_set_out</code> and <code>--descriptor_set_out_dir</code> flags are mutually exclusive; <code>--include_imports</code> controls exported contents only, independently of <code>with_imports</code>. See [project selection and descriptor export](/docs/cli/generator).
+
+## Managed-option validation
+
+Both configuration validation and generation reject unknown managed file or field options and values of the wrong type. Boolean options such as <code>java_multiple_files</code> require a YAML boolean, not a quoted string. String options require strings. <code>optimize_for</code> accepts <code>SPEED</code>, <code>CODE_SIZE</code> or <code>LITE_RUNTIME</code>; <code>jstype</code> accepts <code>JS_NORMAL</code>, <code>JS_STRING</code> or <code>JS_NUMBER</code>. Invalid rules cannot silently fall back to managed defaults.
+
+Place a remote version in the separate <code>version</code> field, not after a colon in the final plugin path. A server port in the host is allowed. For example, use <code>remote: localhost:8080/go</code> with <code>version: v1.2.3</code>.
+
+## Package selection and imports
+
+~~~yaml
+version: v1
+generate:
+  packages: [api.v1]
+plugins:
+  - name: go
+    out: gen/go
+    with_imports: true
+  - name: python
+    out: gen/python
+~~~
+
+Select an existing package in your module. All its files become generation targets, while required imports remain available for compilation. Only the Go plugin above generates those dependencies; the Python plugin generates selected files only. Unrelated packages, including invalid unused declarations, are not compiled. Malformed selected sources and required imports still fail.
+
+Matching is exact and evaluated across all modules of the project. An unknown package fails before any plugin runs; duplicate names do not duplicate execution. Descriptor exports respect the same selection. The separate <code>--include_imports</code> switch adds the selected import closure to the descriptor output without changing plugin targets.
