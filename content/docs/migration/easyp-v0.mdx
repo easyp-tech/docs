@@ -88,6 +88,8 @@ Released v0 installers archived Git's <code>*.proto</code> pathspec and stripped
 
 The v1 content hash is then calculated independently over the tracked repository files. Old and new hashes cover different path layouts and cannot be copied or compared as interchangeable values. A missing historical dependency pin is not replaced with current HEAD.
 
+Auxiliary Git symlinks, such as PGV's `example-workspace/.bazelrc`, are omitted without reading their targets. This also permits dangling links and links materialized as text by `core.symlinks=false`. Links affecting proto files, dependency metadata or configured source roots remain errors. When auxiliary links are omitted, historical verification requires the actual v0 proto archive hash; a whole-tree hash calculated after dropping links is not accepted as historical proof. The native hash covers regular tracked files and excludes the omitted links.
+
 ## Explicit limitations
 
 Invalid known fields, invalid or multi-document YAML, ambiguous source selection, unsupported references, and conflicting native outputs are rejected. Keys ignored by v0 are omitted with warnings and remain in the legacy backup. Custom Git-input roots/subdirectories, external or sliced local inputs whose exact selection cannot be preserved, unsafe managed selectors, and full lock conversion with local replacements may require manual migration. Buf configurations are not inputs to this v0 converter.
