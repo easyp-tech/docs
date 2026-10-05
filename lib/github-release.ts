@@ -1,32 +1,26 @@
 interface GithubRelease {
   tag_name: string
-}
-
-interface GithubTag {
-  name: string
+  draft: boolean
+  prerelease: boolean
 }
 
 const REPO = 'easyp-tech/easyp'
 
-function isStable(name: string): boolean {
-  const v = name.toLowerCase()
+function isPublishedStable(value: unknown): value is GithubRelease {
+  if (typeof value !== 'object' || value === null) return false
+  const release = value as Partial<GithubRelease>
   return (
-    !v.includes('-rc') &&
-    !v.includes('-alpha') &&
-    !v.includes('-beta') &&
-    !v.includes('-pre') &&
-    !v.includes('-dev')
+    release.draft === false &&
+    release.prerelease === false &&
+    typeof release.tag_name === 'string' &&
+    /^v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/.test(release.tag_name)
   )
 }
 
-/**
- * Server-friendly latest stable version (Next fetch cache).
- * Prefer /releases/latest; fall back to tags list.
- */
-export async function getLatestRelease(): Promise<string> {
+async function readReleases(path: string): Promise<unknown> {
   try {
-    const releaseRes = await fetch(
-      `https://api.github.com/repos/${REPO}/releases/latest`,
+    const response = await fetch(
+      `https://api.github.com/repos/${REPO}/${path}`,
       {
         headers: {
           Accept: 'application/vnd.github+json',
@@ -36,30 +30,39 @@ export async function getLatestRelease(): Promise<string> {
       },
     )
 
-    if (releaseRes.ok) {
-      const data = (await releaseRes.json()) as GithubRelease
-      if (data.tag_name) return data.tag_name
-    }
-
-    const tagsRes = await fetch(`https://api.github.com/repos/${REPO}/tags`, {
-      headers: {
-        Accept: 'application/vnd.github+json',
-        'User-Agent': 'easyp-docs',
-      },
-      next: { revalidate: 3600 },
-    })
-
-    if (!tagsRes.ok) {
-      throw new Error(`GitHub tags status ${tagsRes.status}`)
-    }
-
-    const tags = (await tagsRes.json()) as GithubTag[]
-    if (tags.length === 0) throw new Error('No tags')
-
-    const stable = tags.find((t) => isStable(t.name))
-    return stable?.name ?? tags[0].name
+    if (!response.ok) return null
+    return await response.json()
   } catch (error) {
     console.error(error)
-    return 'unknown version'
+    return null
   }
+}
+
+function compareVersions(left: string, right: string): number {
+  const a = left.slice(1).split('.').map(BigInt)
+  const b = right.slice(1).split('.').map(BigInt)
+  for (let i = 0; i < a.length; i++) {
+    if (a[i] !== b[i]) return a[i] > b[i] ? 1 : -1
+  }
+  return 0
+}
+
+/** Server-friendly published stable version, cached with Next fetch. */
+export async function getLatestRelease(): Promise<string> {
+  const latest = await readReleases('releases/latest')
+  if (isPublishedStable(latest)) return latest.tag_name
+
+  const releases = await readReleases('releases?per_page=100')
+  if (!Array.isArray(releases)) return 'unknown version'
+
+  let stable: string | undefined
+  for (const release of releases) {
+    if (
+      isPublishedStable(release) &&
+      (stable === undefined || compareVersions(release.tag_name, stable) > 0)
+    ) {
+      stable = release.tag_name
+    }
+  }
+  return stable ?? 'unknown version'
 }

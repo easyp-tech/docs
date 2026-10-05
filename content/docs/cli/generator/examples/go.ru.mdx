@@ -1,6 +1,6 @@
 ---
 title: "Генерация Go-кода"
-description: "Минимальная конфигурация EasyP v1 с локальными Go-плагинами."
+description: "Минимальная конфигурация EasyP v1 с Go-плагинами."
 ---
 
 Объявите корень исходников в `protobuf.mod`:
@@ -27,6 +27,8 @@ plugins:
       paths: source_relative
 ```
 
-Добавьте `protoc-gen-go` и `protoc-gen-go-grpc` в `PATH`, затем выполните `easyp generate`. Go import path задаётся опцией `go_package` в `.proto` или managed-опцией `options.go.package_prefix`. Подробности — в [справочнике managed mode](/ru/docs/reference/easyp-gen-yaml).
+Выполните `easyp generate`. Если `protoc-gen-go` или `protoc-gen-go-grpc` доступен в `PATH`, EasyP использует этот бинарник; иначе запускает соответствующий встроенный WASM-плагин. Go import path задаётся опцией `go_package` в `.proto` или managed-опцией `options.go.package_prefix`. Подробности — в [справочнике managed mode](/ru/docs/reference/easyp-gen-yaml).
+
+Например, `options.go.package_prefix: github.com/acme/contracts/gen/go` отображает protobuf-пакет `common.v1` в `github.com/acme/contracts/gen/go/common/v1`. С `paths: source_relative` файлы попадают в `gen/go/common/v1`, согласуя каталоги с Go-импортами.
 
 Имена `go` и `go-grpc` обозначают плагины. У генератора v1 нет `generate.inputs` или флага `--path`: исходники берутся из корней выбранного модуля.

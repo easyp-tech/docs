@@ -34,6 +34,8 @@ Only the main consumer's replacements apply, at every depth of the required grap
 
 Generate, selected dependency generation, both descriptor export modes, lint, ls-files and breaking import resolution use this same effective graph. Replaced modules need no remote fetch and may be unpublished. A fully local graph works offline without a lock.
 
+Reached replacement trees are imports during consumer lint and breaking checks; their policies do not become consumer policies. Use <code>--path</code> to check a replacement explicitly. Unused replacement paths cannot exclude the consumer's own sources. Buf includes/excludes remain effective for replacement sources; see [dependency filters](/docs/cli/package-manager#dependencies-using-buf-or-older-easyp).
+
 ## Local Mode and the Published Lock
 
 While the main manifest contains replacements, EasyP leaves an existing <code>protobuf.lock</code> **byte-for-byte unchanged** and does not create one if absent. Local paths, local versions/hashes and fork-only transitive dependencies never enter the shared lock. This is an explicit EasyP invariant: <code>protobuf.lock</code> is not <code>go.sum</code>, and this does not mean Go never updates <code>go.sum</code> with replacements. The main-module replacement semantics follow [Go's replacement model](https://go.dev/ref/mod#go-mod-file-replace).

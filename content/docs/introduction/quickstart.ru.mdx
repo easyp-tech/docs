@@ -1,13 +1,17 @@
 ---
 title: "Быстрый старт"
-description: "Создание protobuf-модуля и генерация кода в пилотной версии EasyP v1."
+description: "Создание protobuf-модуля и генерация кода в EasyP v1 nightly."
 ---
 
-Установите пилотную сборку EasyP v1 и убедитесь, что доступен Git. В примере используется локальный Go-плагин: перед генерацией добавьте `protoc-gen-go` в `PATH`.
+Установите [явно выбранный v1 nightly](/ru/docs/introduction/install#явная-установка-v1-nightly) и убедитесь, что доступен Git. Плагин `go` использует `protoc-gen-go` из `PATH`, если он установлен; иначе EasyP запускает встроенный WASM-генератор.
 
 ## 1. Создайте модуль
 
 ```bash
+# Выберите nightly из инструкции по установке для текущего терминала.
+export PATH="$HOME/.local/share/easyp-nightly/bin:$PATH"
+easyp --version
+
 mkdir contracts && cd contracts
 git init
 easyp init --module github.com/acme/contracts

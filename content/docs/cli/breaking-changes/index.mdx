@@ -27,6 +27,8 @@ The baseline can name a local branch, a lightweight or annotated tag, a full com
 
 <code>--path</code> selects a file or directory relative to the scan root; <code>--root</code> changes that root from the policy directory. Checked file identities remain repository-relative. <code>breaking.ignore</code> excludes directories; vendored sources are excluded from targets.
 
+Directory and file symlinks select their canonical repository paths, including a deleted suffix beneath an existing directory. Selecting an alias does not skip changes visible through the original path. Targets outside the repository are rejected.
+
 <code>breaking.ignore</code> paths are relative to the file supplying the effective <code>breaking</code> section, not the Git root or <code>--root</code>. For example, <code>ignore: [generated]</code> in <code>api/easyp.yaml</code> excludes <code>api/generated</code>, including when that section is inherited. Entries must be nonempty local relative paths; absolute paths and paths escaping the policy directory or repository are rejected.
 
 Policies come from current configuration. Each nearest defined <code>breaking</code> section applies as a whole; nested policies may select different baselines. Repeated identical findings are emitted once.
@@ -35,13 +37,15 @@ Policies come from current configuration. Each nearest defined <code>breaking</c
 
 Each selected module is compared separately. Current and baseline revisions use their own module roots, <code>protobuf.mod</code>, <code>protobuf.lock</code>, and dependencies. Baseline sources, manifests, and locks are read from an isolated Git snapshot. The caller's checkout, manifest, and lock are unchanged; the verified dependency cache may be populated. Temporary snapshots are removed after use.
 
+Buf source filters and replacement metadata also belong to their respective revisions. Current files or filters never substitute for missing historical metadata. During consumer checks, reached replacement sources supply imports; they become policy targets only when explicitly selected. Unused replacements cannot exclude consumer targets.
+
 Baseline-only files and deleted modules remain checkable, including through <code>--path</code>. Dependency findings use the policy of the selected files. A policy can also run without a module manifest.
 
 Local replacements inside the repository use the contents of the corresponding revision; absolute paths inside the repository are mapped into the baseline snapshot. External local replacements are rejected because they have no recoverable historical identity. Use a locked dependency for a reproducible baseline.
 
 ## Categories and unstable packages
 
-Nonempty <code>breaking.categories</code> selects real descriptor-based profiles: <code>FILE</code>, <code>PACKAGE</code>, <code>WIRE_JSON</code>, or <code>WIRE</code>. Omitted or empty categories retain the legacy checker; this is not an alias for WIRE. Multiple profiles apply their union without duplicate diagnostics.
+<code>breaking.categories</code> selects descriptor-based profiles: <code>FILE</code>, <code>PACKAGE</code>, <code>WIRE_JSON</code>, or <code>WIRE</code>. Omitted or empty categories select <code>FILE</code>. Multiple profiles apply their union without duplicate diagnostics.
 
 | Change | FILE | PACKAGE | WIRE_JSON | WIRE |
 |---|---|---|---|---|
