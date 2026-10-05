@@ -1,0 +1,124 @@
+---
+title: "Security Model"
+description: "What a plugin can do on the service host, who can register plugins, and how to isolate the service yourself."
+---
+
+## The one thing to know
+
+**Plugins are not sandboxed.** A plugin is an ordinary child process of the
+service, running as the service's user, on the service's host, in the service's
+network. Registering a plugin is as privileged as running arbitrary code there.
+
+Everything below follows from that.
+
+## What the service does bound
+
+| Bound | How | Setting |
+|---|---|---|
+| Time | Context deadline; on expiry the whole process group gets `SIGKILL`. | `worker_pool.generation_timeout`, per-plugin `timeout` |
+| Concurrency | Generation slots and a bounded queue. | `worker_pool.max_concurrent_generations`, `worker_pool.queue_size` |
+| Output size | Stdout read up to the limit; beyond it the generation fails. Stderr capped at 1 MiB. | `registry.max_output_size` |
+| Environment | Empty except the plugin's own `env`. Database DSN, S3 keys, licence and tokens are not inherited. | plugin config `env` |
+| Executable location | `command[0]` must resolve, after symlinks, inside `plugins_dir`. Archives with symlinks pointing outside themselves are refused at unpack. | `registry.plugins_dir` |
+| Binary integrity | With object storage, the archive's sha256 is recorded by the service at registration and checked after every download. | — |
+
+## What it does not bound
+
+- **Memory.** A plugin can allocate until the container or host kills something.
+- **CPU.** Beyond the number of concurrent plugins, nothing.
+- **Filesystem.** Whatever the service user can read and write: the plugin
+  cache (every other plugin's binaries), `/tmp`, any mounted secret files. The
+  working directory is the service's.
+- **Network.** Whatever the service can reach: PostgreSQL, object storage, the
+  cloud metadata endpoint, the internet.
+- **Processes and syscalls.** The service applies no seccomp profile,
+  namespaces or capability changes of its own to the plugin process. (The Helm
+  chart applies some to the whole pod — see below.)
+- **Determinism.** A plugin that reads the clock, the network or the filesystem
+  produces whatever it produces.
+
+The output limit is also a memory statement: responses are buffered whole, so
+peak memory is roughly `max_concurrent_generations × max_output_size × 2`
+before any plugin's own usage.
+
+## Who can do what
+
+| Actor | Can |
+|---|---|
+| Anyone who reaches the gRPC port (default) | List plugins; run any registered plugin on input of their choosing. |
+| Holder of any write token | Register, change and delete any plugin — that is, run code of their choosing on the host. There are no scopes or roles. |
+| Anyone who can write to `plugins_dir` | Replace a binary. In local mode nothing checks it. |
+| Anyone who can edit the configuration | Add write tokens, change the licence trust anchor, point `command` anywhere inside `plugins_dir`. |
+
+So: treat a write token like SSH access to the service host, and a shared
+registry as a set of people who all trust each other.
+
+Anonymous `GenerateCode` is less dangerous — the caller chooses the input, not
+the code — but a registered plugin with a parsing bug is still attack surface
+reachable by anyone who can reach the port. Set
+`auth.require_authentication: true` or restrict the network if that matters,
+knowing that the easyp CLI cannot send a token (see
+[Client usage](/docs/api-service/client-usage)).
+
+## What to register
+
+- Plugins built from the service repository's reviewed recipes, pinned by
+  version, with base images pinned by digest.
+- Your own plugins from your own build pipeline.
+- Not: arbitrary binaries from users, plugins that need network or filesystem
+  access to work, anything whose provenance you cannot trace to a source
+  revision.
+
+Use object storage mode in production even with one host: it gives you the
+checksum check, and the build pipeline — not the service host — holds write
+access to the artifacts.
+
+## Isolating the host yourself
+
+The service does not provide these; they are what the environment around it
+can provide.
+
+**On Kubernetes**
+
+The Helm chart already runs the pod as UID 65532 with `runAsNonRoot`, the
+`RuntimeDefault` seccomp profile, all capabilities dropped and privilege
+escalation disabled. Plugins inherit this because they are processes in the same
+container. The root filesystem is not read-only (archives are unpacked at run
+time; the cache is a separate volume). Beyond that:
+
+- Run the service in its own namespace, ideally on dedicated nodes
+  (`nodeSelector`, `tolerations`, `affinity` are exposed in the chart).
+- Keep the chart's `NetworkPolicy` enabled (the default). Its egress allows DNS,
+  5432, 443 and 4317; narrow 443 to your object storage if you can, and block the
+  cloud metadata endpoint.
+- Keep `resources.limits`; the chart refuses limits that cannot hold the output
+  buffers.
+- Use a sandboxed runtime class (gVisor, Kata) for the pod if your cluster has
+  one. The chart does not expose `runtimeClassName` in v1.0.2; it would need a
+  post-render patch.
+- Give the service account no Kubernetes API permissions it does not need.
+
+**On a VM or bare host**
+
+- A dedicated host or VM, not one shared with other workloads.
+- Run the container as a non-root user with dropped capabilities, the default
+  seccomp profile, `no-new-privileges`, and a memory limit — the same as the
+  chart does.
+- Firewall outbound traffic to PostgreSQL, object storage and your telemetry
+  collector.
+
+**Everywhere**
+
+- TLS on the listener; mutual TLS with a CA dedicated to this service where
+  clients allow it.
+- `server.trusted_proxies` set to your ingress range, so rate limits and the
+  audit trail see real clients.
+- Few write tokens, held by CI rather than by people, rotated by replacing the
+  digest.
+- An Enterprise licence if you need a record of who registered what.
+
+## Reporting vulnerabilities
+
+As of v1.0.2 the service repository publishes no security policy and has
+GitHub's private vulnerability reporting turned off. Contact the maintainers
+privately before opening a public issue about a vulnerability.

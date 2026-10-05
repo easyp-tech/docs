@@ -1,0 +1,162 @@
+---
+title: "Быстрый старт"
+description: "С нуля до первой удалённой генерации: PostgreSQL, образ сервиса, один плагин, easyp generate."
+---
+
+Здесь сервис запускается с минимальным окружением: один контейнер PostgreSQL,
+релизный образ, без объектного хранилища и без TLS. Это чтобы увидеть, из чего
+всё состоит, а не чтобы выставлять в сеть.
+
+## Что понадобится
+
+- Docker с плагином compose.
+- Клон [easyp-tech/service](https://github.com/easyp-tech/service) — бинарники
+  плагинов собираются из его каталога `registry/`.
+- Go 1.26+, чтобы запускать CLI оператора из исходников, или бинарник
+  `easyp-svc` со [страницы релизов](https://github.com/easyp-tech/service/releases).
+- [easyp CLI](/ru/docs/introduction/install).
+
+## 1. Собрать плагин
+
+Плагины собираются из Dockerfile'ов в `registry/`. Весь каталог собирается
+часами; фильтр собирает одну версию:
+
+```bash
+cd service
+go run ./cmd/easyp-svc plugins build registry \
+  --output plugins \
+  --filter 'protocolbuffers/go:v1.36.10'
+```
+
+Результат — `plugins/protocolbuffers/go/v1.36.10/plugin`. Сборка идёт в Docker,
+поэтому бинарник линуксовый: он запустится внутри контейнера сервиса, но не
+нативно на macOS.
+
+## 2. Создать токен записи
+
+Регистрация плагина — это запись, а запись требует токена. Сервис хранит только
+его sha256:
+
+```bash
+go run ./cmd/easyp-svc auth new-token --name quickstart
+```
+
+Команда один раз печатает токен и пару `name`/`sha256` для конфигурации сервиса.
+Сохраните и то, и другое.
+
+## 3. Запустить PostgreSQL и сервис
+
+Сохраните рядом с каталогом `plugins/` как `compose.yml`, подставив дайджест из
+шага 2:
+
+```yaml
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: easyp
+      POSTGRES_PASSWORD: easyp
+      POSTGRES_DB: easyp
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "easyp"]
+      interval: 2s
+      retries: 30
+
+  service:
+    image: ghcr.io/easyp-tech/service:v1.0.2
+    command: ["service", "start"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DB_POSTGRES_DSN: postgres://easyp:easyp@postgres:5432/easyp?sslmode=disable
+      AUTH_WRITE_TOKENS: quickstart=<sha256 из шага 2>
+    volumes:
+      - ./plugins:/plugins
+    ports:
+      - "127.0.0.1:23410:23410"   # gRPC
+      - "127.0.0.1:23411:23411"   # метрики
+      - "127.0.0.1:23412:23412"   # health
+```
+
+```bash
+docker compose up -d
+curl -i http://localhost:23412/live   # 200, как только процесс поднялся
+curl -i http://localhost:23412/       # 200, как только отвечает PostgreSQL
+```
+
+Сервис сам применяет миграции БД при старте. Его лог начинается со строки
+`configuration resolved` со всеми настройками, отличающимися от значений по
+умолчанию, и предупреждением, что gRPC работает без TLS.
+
+<Callout type="warn">
+Монтируйте `plugins/` на запись. Сервис при старте создаёт `plugins/.tmp` даже
+без объектного хранилища, и с томом только для чтения падает с
+`mkdir /plugins/.tmp: read-only file system`.
+</Callout>
+
+## 4. Зарегистрировать плагин
+
+```bash
+EASYP_TOKEN=<токен из шага 2> \
+go run ./cmd/easyp-svc plugins register \
+  --addr localhost:23410 \
+  --insecure \
+  plugins
+```
+
+`register` обходит `plugins/` и для каждой версии вызывает `CreatePlugin` с путём
+к команде в том виде, в каком его видит сервис
+(`/plugins/protocolbuffers/go/v1.36.10/plugin`). Без токена каждая регистрация
+завершается ошибкой `Unauthenticated`.
+
+## 5. Сгенерировать код
+
+В проекте с `.proto`-файлами в `proto/`:
+
+```yaml
+# easyp.yaml
+generate:
+  inputs:
+    - directory:
+        path: .
+        root: proto
+  plugins:
+    - remote: "localhost:23410/protocolbuffers/go:v1.36.10"
+      out: gen/go
+      opts:
+        paths: source_relative
+```
+
+```bash
+easyp generate
+```
+
+С `localhost` CLI работает без шифрования, с любым другим хостом — по TLS.
+Всегда фиксируйте версию в `remote:` — почему `latest` не значит «самая новая» в
+смысле семантических версий, объяснено в
+[Использовании клиентами](/ru/docs/api-service/client-usage).
+
+## Полный стенд для разработки
+
+`service/deploy/docker-compose.yml` — стенд, на котором работают мейнтейнеры:
+PostgreSQL, S3-совместимое хранилище (RustFS), Traefik с взаимным TLS спереди и
+Grafana, Loki, Tempo, Mimir и Pyroscope. Им управляет `Taskfile.yml`
+репозитория сервиса:
+
+```bash
+FILTER='protocolbuffers/go:v1.36.10' task build-plugins-filter
+task up                 # генерирует dev-сертификаты, поднимает стенд
+task push-plugins       # загружает архивы в хранилище
+task register-plugins   # регистрирует их через Traefik
+```
+
+Там gRPC доступен через Traefik на `easyp.api.localhost:4443`, а Grafana — на
+`localhost:3000`. Подробности — в
+[README сервиса](https://github.com/easyp-tech/service#quick-start).
+
+## Дальше
+
+- [Установка](/ru/docs/api-service/installation) — Helm и настройки для продакшена.
+- [Плагины](/ru/docs/api-service/plugins) — объектное хранилище и полный каталог.
+- [Безопасность](/ru/docs/api-service/security) — прежде чем давать кому-то ещё регистрировать плагины.
