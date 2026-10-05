@@ -1,10 +1,12 @@
 ---
-title: "Установка EasyP CLI"
+title: "Установка EasyP"
 ---
 
-### Установка через менеджер пакетов системы
+<Callout type="info">
+Для установки EasyP v1 явно выберите опубликованный nightly-тег. Стабильная установка по умолчанию остаётся на v0.17.0, пока для v1 существуют только prerelease-теги. Для конфигурации и команд v1 из этой документации используйте [инструкцию nightly](#явная-установка-v1-nightly).
+</Callout>
 
-##### Рекомендуемый способ установки
+## Установка стабильного CLI
 
 <Tabs items={["Homebrew", "Go install", "Binary Download"]}>
   <Tab value="Homebrew">
@@ -19,35 +21,84 @@ title: "Установка EasyP CLI"
     `Work in progress` — поддержка других системных менеджеров (apt, yum, pacman и т.д.) в процессе.
   </Tab>
   <Tab value="Go install">
-    #### Требуется Go 1.24 или новее
+    #### Go toolchain
 
-    Установка последней стабильной версии EasyP через Go toolchain:
+    Установите последнюю опубликованную стабильную версию через Go toolchain, требуемый выбранным релизом:
 
     ```bash
     go install github.com/easyp-tech/easyp/cmd/easyp@latest
     ```
   </Tab>
   <Tab value="Binary Download">
-    #### Сборка из исходников
-
-    1. Клонирование репозитория:
-
-    ```bash
-    git clone https://github.com/easyp-tech/easyp.git
-    ```
-
-    2. Сборка с помощью Go:
-
-    ```bash
-    go build ./cmd/easyp
-    ```
+    Скачайте архив для своей ОС и архитектуры из [последнего стабильного релиза](https://github.com/easyp-tech/easyp/releases/latest). Распакуйте его и добавьте бинарник `easyp` в `PATH`.
   </Tab>
 </Tabs>
 
-## Особые указания по локальной сборке
+Стабильный Docker-канал — `ghcr.io/easyp-tech/easyp:latest`; сейчас он указывает
+на тот же образ, что и `ghcr.io/easyp-tech/easyp:v0.17.0`.
 
-Установка через пакетные менеджеры предпочтительнее локальной сборки вручную, так как пакетные менеджеры обеспечивают:
-- Автоматические обновления и патчи безопасности
-- Улучшенную интеграцию с операционной системой
-- Упрощённый процесс установки и удаления
-- Проверенные бинарные сборки
+## Явная установка v1 nightly
+
+Nightly-теги имеют формат `v1.0.0-nightly.YYYYMMDD.sequence`. Выберите точный опубликованный тег в [GitHub Releases](https://github.com/easyp-tech/easyp/releases). Тег `v1.0.0-nightly.20261005.1` ниже — пример, а не утверждение, что такой релиз существует; замените его опубликованным тегом перед запуском команд. Nightly не обновляет стабильную формулу Homebrew или Docker-образ `latest`.
+
+### Go: CLI и MCP
+
+Для сборки v1 требуется **Go 1.26.6 или новее**. Установите оба бинарника в одной точной версии в отдельный каталог, чтобы сохранить стабильный CLI в `PATH`:
+
+```bash
+# Только пример: замените тег реально опубликованным nightly.
+NIGHTLY_TAG='v1.0.0-nightly.20261005.1'
+NIGHTLY_BIN="$HOME/.local/share/easyp-nightly/bin"
+mkdir -p "$NIGHTLY_BIN"
+GOBIN="$NIGHTLY_BIN" go install "github.com/easyp-tech/easyp/cmd/easyp@${NIGHTLY_TAG}"
+GOBIN="$NIGHTLY_BIN" go install "github.com/easyp-tech/easyp/cmd/easyp-mcp@${NIGHTLY_TAG}"
+"$NIGHTLY_BIN/easyp" --version
+```
+
+Вызывайте nightly CLI по полному пути. Настройте MCP-клиент на запуск `easyp-mcp` из этого каталога как stdio-сервера: он предоставляет справочник конфигурации v1 через `easyp_config_describe`. Для примеров с командой `easyp` выберите nightly в текущем терминале: `export PATH="$NIGHTLY_BIN:$PATH"`. Не добавляйте этот каталог в постоянный `PATH`, чтобы сохранить стабильную версию по умолчанию.
+
+### Архив релиза: CLI и MCP
+
+Архив v1 содержит `easyp` и `easyp-mcp`. Скачайте файл для своей платформы и проверьте его по контрольным суммам релиза. Пример для Linux amd64:
+
+```bash
+# Только пример: замените тег реально опубликованным nightly.
+NIGHTLY_TAG='v1.0.0-nightly.20261005.1'
+NIGHTLY_VERSION="${NIGHTLY_TAG#v}"
+NIGHTLY_ASSET="easyp-${NIGHTLY_VERSION}-linux-amd64.tar.gz"
+NIGHTLY_BIN="$HOME/.local/share/easyp-nightly/bin"
+curl -fLO "https://github.com/easyp-tech/easyp/releases/download/${NIGHTLY_TAG}/${NIGHTLY_ASSET}"
+curl -fLO "https://github.com/easyp-tech/easyp/releases/download/${NIGHTLY_TAG}/easyp-${NIGHTLY_VERSION}-checksums.txt"
+sha256sum --check --ignore-missing "easyp-${NIGHTLY_VERSION}-checksums.txt"
+mkdir -p "$NIGHTLY_BIN"
+tar -xzf "$NIGHTLY_ASSET" --strip-components=1 -C "$NIGHTLY_BIN"
+"$NIGHTLY_BIN/easyp" --version
+```
+
+Вызывайте CLI и MCP по полным путям в этом отдельном каталоге. Архивы macOS используют `darwin`; архивы Windows имеют расширение `.zip` и содержат `.exe`. Для запуска готовых бинарников Go toolchain не нужен.
+
+### Docker: CLI
+
+Nightly-образ CLI в GHCR выбирается по точному тегу:
+
+```bash
+# Только пример: замените тег реально опубликованным nightly.
+NIGHTLY_TAG='v1.0.0-nightly.20261005.1'
+docker run --rm -v "$PWD:/workspace" -w /workspace \
+  "ghcr.io/easyp-tech/easyp:${NIGHTLY_TAG}" --version
+```
+
+Замените `--version` нужной командой EasyP. Образ содержит CLI; MCP stdio-сервер устанавливается через Go или архив.
+
+## Go modules: переход с v0 на v1
+
+EasyP v0 и v1 используют один путь модуля: `github.com/easyp-tech/easyp`, без суффикса `/v1`. Начиная с major 2 Go требует новый путь `/v2`, чтобы несовместимые мажорные версии могли сосуществовать. Переход v0→v1 всё же может требовать изменений кода и конфигурации. См. [нумерацию версий Go](https://go.dev/doc/modules/version-numbers).
+
+Слияние разработки v1 в `main` не меняет опубликованный тег `v0.17.0` и установки, закреплённые на v0. При переходе со стабильного v0 команды `@latest` и обычный `go get -u` предпочитают опубликованную стабильную версию prerelease-версиям v1. Явный nightly-тег включает v1 и требует учёта изменений API и конфигурации. Уже выбранная более высокая prerelease-версия автоматически не понижается. См. [запросы версий Go](https://go.dev/ref/mod#version-queries).
+
+Стабильный Git-тег `v1.0.0` попадёт в выбор Go по умолчанию даже без GitHub Release или при флаге prerelease у этого Release. На этапе nightly публикуются только точные nightly-теги указанного выше формата. `@main` явно запрашивает код разработки и не является каналом стабильной установки.
+
+Для одной сборки Go выбирает одну версию каждого module path. Другая зависимость,
+требующая v1 nightly, также может повысить выбранную версию EasyP через
+[minimal version selection](https://go.dev/ref/mod#minimal-version-selection).
+Если вы используете v0 как библиотеку, её граф зависимостей тоже должен быть совместим с v0.

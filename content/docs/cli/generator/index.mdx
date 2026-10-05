@@ -87,8 +87,12 @@ All requested graphs and export destinations pass preflight before any plugin ru
 
 Each plugin sets exactly one source: <code>name</code>, <code>path</code>, <code>command</code>, or <code>remote</code>. Local binaries and commands run from the invocation directory. Remote plugins require a pinned semantic <code>version</code>; local and bundled plugins reject a separate version field.
 
+Bundled names such as <code>go</code> and <code>go-grpc</code> use a matching <code>protoc-gen-*</code> on <code>PATH</code> when available, otherwise their bundled WASM plugin.
+
 <code>plugins[].with_imports</code> defaults to false. Set it to true for a particular plugin to generate code for transitive imports as well as the selected files. Other plugins still receive dependency descriptors for linking. This setting is independent of descriptor export's <code>--include_imports</code>. Keep Go import paths and output directories aligned: different Go packages must not share one generated directory. Identical shared outputs are deduplicated; conflicting file contents or Go package declarations fail before generated files are written.
 
 <code>options.go.package_prefix</code> changes Go options only. Defaults for other languages and field-option transformations require explicit <code>generate.managed.enabled: true</code>. An inherited Go prefix precedes explicit managed Go overrides; a prefix in the current file has the highest priority. Go disable selectors still apply. See the full [configuration reference](/docs/reference/easyp-gen-yaml).
 
-Dependency repositories may use v1 EasyP, older EasyP, Buf v1, or Buf v2 metadata. EasyP reads dependency metadata without executing dependency plugins.
+A plain prefix maps a multi-component protobuf package such as <code>common.v1</code> to <code>&lt;prefix&gt;/common/v1</code>. With explicit <code>paths: source_relative</code>, Go output directories follow the plugin's effective import path under that prefix, including its <code>Mfile.proto</code> mappings. Insertion-point outputs follow the producer's output file. See [Go output paths and plugin mappings](/docs/reference/easyp-gen-yaml#go-output-paths-and-plugin-mappings) for marker templates and precedence.
+
+Dependency repositories may use v1 EasyP, older EasyP, Buf v1, or Buf v2 metadata. EasyP reads dependency metadata without executing dependency plugins. Buf source includes/excludes also apply when selecting a dependency or its packages for generation; excluded files cannot be reintroduced as imports. See [dependency metadata and filters](/docs/cli/package-manager#dependencies-using-buf-or-older-easyp).

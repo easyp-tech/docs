@@ -19,7 +19,7 @@ The <code>easyp.gen.yaml</code> file specifies **consumer-side code generation r
       default: "v1"
     },
     generate: {
-      description: "Complete-module selection; package filtering is reserved.",
+      description: "Module and exact protobuf-package selection, with managed descriptor options.",
       type: "object"
     },
     "generate.modules": {
@@ -139,7 +139,9 @@ plugins:
 
 Instead of requiring explicit file-level options (like <code>option go_package = "..."</code>) inside every individual <code>.proto</code> schema file, EasyP's managed <code>options</code> block groups settings logically by target language.
 
-<code>options.go.package_prefix</code> computes <code>go_package</code> from the proto file path without changing the source. The prefix alone changes Go options only: it does not enable Java, C#, PHP, Ruby, Objective-C, or C++ defaults. Full managed mode and field-option transformations require explicit <code>generate.managed.enabled: true</code>. Go disable selectors, including <code>go_package</code>, suppress the prefix.
+<code>options.go.package_prefix</code> computes <code>go_package</code> without changing the source. A plain prefix uses the hierarchy of a multi-component protobuf package: <code>common.v1</code> with prefix <code>github.com/acme/sdk</code> becomes <code>github.com/acme/sdk/common/v1;commonv1</code>. A single-component package keeps the proto file directory. Templates such as `{{file_path}}` and `{{file_dir}}` use the proto path instead.
+
+The prefix changes Go options even when full managed mode is omitted or disabled. It does not enable Java, C#, PHP, Ruby, Objective-C, or C++ defaults. Full managed mode and field-option transformations require explicit <code>generate.managed.enabled: true</code>. Go disable selectors, including <code>go_package</code>, suppress the prefix.
 
 The existing managed-mode rules remain available under <code>generate.managed</code>. For example, a package-specific override can be written as:
 
@@ -159,9 +161,19 @@ plugins:
 
 A repository-root <code>easyp.gen.yaml</code> may provide <code>options.go.package_prefix</code> as a default for nested generator files. Nested <code>generate.managed</code> rules take precedence over that inherited default. A prefix declared in the same generator file has the highest priority. Plugin lists stay local to each generator file.
 
+### Go output paths and plugin mappings
+
+With a Go prefix and explicit <code>paths: source_relative</code>, generated Go directories follow the effective import path relative to that prefix. In the <code>common.v1</code> example, <code>out: gen/go</code> writes <code>gen/go/common/v1/*.go</code>, regardless of the proto file's directory. Marker templates use the complete parent path before the first marker as their output base. Imports outside that base keep the plugin's output path. Default <code>paths</code>, <code>paths: import</code>, and the plugin's <code>module</code> option retain plugin-controlled layouts.
+
+A plugin's <code>Mfile.proto=import/path</code> option overrides the effective import path for that plugin. The last nonempty import mapping wins; alias-only or empty mappings do not erase the descriptor import or a preceding import mapping. These plugin parameters do not change exported descriptors or other plugins' options.
+
+Insertion-point responses follow the output file created by their producer, even when the inserting plugin has different path or mapping options. An ambiguous producer is an error. Comments copied from a proto source do not change which Go or gRPC file receives the generated output.
+
 The generator selects module sources by default. Nonempty <code>generate.packages</code> filters them by exact protobuf package name. Unknown names fail before plugins; required imports remain in the compilation graph.
 
 Remote plugins require a <code>version</code> such as <code>v2.0.0</code>. EasyP sends that exact version to the remote generator. For local <code>protoc-gen-&#42;</code> executables and bundled WASM plugins, the executable selected at runtime determines the version; the separate <code>version</code> field is rejected because EasyP cannot verify it.
+
+For bundled names such as <code>go</code> and <code>go-grpc</code>, a matching <code>protoc-gen-*</code> executable on <code>PATH</code> takes precedence. Otherwise EasyP uses the bundled WASM plugin. Use <code>path</code> or <code>command</code> to select an explicit executable.
 
 Each plugin declares exactly one source: <code>name</code>, <code>path</code>, <code>command</code>, or <code>remote</code>. Use <code>path</code> for a specific binary and <code>command</code> for an executable plus arguments. Both run from the directory where <code>easyp generate</code> starts and, like any Protobuf plugin, must read a <code>CodeGeneratorRequest</code> from stdin and write a <code>CodeGeneratorResponse</code> to stdout.
 

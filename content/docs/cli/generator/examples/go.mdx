@@ -1,6 +1,6 @@
 ---
 title: "Generate Go code"
-description: "A minimal EasyP v1 generator using local Go plugins."
+description: "A minimal EasyP v1 generator using Go plugins."
 ---
 
 Declare the source root in `protobuf.mod`:
@@ -27,6 +27,8 @@ plugins:
       paths: source_relative
 ```
 
-Place `protoc-gen-go` and `protoc-gen-go-grpc` on `PATH`, then run `easyp generate`. A `go_package` option in each source file, or a managed `options.go.package_prefix`, supplies the Go import path. See the [managed options reference](/docs/reference/easyp-gen-yaml).
+Run `easyp generate`. If `protoc-gen-go` or `protoc-gen-go-grpc` is on `PATH`, EasyP uses that executable; otherwise it uses the corresponding bundled WASM plugin. A `go_package` option in each source file, or a managed `options.go.package_prefix`, supplies the Go import path. See the [managed options reference](/docs/reference/easyp-gen-yaml).
+
+For example, adding `options.go.package_prefix: github.com/acme/contracts/gen/go` maps the protobuf package `common.v1` to `github.com/acme/contracts/gen/go/common/v1`. With `paths: source_relative`, the generated files go to `gen/go/common/v1`, keeping directories aligned with the Go imports.
 
 The `go` and `go-grpc` names identify plugins; the v1 generator has no `generate.inputs` or `--path` option. Its inputs come from the selected module's roots.
