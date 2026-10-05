@@ -8,7 +8,10 @@
     "start": "next start",
     "types:check": "fumadocs-mdx && tsc --noEmit",
     "test:release": "node --experimental-strip-types --test lib/github-release.test.mjs",
-    "migrate:content": "node scripts/migrate-content.mjs"
+    "migrate:content": "node scripts/migrate-content.mjs",
+    "sync:plugins": "node scripts/sync-plugin-catalog.mjs",
+    "sync:helm-values": "node scripts/sync-helm-values.mjs",
+    "sync:service": "node scripts/sync-plugin-catalog.mjs && node scripts/sync-helm-values.mjs"
   },
   "dependencies": {
     "@easyp/brand": "file:./brand",
@@ -17,6 +20,7 @@
     "fumadocs-mdx": "^15.2.0",
     "fumadocs-ui": "^16.11.5",
     "lucide-react": "^0.554.0",
+    "mermaid": "12.0.0",
     "next": "^16.2.10",
     "react": "^19.2.0",
     "react-dom": "^19.2.0"
@@ -28,7 +32,9 @@
     "@types/react": "^19.2.0",
     "@types/react-dom": "^19.2.0",
     "postcss": "^8.5.0",
+    "semver": "7.8.5",
     "tailwindcss": "^4.1.0",
-    "typescript": "^5.9.0"
+    "typescript": "^5.9.0",
+    "yaml": "2.9.0"
   }
 }

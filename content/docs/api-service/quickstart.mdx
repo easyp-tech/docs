@@ -1,0 +1,160 @@
+---
+title: "Quickstart"
+description: "From nothing to a first remote code generation: PostgreSQL, the service image, one plugin, easyp generate."
+---
+
+This walk-through runs the service with the least possible around it: one
+PostgreSQL container, the released image, no object storage, no TLS. It is for
+seeing the moving parts, not for exposing to a network.
+
+## Prerequisites
+
+- Docker with the compose plugin.
+- A checkout of [easyp-tech/service](https://github.com/easyp-tech/service) —
+  plugin binaries are built from its `registry/` directory.
+- Go 1.26+ to run the operator CLI from source, or the `easyp-svc` binary from the
+  [releases page](https://github.com/easyp-tech/service/releases).
+- The [easyp CLI](/docs/introduction/install).
+
+## 1. Build a plugin
+
+Plugins are built from the Dockerfiles in `registry/`. Building the whole
+catalogue takes hours; a filter builds one version:
+
+```bash
+cd service
+go run ./cmd/easyp-svc plugins build registry \
+  --output plugins \
+  --filter 'protocolbuffers/go:v1.36.10'
+```
+
+The result is `plugins/protocolbuffers/go/v1.36.10/plugin`. The build runs in
+Docker, so the binary is a Linux binary: it runs inside the service container,
+not natively on macOS.
+
+## 2. Create a write token
+
+Registering a plugin is a write, and writes need a token. The service stores only
+its sha256:
+
+```bash
+go run ./cmd/easyp-svc auth new-token --name quickstart
+```
+
+The command prints the token once and the `name`/`sha256` pair the service
+needs. Keep both.
+
+## 3. Start PostgreSQL and the service
+
+Save as `compose.yml` next to the `plugins/` directory, with the digest from
+step 2:
+
+```yaml
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: easyp
+      POSTGRES_PASSWORD: easyp
+      POSTGRES_DB: easyp
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "easyp"]
+      interval: 2s
+      retries: 30
+
+  service:
+    image: ghcr.io/easyp-tech/service:v1.0.2
+    command: ["service", "start"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DB_POSTGRES_DSN: postgres://easyp:easyp@postgres:5432/easyp?sslmode=disable
+      AUTH_WRITE_TOKENS: quickstart=<sha256 from step 2>
+    volumes:
+      - ./plugins:/plugins
+    ports:
+      - "127.0.0.1:23410:23410"   # gRPC
+      - "127.0.0.1:23411:23411"   # metrics
+      - "127.0.0.1:23412:23412"   # health
+```
+
+```bash
+docker compose up -d
+curl -i http://localhost:23412/live   # 200 once the process is up
+curl -i http://localhost:23412/       # 200 once PostgreSQL answers
+```
+
+The service applies its database migrations on start. Its log begins with a
+`configuration resolved` line listing every setting that differs from the
+default, and warns that gRPC is running without TLS.
+
+<Callout type="warn">
+Mount `plugins/` read-write. The service creates `plugins/.tmp` on start even
+without object storage, and a read-only mount stops it with
+`mkdir /plugins/.tmp: read-only file system`.
+</Callout>
+
+## 4. Register the plugin
+
+```bash
+EASYP_TOKEN=<token from step 2> \
+go run ./cmd/easyp-svc plugins register \
+  --addr localhost:23410 \
+  --insecure \
+  plugins
+```
+
+`register` walks `plugins/`, and for each version calls `CreatePlugin` with the
+command path as the service sees it (`/plugins/protocolbuffers/go/v1.36.10/plugin`).
+Without the token every registration fails with `Unauthenticated`.
+
+## 5. Generate code
+
+In a project with `.proto` files under `proto/`:
+
+```yaml
+# easyp.yaml
+generate:
+  inputs:
+    - directory:
+        path: .
+        root: proto
+  plugins:
+    - remote: "localhost:23410/protocolbuffers/go:v1.36.10"
+      out: gen/go
+      opts:
+        paths: source_relative
+```
+
+```bash
+easyp generate
+```
+
+The CLI talks plaintext to `localhost` and TLS to any other host. Always pin the
+version in `remote:` — see [Client usage](/docs/api-service/client-usage) for
+why `latest` is not "newest" in the semantic-version sense.
+
+## The full development stack
+
+`service/deploy/docker-compose.yml` is the stack the maintainers develop
+against: PostgreSQL, an S3-compatible store (RustFS), Traefik in front with
+mutual TLS, and Grafana, Loki, Tempo, Mimir and Pyroscope. The service
+repository's `Taskfile.yml` drives it:
+
+```bash
+FILTER='protocolbuffers/go:v1.36.10' task build-plugins-filter
+task up                 # generates dev certificates, starts the stack
+task push-plugins       # uploads archives to the object store
+task register-plugins   # registers them through Traefik
+```
+
+There the gRPC port is reached through Traefik at `easyp.api.localhost:4443`,
+and Grafana is on `localhost:3000`. See the service
+[README](https://github.com/easyp-tech/service#quick-start) for details.
+
+## Next
+
+- [Installation](/docs/api-service/installation) for Helm and production settings.
+- [Plugins](/docs/api-service/plugins) for object storage and the full catalogue.
+- [Security](/docs/api-service/security) before letting anyone else register plugins.

@@ -54,13 +54,22 @@ Same procedure as above, without the slack.
 
 ## EasypGenerationsRejected
 
-Generation requests are being refused with `ResourceExhausted`. The service is
-doing this deliberately — it is not an error, it is a full queue.
+Generation requests are being refused with `ResourceExhausted` (reason
+`SERVER_OVERLOADED`). The service is doing this deliberately — it is not an
+error, it is a full queue. The alert watches
+`easyp_pool_generations_rejected_total`: every generation slot was busy and
+`config.workerPool.queueSize` requests were already waiting.
 
-1. `easyp_pool_queue_depth` against `config.workerPool.queueSize`, and
-   `easyp_pool_active_workers` against `workers`.
-2. Decide which limit is actually binding: workers, `maxConcurrentGenerations`,
-   or the per-caller `rateLimit.maxConcurrentPerIP`.
+1. `easyp_pool_generations_active` against
+   `config.workerPool.maxConcurrentGenerations`, and
+   `easyp_pool_generations_waiting` against `queueSize`. The lookup side
+   (`easyp_pool_active_workers`, `easyp_pool_queue_depth`,
+   `easyp_pool_rejected_total`) refuses with the same reason and is worth a look
+   when cache misses are frequent.
+2. Decide which limit is actually binding: `maxConcurrentGenerations`,
+   `workers`, or the per-caller `rateLimit.maxConcurrentPerIP` (which shows up in
+   `easyp_concurrency_rejected_total`, not here). On Community, generations are
+   capped at 16 and workers at 4 whatever the configuration says.
 3. Raise the binding one — but check the memory arithmetic first. Peak buffers
    are `maxConcurrentGenerations × maxOutputSize × 2`, and the chart refuses an
    install where that exceeds the memory limit. Raising concurrency without
@@ -74,8 +83,10 @@ intended. Note that CI runners behind one NAT share an address.
 
 Work has been queued continuously for ten minutes. Same knobs as above; the
 difference is that this is sustained rather than bursty, so it is a capacity
-statement, not a spike. Consider more replicas rather than a deeper queue — a
-longer queue only moves the latency around.
+statement, not a spike. Add capacity rather than a deeper queue — a longer queue
+only moves the latency around. Capacity here means a bigger pod: more CPU and a
+higher `maxConcurrentGenerations` (with the memory to match). More replicas on a
+shared cache volume are not supported.
 
 ## EasypPluginCacheAtLimit
 
@@ -191,11 +202,15 @@ it a month at a time with the detach and reattach as separate transactions.
 More than `prometheusRule.generationErrorRatio` of generations are failing.
 
 1. `easyp_generation_errors_total` by `plugin` and `error_type` — this is almost
-   always one plugin, not a general fault.
-2. If `error_type` names a checksum mismatch, the binary on disk does not match
-   what was recorded for that plugin version. Do not "fix" it by re-registering:
-   find out why it changed.
-3. Otherwise, run the plugin by hand with the same request. Plugin failures are
+   always one plugin, not a general fault. `error_type` is `transient` (the
+   error text contained `connection refused` or `temporary failure` and was
+   retried) or `permanent` (everything else).
+2. If the logs say `plugin archive checksum mismatch`, the archive in object
+   storage does not match what was recorded at registration. Do not "fix" it by
+   re-registering: find out why it changed.
+3. `output limit exceeded` means the plugin wrote more than
+   `config.registry.maxOutputSize`.
+4. Otherwise, run the plugin by hand with the same request. Plugin failures are
    reported faithfully, so the plugin's own stderr is in the logs.
 
 ## EasypPanics
@@ -205,9 +220,9 @@ for — but a recovered panic is still a bug, and the counter exists so that it 
 not silent.
 
 `kubectl logs deploy/$REL | grep -A30 panic` for the stack, or
-`docker logs easyp-api-enterprise 2>&1 | grep -A30 panic`. The barrier's `name`
-label says which unit of work it was: `worker.process_job` for generation,
-`audit.flush` for the audit writer.
+`docker logs easyp-api-enterprise 2>&1 | grep -A30 panic`. The counter has no
+labels; the log line around the stack trace says which unit of work panicked —
+a gRPC handler, a pool worker, or the audit writer.
 
 The alert carries a `tier` label; on the compose stack it names the container,
 so read `easyp-api-community` from it when that is the one that panicked.
@@ -217,8 +232,12 @@ so read `easyp-api-community` from it when that is the one that panicked.
 Write credentials are being rejected faster than
 `prometheusRule.authFailureRate` per second.
 
-Reads are anonymous by design, so everything here is a mutating call:
-CreatePlugin, UpdatePlugin, DeletePlugin.
+By default reads are anonymous, so everything here is a mutating call:
+CreatePlugin, UpdatePlugin, DeletePlugin. With
+`config.auth.requireAuthentication` on, reads count too — and every easyp CLI
+user is a failure, since the CLI sends no token. The `reason` label separates
+`no_credentials` (nothing sent) from `unknown_token` (a token that matches no
+digest).
 
 1. A rollout of CI credentials that did not land is the usual cause — check
    whether the rate started at a deploy.
@@ -232,8 +251,11 @@ CreatePlugin, UpdatePlugin, DeletePlugin.
 
 ## The host
 
-These three come from `prometheus.exporter.unix` in `config.alloy` and exist only
-on the compose stack. On Kubernetes the cluster's own node monitoring owns this
+These six exist only on the compose stack, in
+`deploy/observability/mimir/rules/anonymous/host.yaml`. The disk and memory
+alerts come from `prometheus.exporter.unix` in `config.alloy`, the target and
+discovery alerts from Alloy's own scraping, and the certificate alert from
+Traefik. On Kubernetes the cluster's own node monitoring owns this
 ground, so the chart does not ship them.
 
 The commands assume `ssh user@host` and the stack in `~/easyp`.

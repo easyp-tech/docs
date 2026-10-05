@@ -1,0 +1,158 @@
+---
+title: "Миграция с remote plugins BSR"
+description: "Перенос генерации кода с remote plugins Buf на self-hosted EasyP API Service и обратно."
+---
+
+Здесь речь только о **remote plugins**. Перенос модулей и зависимостей из
+`buf.yaml` в easyp CLI описан в [Миграции с Buf](/ru/docs/guides/buf-migration).
+
+Сведения о Buf актуальны на 23 сентября 2026 года.
+
+## Прежде чем начать
+
+- Работающий EasyP API Service, доступный с машин разработчиков и из CI, —
+  [Установка](/ru/docs/api-service/installation).
+- easyp CLI, настроенный на ваши схемы (`easyp.yaml` с `generate.inputs`).
+- Список всех `remote:`-плагинов из ваших `buf.gen.yaml` с версиями.
+
+## 1. Сопоставить имена плагинов
+
+Ссылки BSR имеют вид `buf.build/<owner>/<plugin>:<version>`
+([remote plugins](https://buf.build/docs/bsr/remote-plugins/)). Имена EasyP —
+`<group>/<name>:<version>` на вашем хосте. Каталог EasyP повторяет тех же
+владельцев, поэтому путь после хоста обычно совпадает:
+
+| `remote:` в BSR | `remote:` в EasyP |
+|---|---|
+| `buf.build/protocolbuffers/go:v1.36.10` | `plugins.example.com/protocolbuffers/go:v1.36.10` |
+| `buf.build/grpc/go:v1.5.1` | `plugins.example.com/grpc/go:v1.5.1` |
+| `buf.build/connectrpc/go:v1.18.1` | `plugins.example.com/connectrpc/go:v1.18.1` |
+| `buf.build/bufbuild/es:v2.2.0` | `plugins.example.com/bufbuild/es:v2.2.0` |
+
+Проверьте каждый:
+
+1. Есть ли рецепт? `ls registry/<owner>/<plugin>` в репозитории сервиса.
+2. Есть ли версия в его `plugin.yaml`? Если нет — добавьте: Dockerfile принимает
+   `ARG VERSION`.
+3. Зарегистрирован ли он на вашем сервисе? `grpcurl … GeneratorAPI/Plugins` или
+   `ListPlugins` из Go SDK.
+
+Для плагина, которого нет в каталоге EasyP, нужен собственный рецепт — см.
+[Плагины](/ru/docs/api-service/plugins#adding-a-plugin).
+
+Всегда фиксируйте версии. Незафиксированная ссылка EasyP разрешается в версию,
+последнюю при сравнении строк, а не в самый новый релиз.
+
+## 2. Собрать, загрузить и зарегистрировать
+
+```bash
+easyp-svc plugins build registry --filter 'protocolbuffers/go:v1.36.10'
+easyp-svc plugins build registry --filter 'grpc/go:v1.5.1'
+easyp-svc plugins push plugins --cfg config.yml
+EASYP_TOKEN=… easyp-svc plugins register --addr plugins.example.com:443 plugins
+```
+
+С лицензией Community можно зарегистрировать не больше 10 версий. Сначала
+посчитайте различные версии плагинов во всех ваших `buf.gen.yaml`.
+
+## 3. Перевести `buf.gen.yaml`
+
+```yaml
+# buf.gen.yaml (v2)
+version: v2
+plugins:
+  - remote: buf.build/protocolbuffers/go:v1.36.10
+    out: gen/go
+    opt: paths=source_relative
+  - remote: buf.build/grpc/go:v1.5.1
+    out: gen/go
+    opt:
+      - paths=source_relative
+      - require_unimplemented_servers=false
+```
+
+```yaml
+# easyp.yaml
+generate:
+  inputs:
+    - directory:
+        path: .
+        root: proto
+  plugins:
+    - remote: "plugins.example.com/protocolbuffers/go:v1.36.10"
+      out: gen/go
+      opts:
+        paths: source_relative
+    - remote: "plugins.example.com/grpc/go:v1.5.1"
+      out: gen/go
+      opts:
+        paths: source_relative
+        require_unimplemented_servers: false
+```
+
+| buf.gen.yaml | easyp.yaml |
+|---|---|
+| `plugins[].remote` | `generate.plugins[].remote`, с вашим хостом |
+| `plugins[].opt` (строка или список) | `generate.plugins[].opts` (карта) |
+| `plugins[].out` | `generate.plugins[].out` |
+| `inputs` | `generate.inputs` |
+| managed mode | `generate.managed` — см. [Генератор](/ru/docs/cli/generator) |
+
+## 4. CI
+
+- Замените `buf generate` на `easyp generate`.
+- Уберите `BUF_TOKEN` из шага генерации. easyp CLI не отправляет токен, поэтому
+  сервис должен быть доступен из CI для анонимного чтения по TLS. Закрывайте его
+  на уровне сети (приватная сеть, VPN, allow-list IP на ingress).
+- Если сертификат сервиса выпущен приватным CA, добавьте этот CA в системное
+  хранилище образа CI: easyp CLI использует только его.
+- Вызовы генерации на клиенте ограничены 30 секундами. Плагины, которым на
+  больших схемах нужно дольше, упадут; проверьте самый медленный плагин до
+  переключения.
+
+## 5. Проверить
+
+Сгенерируйте обоими способами и сравните:
+
+```bash
+buf generate && mv gen gen.buf
+easyp generate && diff -r gen.buf gen
+```
+
+При той же версии плагина и тех же опциях результат должен совпасть байт в байт.
+Различие обычно означает другую версию, другие опции или другой набор входных
+файлов.
+
+## От чего вы отказываетесь
+
+- Generated SDKs: у пакетов, которые BSR собирает для npm, Go, Maven и других,
+  аналога в EasyP нет. Их потребителям нужен другой путь распространения —
+  генерация в своей сборке или публикация сгенерированного кода вами.
+- Песочница: плагины теперь выполняются на вашем хосте без изоляции. Прочитайте
+  [Безопасность](/ru/docs/api-service/security).
+- Эксплуатация силами Buf: доступность теперь на вас.
+
+## Обратно на BSR
+
+Обратный путь — та же таблица, прочитанная справа налево.
+
+1. Для каждого `remote:` в `easyp.yaml` убедитесь, что плагин есть в каталоге BSR
+   (https://buf.build/plugins) в той же версии. Внутренние плагины, которые вы
+   регистрировали в EasyP, придётся превратить в
+   [custom plugins](https://buf.build/docs/bsr/remote-plugins/custom-plugins/)
+   на приватном инстансе BSR — это функция тарифа Pro — в виде Docker-образа
+   `linux/amd64` с `buf.plugin.yaml`. Плагины, читающие файлы или ходящие в сеть,
+   BSR не поддерживает.
+2. Напишите `buf.gen.yaml` с `remote: buf.build/<group>/<name>:<version>` и `opt`
+   вместо `opts`.
+3. В CI замените `easyp generate` на `buf generate` и выполните вход через
+   `buf registry login` или задайте `BUF_TOKEN`: генерация без аутентификации на
+   публичном BSR ограничена 10 запросами в час на IP
+   ([rate limits](https://buf.build/docs/bsr/rate-limits/)).
+4. Сравните результат, как описано выше.
+5. Выведите сервис из эксплуатации: сохраните бэкап PostgreSQL, если у вас есть
+   журнал аудита, который вы обязаны хранить, затем удалите развёртывание и бакет.
+
+В сервисе EasyP нет состояния, которое понадобилось бы `buf`: реестр плагинов —
+это список бинарников, собранных вами по публичным рецептам, и его можно просто
+выбросить.

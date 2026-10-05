@@ -1,0 +1,186 @@
+---
+title: "Использование клиентами"
+description: "Как направить easyp CLI на сервис, как пользоваться Go SDK и как вызывать gRPC API напрямую."
+---
+
+## easyp CLI
+
+Плагин выполняется на сервисе, если в его записи в `generate.plugins` указан
+`remote:` вместо `name:`, `path:` или `command:`:
+
+```yaml
+generate:
+  inputs:
+    - directory:
+        path: .
+        root: proto
+  plugins:
+    - remote: "plugins.example.com/protocolbuffers/go:v1.36.10"
+      out: gen/go
+      opts:
+        paths: source_relative
+    - remote: "plugins.example.com/grpc/go:v1.6.2"
+      out: gen/go
+      opts:
+        paths: source_relative
+        require_unimplemented_servers: false
+```
+
+### Значение `remote:`
+
+`[http://|https://]host[:port]/group/name[:version]`
+
+| Часть | Поведение |
+|---|---|
+| схема | Необязательна. `https://` или без схемы → TLS; `http://` → без шифрования. |
+| host | Хост, содержащий `localhost` или `127.0.0.1`, всегда без шифрования, если не указан `https://`. |
+| port | Необязателен. Без него действует порт gRPC-клиента по умолчанию (443 для TLS); ingress из Helm-чарта слушает 443, сервис без обвязки — 23410. |
+| group/name | Должны совпадать с зарегистрированным плагином. |
+| version | Необязательна. Без неё — `latest`, то есть версия, последняя при сравнении строк, а не самая новая семантическая версия. |
+
+`opts` склеиваются в параметр `CodeGeneratorRequest`
+(`paths=source_relative,require_unimplemented_servers=false`) — так же, как для
+локальных плагинов.
+
+### Что CLI умеет и чего не умеет
+
+- Он локально разбирает и разрешает `.proto`-файлы, включая зависимости из
+  `deps`. Отправляется только получившийся `CodeGeneratorRequest`.
+- Один gRPC-вызов на плагин, каждый — по новому соединению, с фиксированным
+  дедлайном **30 секунд**. Собственный лимит сервиса — 120 с; плагин, которому
+  нужно больше 30 с, падает на стороне клиента с `DeadlineExceeded`, хотя сервер
+  может ещё его выполнять.
+- TLS использует системное хранилище сертификатов. Указать свой CA нельзя:
+  установите его в системное хранилище машины, где запускается `easyp`.
+- **Ни токена, ни клиентского сертификата.** CLI не может работать с сервисом,
+  где включён `auth.require_authentication: true`, или с listener'ом,
+  требующим взаимный TLS. Поддерживаемый вариант — анонимное чтение по TLS.
+- Протокол — собственный `easyp.generator.v1.GeneratorAPI`. Значение `remote:`,
+  указывающее на `buf.build`, не попадёт в remote plugins Buf: реестр Buf этот API
+  не реализует.
+
+`command:` приоритетнее `remote:`; у записи плагина должен быть ровно один
+источник.
+
+## Go SDK
+
+`github.com/easyp-tech/service/sdk`, Apache-2.0.
+
+```go
+package main
+
+import (
+	"context"
+	"log"
+	"time"
+
+	"github.com/easyp-tech/service/sdk"
+	"google.golang.org/protobuf/types/pluginpb"
+)
+
+func main() {
+	client, err := sdk.NewClient(
+		"plugins.example.com:443",
+		sdk.WithGenerateCodeTimeout(2*time.Minute),
+	)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer client.Close()
+
+	ctx := context.Background()
+
+	plugins, err := client.ListPlugins(ctx,
+		sdk.WithFilter(sdk.PluginFilter{Group: "protocolbuffers"}))
+	if err != nil {
+		log.Fatal(err)
+	}
+	log.Printf("%d protocolbuffers plugins", len(plugins))
+
+	var req *pluginpb.CodeGeneratorRequest // собран из ваших дескрипторов
+	resp, err := client.GenerateCode(ctx, "protocolbuffers/go:v1.36.10", req)
+	if err != nil {
+		log.Fatal(err)
+	}
+	log.Printf("%d files", len(resp.GetFile()))
+}
+```
+
+### Опции
+
+| Опция | По умолчанию | Назначение |
+|---|---|---|
+| (нет) | TLS, системные корни | Транспорт. |
+| `WithInsecure()` | — | Без шифрования, для локального сервиса. |
+| `WithTransportCredentials(creds)` | — | Свой CA, клиентский сертификат (mTLS). |
+| `WithToken(token)` | — | `authorization: Bearer` в каждом вызове. Нужен для записи и для чтения, если сервис требует аутентификацию. |
+| `WithGenerateCodeTimeout(d)` | 30 с | Дедлайн вызова, если в контексте его нет. Поднимайте к `generation_timeout` сервера. |
+| `WithListPluginsTimeout(d)` | 10 с | На весь постраничный обход. |
+| `WithCreatePluginTimeout(d)` | 120 с | Регистрация читает архив из хранилища. |
+| `WithMaxRetries(n)`, `WithRetryBaseDelay(d)`, `WithRetryMaxDelay(d)` | 3, 100 мс, 5 с | Экспоненциальная задержка. |
+| `WithMaxRecvMsgSize(n)` | 64 МиБ | Совпадает с лимитом вывода сервера. |
+| `WithHealthCheck(interval)` | 30 с | Фоновая проверка состояния соединения. |
+| `WithKeepaliveParams(p)` | — | gRPC keepalive. |
+| `WithUnaryInterceptor(i)`, `WithLoggingInterceptor(l)`, `WithMetricsInterceptor(c)` | — | Хуки. |
+
+Повторяется только `UNAVAILABLE`. `RESOURCE_EXHAUSTED` (перегрузка, rate limit,
+потолок плагинов) и `DEADLINE_EXCEEDED` возвращаются сразу: повтор первого
+добавляет нагрузки ровно тогда, когда у сервера её некуда девать, а повтор
+второго заново запускает генерацию, уже потратившую весь таймаут.
+
+Методы: `GenerateCode`, `ListPlugins` (обходит все страницы), `CreatePlugin`,
+`UpdatePlugin`, `DeletePlugin`, `Close`.
+
+## gRPC напрямую
+
+Контракт — `easyp.generator.v1.GeneratorAPI` в
+`api/easyp/generator/v1/generator.proto`:
+
+```protobuf
+service GeneratorAPI {
+  rpc GenerateCode(GenerateCodeRequest) returns (GenerateCodeResponse);
+  rpc Plugins(PluginsRequest) returns (PluginsResponse);
+  rpc CreatePlugin(CreatePluginRequest) returns (CreatePluginResponse);
+  rpc UpdatePlugin(UpdatePluginRequest) returns (UpdatePluginResponse);
+  rpc DeletePlugin(DeletePluginRequest) returns (DeletePluginResponse);
+}
+```
+
+`GenerateCodeRequest` содержит `code_generator_request` и `plugin_name`
+(`group/name:version`; на этом уровне версия обязательна). Сервер не отдаёт
+reflection; набор дескрипторов пишет CLI оператора:
+
+```bash
+easyp-svc api descriptor -o api.protoset
+grpcurl -protoset api.protoset -plaintext localhost:23410 \
+  easyp.generator.v1.GeneratorAPI/Plugins
+```
+
+`Plugins` постраничный: `page_size` по умолчанию 100, не больше 1000;
+передавайте `next_page_token` обратно как `page_token` с теми же фильтрами.
+
+### Ошибки
+
+Каждый не-OK статус несёт `google.rpc.ErrorInfo` с доменом `easyp.tech` и
+стабильным `reason`. Ветвитесь по reason, а не по тексту.
+
+| Reason | Код gRPC | Типичная причина |
+|---|---|---|
+| `NOT_FOUND` | `NOT_FOUND` | Нет такого плагина или версии. |
+| `INVALID_PLUGIN_NAME` | `INVALID_ARGUMENT` | Имя не вида `group/name:version`. |
+| `INVALID_CONFIG` | `INVALID_ARGUMENT` | Неверный конфиг плагина при создании/изменении. |
+| `GENERATION_FAILED` | `INTERNAL` | Плагин завершился с ошибкой, выдал некорректный вывод или превысил `max_output_size`. |
+| `SERVER_OVERLOADED` | `RESOURCE_EXHAUSTED` | Очередь воркеров или генераций заполнена. |
+| `MAX_PLUGINS_EXCEEDED` | `RESOURCE_EXHAUSTED` | Потолок Community в 10 версий. |
+| `ALREADY_EXISTS` | `ALREADY_EXISTS` | Версия уже зарегистрирована. |
+| `BINARY_NOT_UPLOADED` | `FAILED_PRECONDITION` | Регистрация до `plugins push`. |
+| `STORAGE_UNAVAILABLE` | `UNAVAILABLE` | Объектное хранилище недоступно или архив пропал. |
+| `SHUTTING_DOWN` | `UNAVAILABLE` | Сервис останавливается. |
+| `FEATURE_DENIED` | `PERMISSION_DENIED` | Функции нет в лицензии. |
+| `DEADLINE_EXCEEDED` | `DEADLINE_EXCEEDED` | Плагин не уложился в таймаут. |
+| `CANCELED` | `CANCELLED` | Клиент ушёл. |
+| `INTERNAL` | `INTERNAL` | Всё остальное. |
+
+Отказы rate limit и лимита одновременных запросов на клиента приходят от
+интерсепторов: это `RESOURCE_EXHAUSTED` без reason в `ErrorInfo`. Отсутствующий
+или неизвестный токен — `UNAUTHENTICATED`.

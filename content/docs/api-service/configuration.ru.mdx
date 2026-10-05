@@ -1,0 +1,191 @@
+---
+title: "Справочник конфигурации"
+description: "Каждая настройка, которую читает сервис: ключ YAML, переменная окружения, тип, значение по умолчанию и смысл."
+---
+
+## Как определяется значение
+
+У каждой настройки ровно один ключ YAML и одна переменная окружения. Для каждой
+настройки побеждает первый источник, в котором есть значение:
+
+1. окружение;
+2. YAML-файл, указанный через `--cfg` (или `EASYP_CONFIG`);
+3. значение по умолчанию, вшитое в бинарник.
+
+Нераспознанный ключ в YAML-файле останавливает запуск: опечатка — это ошибка, а
+не молча проигнорированная настройка. Единственный флаг командной строки,
+переопределяющий настройку, — `--log-level` у `service start`.
+
+Бинарник сам скажет, что применяется:
+
+```bash
+easyp-svc config validate --cfg config.yml            # запустится ли?
+easyp-svc config print --cfg config.yml --origin      # значение и источник каждой настройки
+easyp-svc config print --cfg config.yml --changed     # только отличия от значений по умолчанию
+```
+
+Без `--cfg` обе команды берут только окружение — так конфигурируется
+развёртывание через Helm. Секреты печатаются заглушкой, если не указан
+`--show-secrets`. При каждом старте сервис пишет ту же сводку одной строкой
+`configuration resolved`.
+
+## Переменные вне дерева настроек
+
+| Переменная | Кто читает | Смысл |
+|---|---|---|
+| `EASYP_CONFIG` | каждая команда с `--cfg` | Путь к YAML-файлу. Позволяет `HEALTHCHECK` образа (`easyp-svc health`) найти тот же файл, что и сервис. |
+| `EASYP_TOKEN` | `plugins register` | Токен записи, если не задан `--token`. |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | сервис | Синоним `TELEMETRY_OTLP_ENDPOINT`. |
+
+## Длительности и размеры
+
+Длительности — в синтаксисе Go: `30s`, `10m`, `6h`. Размеры — целое число байт.
+
+## server
+
+| Ключ YAML | Переменная | Тип | По умолчанию | Описание |
+|---|---|---|---|---|
+| `server.host` | `SERVER_HOST` | string | `0.0.0.0` | Адрес, на котором слушают все listener'ы. |
+| `server.port.grpc` | `SERVER_PORT_GRPC` | string | `23410` | gRPC API. |
+| `server.port.metric` | `SERVER_PORT_METRIC` | string | `23411` | Prometheus `/metrics`. |
+| `server.port.health` | `SERVER_PORT_HEALTH` | string | `23412` | `/live` (liveness) и `/` (readiness). |
+| `server.port.mcp` | `SERVER_PORT_MCP` | string | `23413` | MCP `/mcp`, только при `mcp.enabled`. |
+| `server.tls.cert_file` | `SERVER_TLS_CERT_FILE` | string | — | Серверный сертификат (PEM). Пусто — TLS выключен: gRPC без шифрования, в лог пишется предупреждение. |
+| `server.tls.key_file` | `SERVER_TLS_KEY_FILE` | string | — | Приватный ключ к `cert_file`. |
+| `server.tls.client_ca_file` | `SERVER_TLS_CLIENT_CA_FILE` | string | — | Бандл CA; если задан, клиент обязан предъявить сертификат, подписанный им (взаимный TLS). Проверяется только CA, не субъект. |
+| `server.force_shutdown_after` | `SERVER_FORCE_SHUTDOWN_AFTER` | duration | `150s` | Жёсткий выход через столько после SIGTERM. Должно быть больше `worker_pool.generation_timeout`. |
+| `server.trusted_proxies` | `SERVER_TRUSTED_PROXIES` | список CIDR | — | Пиры, чьим `X-Forwarded-For`/`X-Real-IP` верят. Обязательно за прокси, иначе все клиенты делят одну корзину rate limit, а аудит записывает прокси. |
+| `server.max_recv_msg_size` | `SERVER_MAX_RECV_MSG_SIZE` | int | `67108864` | Максимальный gRPC-запрос, байт. |
+| `server.max_send_msg_size` | `SERVER_MAX_SEND_MSG_SIZE` | int | `67108864` | Максимальный gRPC-ответ, байт. Не меньше `registry.max_output_size`. |
+| `server.max_concurrent_streams` | `SERVER_MAX_CONCURRENT_STREAMS` | uint32 | `256` | Одновременных стримов на соединение. |
+
+## db
+
+| Ключ YAML | Переменная | Тип | По умолчанию | Описание |
+|---|---|---|---|---|
+| `db.postgres` | `DB_POSTGRES_DSN` | string, секрет | — | Строка подключения PostgreSQL, например `postgres://user:pass@host:5432/easyp?sslmode=require`. Обязательна. |
+
+## registry
+
+| Ключ YAML | Переменная | Тип | По умолчанию | Описание |
+|---|---|---|---|---|
+| `registry.plugins_dir` | `REGISTRY_PLUGINS_DIR` | string | `/plugins` | Где лежат исполняемые файлы плагинов (локальный режим) или куда они распаковываются (режим объектного хранилища). Должен быть доступен на запись. `command[0]` плагина обязан разрешаться внутрь него. |
+| `registry.max_output_size` | `REGISTRY_MAX_OUTPUT_SIZE` | int64 | `67108864` | Максимальный stdout плагина, байт. Больше — генерация падает. |
+| `registry.cache_max_bytes` | `REGISTRY_CACHE_MAX_BYTES` | int64 | `21474836480` | Предел распакованных плагинов на диске; сверх него вытесняются давно не использованные версии. `0` отключает вытеснение. Имеет смысл только с объектным хранилищем. |
+| `registry.s3.endpoint` | `REGISTRY_S3_ENDPOINT` | string | — | URL S3-эндпоинта, например `http://minio:9000`. Пусто — AWS. |
+| `registry.s3.bucket` | `REGISTRY_S3_BUCKET` | string | — | Бакет для архивов плагинов. **Пусто — объектное хранилище выключено.** |
+| `registry.s3.region` | `REGISTRY_S3_REGION` | string | `us-east-1` | Регион. |
+| `registry.s3.prefix` | `REGISTRY_S3_PREFIX` | string | — | Префикс ключей архивов. |
+| `registry.s3.access_key_id` | `REGISTRY_S3_ACCESS_KEY_ID` | string | — | Ключ доступа. Если оба ключа пусты, используется стандартная цепочка учётных данных AWS. |
+| `registry.s3.secret_access_key` | `REGISTRY_S3_SECRET_ACCESS_KEY` | string, секрет | — | Секретный ключ. |
+| `registry.s3.force_path_style` | `REGISTRY_S3_FORCE_PATH_STYLE` | bool | — (false) | Path-style адресация; нужна MinIO и RustFS. |
+
+## worker_pool
+
+| Ключ YAML | Переменная | Тип | По умолчанию | Описание |
+|---|---|---|---|---|
+| `worker_pool.workers` | `WORKER_POOL_WORKERS` | int | `4` | Одновременных поисков плагина (чтение БД, скачивание при промахе кеша). В Community не больше 4. |
+| `worker_pool.queue_size` | `WORKER_POOL_QUEUE_SIZE` | int | `16` | Очередь ожидания для поиска и для генераций. Сверх неё — `RESOURCE_EXHAUSTED` / `SERVER_OVERLOADED`. |
+| `worker_pool.max_concurrent_generations` | `WORKER_POOL_MAX_CONCURRENT_GENERATIONS` | int | `16` | Одновременных процессов плагинов. В Community не больше 16. |
+| `worker_pool.generation_timeout` | `WORKER_POOL_GENERATION_TIMEOUT` | duration | `120s` | Время одного запуска плагина, без ожидания слота. |
+| `worker_pool.max_retries` | `WORKER_POOL_MAX_RETRIES` | int | `2` | Дополнительные попытки для ошибок с `connection refused` или `temporary failure` в тексте. |
+| `worker_pool.shutdown_timeout` | `WORKER_POOL_SHUTDOWN_TIMEOUT` | duration | `30s` | Сколько пул ждёт поставленные в очередь поиски при остановке. |
+
+Потолки Community понижают `workers` и `max_concurrent_generations` при старте
+и пишут в лог `<setting> lowered to the licence tier's limit`; конфигурацию они
+не отвергают.
+
+## license
+
+| Ключ YAML | Переменная | Тип | По умолчанию | Описание |
+|---|---|---|---|---|
+| `license.key` | `LICENSE_KEY` | string, секрет | — | Лицензионный токен PASETO v4.public. Приоритетнее `license.file`. |
+| `license.file` | `LICENSE_FILE` | string | — | Путь к файлу с токеном. |
+| `license.public_keys` | `LICENSE_PUBLIC_KEYS` | карта key id → hex | — | Публичные ключи Ed25519, которыми можно подписывать лицензии. Key id `"*"` проверяет любой токен. В окружении: `<kid>:<hex>,<kid>:<hex>`. Без ключа токен игнорируется, и сервис работает как Community. |
+| `license.cache_ttl` | `LICENSE_CACHE_TTL` | duration | `5m` | Как часто токен перепроверяется (срок, grace). |
+
+## rate_limit
+
+| Ключ YAML | Переменная | Тип | По умолчанию | Описание |
+|---|---|---|---|---|
+| `rate_limit.requests_per_second` | `RATE_LIMIT_REQUESTS_PER_SECOND` | float | `10.0` | Скорость token bucket на адрес клиента. |
+| `rate_limit.burst` | `RATE_LIMIT_BURST` | int | `20` | Размер корзины. |
+| `rate_limit.cleanup_interval` | `RATE_LIMIT_CLEANUP_INTERVAL` | duration | `10m` | Как часто удаляются корзины неактивных клиентов. |
+| `rate_limit.max_concurrent_per_ip` | `RATE_LIMIT_MAX_CONCURRENT_PER_IP` | int | `2` | Запросов в полёте на один адрес клиента. `0` отключает проверку. CI-раннеры за одним NAT делят адрес. |
+
+## audit
+
+Строки аудита пишутся только с лицензией Enterprise.
+
+| Ключ YAML | Переменная | Тип | По умолчанию | Описание |
+|---|---|---|---|---|
+| `audit.buffer_size` | `AUDIT_BUFFER_SIZE` | int | `1000` | Очередь между операциями и писателем. |
+| `audit.batch_size` | `AUDIT_BATCH_SIZE` | int | `100` | Строк в одной вставке. |
+| `audit.flush_interval` | `AUDIT_FLUSH_INTERVAL` | duration | `1s` | Период сброса неполных пакетов. |
+| `audit.max_save_retries` | `AUDIT_MAX_SAVE_RETRIES` | int | `3` | Повторы упавшего пакета, прежде чем он считается потерянным. |
+| `audit.enqueue_timeout` | `AUDIT_ENQUEUE_TIMEOUT` | duration | `1s` | Сколько операция ждёт места в очереди, прежде чем отбросить свою запись. |
+| `audit.flush_timeout` | `AUDIT_FLUSH_TIMEOUT` | duration | `5s` | Предел на одну запись с учётом повторов. |
+| `audit.retention_months` | `AUDIT_RETENTION_MONTHS` | int | `12` | Месячные партиции старше этого удаляются — по-настоящему. |
+| `audit.pre_create_months` | `AUDIT_PRE_CREATE_MONTHS` | int | `3` | Партиции, создаваемые наперёд. |
+| `audit.partition_check_interval` | `AUDIT_PARTITION_CHECK_INTERVAL` | duration | `6h` | Период обслуживания партиций. |
+| `audit.partition_op_timeout` | `AUDIT_PARTITION_OP_TIMEOUT` | duration | `30s` | Предел на одно создание/удаление партиции. |
+
+## auth
+
+| Ключ YAML | Переменная | Тип | По умолчанию | Описание |
+|---|---|---|---|---|
+| `auth.write_tokens` | `AUTH_WRITE_TOKENS` | список `{name, sha256}` | — | Токены, которым разрешены `CreatePlugin`, `UpdatePlugin`, `DeletePlugin`. Хранятся только sha256-дайджесты. В окружении: `name=<64 hex>,name=<64 hex>`. **Пусто — запись запрещена всем.** |
+| `auth.require_authentication` | `AUTH_REQUIRE_AUTHENTICATION` | bool | `false` | Требовать токен на каждом RPC (кроме Health) и на MCP. easyp CLI не умеет отправлять токен, так что с этой настройкой он перестаёт работать. |
+
+## telemetry
+
+| Ключ YAML | Переменная | Тип | По умолчанию | Описание |
+|---|---|---|---|---|
+| `telemetry.otlp_endpoint` | `TELEMETRY_OTLP_ENDPOINT` | string | — | OTLP gRPC-коллектор, `host:port` или `http://host:port`. Пусто — экспортёр не создаётся. |
+| `telemetry.pyroscope_endpoint` | `TELEMETRY_PYROSCOPE_ENDPOINT` | string | — | Сервер Pyroscope. Пусто — без профилирования. |
+| `telemetry.service_tier` | `TELEMETRY_SERVICE_TIER` | string | — | Метка трейсов и профилей, когда Community и Enterprise пишут в одни бэкенды. Значение, расходящееся с тиром лицензии, выставляет `easyp_config_service_tier_mismatch`. |
+
+## mcp и log
+
+| Ключ YAML | Переменная | Тип | По умолчанию | Описание |
+|---|---|---|---|---|
+| `mcp.enabled` | `MCP_ENABLED` | bool | `false` | Отдавать `/mcp` на `server.port.mcp`. См. [MCP](/ru/docs/api-service/mcp). |
+| `log.level` | `LOG_LEVEL` | string | `info` | `debug`, `info`, `warn`, `error`. `--log-level` переопределяет. |
+
+## Пример файла
+
+```yaml
+server:
+  tls:
+    cert_file: /certs/tls.crt
+    key_file: /certs/tls.key
+    client_ca_file: /certs/ca.crt
+  trusted_proxies: ["10.42.0.0/16"]
+
+registry:
+  plugins_dir: /plugins
+  s3:
+    endpoint: http://minio:9000
+    bucket: easyp-plugins
+    force_path_style: true
+
+worker_pool:
+  max_concurrent_generations: 16
+
+license:
+  public_keys:
+    "2026-08": "81322461987167d5cfd529e9cb8b96f4797f12fce6be4399a0866e250c9b6bb5"
+
+mcp:
+  enabled: false
+```
+
+Секреты — `DB_POSTGRES_DSN`, `REGISTRY_S3_ACCESS_KEY_ID`,
+`REGISTRY_S3_SECRET_ACCESS_KEY`, `LICENSE_KEY`, `AUTH_WRITE_TOKENS` — лучше
+передавать через окружение, а не писать в файл.
+
+<Callout type="info">
+Таблица сгенерирована из собственного списка настроек бинарника
+(`config.Leaves()` в `internal/config/fields.go`) для v1.0.2: 55 настроек. Если
+они когда-нибудь разойдутся, прав `easyp-svc config print` вашей версии.
+</Callout>

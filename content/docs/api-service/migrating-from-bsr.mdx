@@ -1,0 +1,156 @@
+---
+title: "Migrating from BSR Remote Plugins"
+description: "Moving code generation from Buf's remote plugins to a self-hosted EasyP API Service, and back."
+---
+
+This page covers **remote plugins** only. Moving `buf.yaml` modules and
+dependencies to the easyp CLI is in [Migrating from Buf](/docs/guides/buf-migration).
+
+Information about Buf is current as of 23 September 2026.
+
+## Before you start
+
+- A running EasyP API Service reachable from developer machines and CI —
+  [Installation](/docs/api-service/installation).
+- The easyp CLI configured for your schemas (`easyp.yaml` with `generate.inputs`).
+- A list of every `remote:` plugin in your `buf.gen.yaml` files, with versions.
+
+## 1. Map plugin names
+
+BSR references are `buf.build/<owner>/<plugin>:<version>`
+([remote plugins](https://buf.build/docs/bsr/remote-plugins/)). EasyP names are
+`<group>/<name>:<version>` on your host. The EasyP catalogue follows the same
+owners, so the path after the host is usually identical:
+
+| BSR `remote:` | EasyP `remote:` |
+|---|---|
+| `buf.build/protocolbuffers/go:v1.36.10` | `plugins.example.com/protocolbuffers/go:v1.36.10` |
+| `buf.build/grpc/go:v1.5.1` | `plugins.example.com/grpc/go:v1.5.1` |
+| `buf.build/connectrpc/go:v1.18.1` | `plugins.example.com/connectrpc/go:v1.18.1` |
+| `buf.build/bufbuild/es:v2.2.0` | `plugins.example.com/bufbuild/es:v2.2.0` |
+
+Check each one:
+
+1. Is there a recipe? `ls registry/<owner>/<plugin>` in the service repository.
+2. Is the version listed in its `plugin.yaml`? If not, add it — the Dockerfile
+   takes `ARG VERSION`.
+3. Is it registered on your service? `grpcurl … GeneratorAPI/Plugins`, or the Go
+   SDK's `ListPlugins`.
+
+A plugin missing from the EasyP catalogue needs a recipe of your own — see
+[Plugins](/docs/api-service/plugins#adding-a-plugin).
+
+Always pin versions. An unpinned EasyP reference resolves to the version that
+sorts last as a string, not the newest release.
+
+## 2. Build, push and register
+
+```bash
+easyp-svc plugins build registry --filter 'protocolbuffers/go:v1.36.10'
+easyp-svc plugins build registry --filter 'grpc/go:v1.5.1'
+easyp-svc plugins push plugins --cfg config.yml
+EASYP_TOKEN=… easyp-svc plugins register --addr plugins.example.com:443 plugins
+```
+
+On a Community licence at most 10 versions can be registered. Count the distinct
+plugin versions across all your `buf.gen.yaml` files first.
+
+## 3. Translate `buf.gen.yaml`
+
+```yaml
+# buf.gen.yaml (v2)
+version: v2
+plugins:
+  - remote: buf.build/protocolbuffers/go:v1.36.10
+    out: gen/go
+    opt: paths=source_relative
+  - remote: buf.build/grpc/go:v1.5.1
+    out: gen/go
+    opt:
+      - paths=source_relative
+      - require_unimplemented_servers=false
+```
+
+```yaml
+# easyp.yaml
+generate:
+  inputs:
+    - directory:
+        path: .
+        root: proto
+  plugins:
+    - remote: "plugins.example.com/protocolbuffers/go:v1.36.10"
+      out: gen/go
+      opts:
+        paths: source_relative
+    - remote: "plugins.example.com/grpc/go:v1.5.1"
+      out: gen/go
+      opts:
+        paths: source_relative
+        require_unimplemented_servers: false
+```
+
+| buf.gen.yaml | easyp.yaml |
+|---|---|
+| `plugins[].remote` | `generate.plugins[].remote`, with your host |
+| `plugins[].opt` (string or list) | `generate.plugins[].opts` (map) |
+| `plugins[].out` | `generate.plugins[].out` |
+| `inputs` | `generate.inputs` |
+| managed mode | `generate.managed` — see [Generator](/docs/cli/generator) |
+
+## 4. CI
+
+- Replace `buf generate` with `easyp generate`.
+- Remove `BUF_TOKEN` from the generation step. The easyp CLI sends no token, so
+  the service must be reachable from CI with anonymous reads over TLS. Restrict
+  it at the network level (private network, VPN, IP allow-list at the ingress).
+- If your service certificate is issued by a private CA, add that CA to the CI
+  image's system trust store: the easyp CLI uses the system store only.
+- Generation calls time out after 30 seconds on the client. Plugins that need
+  longer on large schemas will fail; check your slowest plugin before switching.
+
+## 5. Verify
+
+Generate with both, and compare:
+
+```bash
+buf generate && mv gen gen.buf
+easyp generate && diff -r gen.buf gen
+```
+
+With the same plugin version and options, output should be byte-identical. A
+difference usually means a different version, different options, or a different
+set of input files.
+
+## What you give up
+
+- Generated SDKs: packages built by the BSR for npm, Go, Maven and others have
+  no EasyP equivalent. Consumers of those packages need another distribution
+  path — generating in their own build, or publishing generated code yourself.
+- The sandbox: plugins now run unsandboxed on your host. Read
+  [Security](/docs/api-service/security).
+- Buf's operations: availability is now yours.
+
+## Going back to BSR
+
+The reverse is the same table read right to left.
+
+1. For each `remote:` in `easyp.yaml`, check the plugin exists in the BSR
+   catalogue (https://buf.build/plugins) at the same version. Internal plugins
+   you registered on EasyP need to become
+   [custom plugins](https://buf.build/docs/bsr/remote-plugins/custom-plugins/)
+   on a private BSR instance — a Pro-plan feature — packaged as a
+   `linux/amd64` Docker image with a `buf.plugin.yaml`. Plugins that read files
+   or use the network are not supported on the BSR.
+2. Write `buf.gen.yaml` with `remote: buf.build/<group>/<name>:<version>` and
+   `opt` in place of `opts`.
+3. In CI, replace `easyp generate` with `buf generate`, log in with
+   `buf registry login` or set `BUF_TOKEN` — unauthenticated generation on the
+   public BSR is limited to 10 requests per hour per IP
+   ([rate limits](https://buf.build/docs/bsr/rate-limits/)).
+4. Compare output as above.
+5. Decommission the service: keep a PostgreSQL backup if you hold an audit
+   trail you are obliged to retain, then remove the deployment and the bucket.
+
+Nothing in the EasyP service stores state that `buf` needs: the plugin registry
+is a list of binaries you built from public recipes, and it can be discarded.

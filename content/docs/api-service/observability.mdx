@@ -1,0 +1,147 @@
+---
+title: "Observability"
+description: "Metrics, traces, profiles, logs, health endpoints and the alert rules, with a runbook for each alert."
+---
+
+## Endpoints
+
+| Port (binary / chart) | Path | Content |
+|---|---|---|
+| 23411 / 8081 | `/metrics` | Prometheus exposition. Always on. |
+| 23412 / 8082 | `/live` | Liveness. 200 once the process is up; checks nothing else. |
+| 23412 / 8082 | `/` | Readiness. 200 while PostgreSQL answers, 503 otherwise and during start. |
+
+Point liveness probes at `/live` and readiness at `/`. Using readiness for
+liveness restarts the pod on every database outage.
+
+## Metrics
+
+All names carry the `easyp_` prefix. Most are registered at start; those marked
+*lazy* appear after their first event, and the cache metrics only when object
+storage is configured.
+
+### Requests
+
+| Metric | Type | Labels | Meaning |
+|---|---|---|---|
+| `easyp_api_grpc_server_started_total` | counter | `grpc_service`, `grpc_method`, `grpc_type` | RPCs started. |
+| `easyp_api_grpc_server_handled_total` | counter | + `grpc_code` | RPCs completed, by status code. |
+| `easyp_api_grpc_server_handling_seconds` | histogram | `grpc_service`, `grpc_method`, `grpc_type` | RPC latency. |
+| `easyp_api_grpc_server_msg_received_total`, `_msg_sent_total` | counter | same | Messages. |
+| `easyp_operations_total` | counter | `operation`, `status` | Every core operation, success or failure, on both tiers. |
+| `easyp_rate_limit_requests_total` | counter | `status` | Rate-limiter decisions. |
+| `easyp_rate_limit_active_clients` | gauge | — | Tracked client buckets. |
+| `easyp_concurrency_rejected_total` | counter | — | Refused by the per-client concurrency limit. |
+| `easyp_concurrency_active_clients` | gauge | — | Clients with requests in flight. |
+| `easyp_auth_failures_total` *(lazy)* | counter | `reason` = `no_credentials` \| `unknown_token` | Rejected credentials. |
+
+### Generation
+
+| Metric | Type | Labels | Meaning |
+|---|---|---|---|
+| `easyp_generated_plugin_code_total` | counter | `plugin` | Successful generations. |
+| `easyp_generation_duration_seconds` | histogram | `plugin` | Plugin run time, retries included. |
+| `easyp_generation_errors_total` *(lazy)* | counter | `plugin`, `error_type` = `transient` \| `permanent` | Failed generations (not counting callers that went away). |
+| `easyp_generation_retries_total` *(lazy)* | counter | `plugin` | Server-side retries. |
+| `easyp_pool_generations_active` | gauge | — | Plugin processes running. |
+| `easyp_pool_generations_waiting` | gauge | — | Requests waiting for a generation slot. |
+| `easyp_pool_generations_rejected_total` | counter | — | Refused: generation queue full. |
+| `easyp_pool_active_workers` | gauge | — | Lookup workers busy. |
+| `easyp_pool_queue_depth` | gauge | — | Lookup jobs queued. |
+| `easyp_pool_jobs_total` | counter | — | Lookup jobs accepted. |
+| `easyp_pool_rejected_total` | counter | — | Refused: lookup queue full. |
+
+### Plugin cache (object storage mode)
+
+| Metric | Type | Meaning |
+|---|---|---|
+| `easyp_plugin_cache_bytes` | gauge | Unpacked plugins on disk. |
+| `easyp_plugin_cache_limit_bytes` | gauge | `registry.cache_max_bytes`. |
+| `easyp_plugin_cache_evictions_total` | counter | Evicted version directories. |
+
+### Licence
+
+| Metric | Type | Labels | Meaning |
+|---|---|---|---|
+| `easyp_license_valid` | gauge | — | 1 when a valid licence is loaded. |
+| `easyp_license_expiry_timestamp_seconds` | gauge | — | Expiry; 0 without a licence. |
+| `easyp_license_in_grace` | gauge | — | 1 during the grace period. |
+| `easyp_license_feature_denied_total` | counter | `feature` | Enterprise features refused on Community. |
+| `easyp_config_service_tier_mismatch` | gauge | — | 1 when `telemetry.service_tier` disagrees with the licence. |
+
+### Audit
+
+| Metric | Type | Labels | Meaning |
+|---|---|---|---|
+| `easyp_audit_queue_depth` | gauge | — | Entries waiting for the writer. |
+| `easyp_audit_batch_size` | histogram | — | Rows per write. |
+| `easyp_audit_events_lost_total` | counter | `reason` = `enqueue_timeout` \| `save_failed` \| `shutdown_timeout` | Dropped entries. |
+| `easyp_audit_events_skipped_total` | counter | — | Not written because the licence has no audit. |
+| `easyp_audit_save_failures_total` | counter | — | Failed batch writes. |
+| `easyp_audit_partitions_current` | gauge | — | Monthly partitions. |
+| `easyp_audit_partitions_created_total`, `_dropped_total` | counter | — | Partition maintenance. |
+| `easyp_audit_partition_maintenance_runs_total` | counter | `result` | Maintenance runs. |
+| `easyp_audit_partition_maintenance_last_success_seconds` | gauge | — | Last successful run. |
+| `easyp_audit_default_partition_used` | gauge | — | 1 when rows sit in `audit_log_default`. |
+
+### Database and inventory
+
+| Metric | Type | Labels | Meaning |
+|---|---|---|---|
+| `easyp_repo_call_duration_seconds` | histogram | `func` | Query latency. |
+| `easyp_repo_errors_total` | counter | `func` | Query errors. |
+| `easyp_db_open_connections`, `_idle_connections` | gauge | — | Pool state. |
+| `easyp_db_wait_count_total`, `_wait_duration_seconds_total` | counter | — | Waits for a connection. |
+| `easyp_business_plugins_total` | gauge | — | Registered plugin versions. |
+| `easyp_business_plugins_by_group` | gauge | `group` | Versions per group. |
+| `easyp_business_plugin_versions_count` | gauge | `group`, `name` | Versions per plugin. |
+| `easyp_business_audit_log_total` | gauge | — | Audit rows. |
+| `easyp_panics_total` | counter | — | Recovered panics, in handlers and background work. |
+
+Plus the standard `go_*` and `process_*` collectors.
+
+## Traces
+
+Set `telemetry.otlp_endpoint` (or `OTEL_EXPORTER_OTLP_ENDPOINT`) to an OTLP gRPC
+collector. The core, the registry and each plugin run are wrapped in spans;
+`pool.Get` records the time spent queued. Empty endpoint: no exporter is built
+and nothing is attempted.
+
+## Profiles
+
+Set `telemetry.pyroscope_endpoint` for continuous profiling with Pyroscope.
+
+## Logs
+
+Structured JSON on stdout. Every start logs `configuration resolved` with the
+settings that differ from defaults, secrets redacted. Worth alerting on in your
+log system: `gRPC server is running WITHOUT TLS`,
+`lowered to the licence tier's limit`, `licence expired`, `audit enqueue timed out`.
+
+## Alerts
+
+The Helm chart ships a `PrometheusRule` (`prometheusRule.enabled=true`, needs the
+Prometheus Operator CRDs). Every alert carries a `runbook_url` pointing at
+`prometheusRule.runbookBaseUrl` plus an anchor named after the alert.
+
+| Alert | Fires when | Runbook |
+|---|---|---|
+| EasypLicenceExpiringSoon | Licence expires within `licenceExpiryWarningDays` (14) | [link](/docs/api-service/runbooks#easyplicenceexpiringsoon) |
+| EasypLicenceInGrace | `easyp_license_in_grace == 1` for 15m | [link](/docs/api-service/runbooks#easyplicenceingrace) |
+| EasypGenerationsRejected | `rate(easyp_pool_generations_rejected_total[5m]) > 0` for 5m | [link](/docs/api-service/runbooks#easypgenerationsrejected) |
+| EasypGenerationQueueSaturated | `easyp_pool_generations_waiting > 0` for 10m | [link](/docs/api-service/runbooks#easypgenerationqueuesaturated) |
+| EasypPluginCacheAtLimit | cache bytes / limit > `cacheUsageWarningRatio` (0.95) for 30m | [link](/docs/api-service/runbooks#easypplugincacheatlimit) |
+| EasypAuditEventsLost | `rate(easyp_audit_events_lost_total[5m]) > 0` for 5m | [link](/docs/api-service/runbooks#easypauditeventslost) |
+| EasypAuditMaintenanceStale | no successful partition maintenance for 24h | [link](/docs/api-service/runbooks#easypauditmaintenancestale) |
+| EasypAuditDefaultPartitionUsed | `easyp_audit_default_partition_used == 1` for 15m | [link](/docs/api-service/runbooks#easypauditdefaultpartitionused) |
+| EasypGenerationErrorRate | error ratio > `generationErrorRatio` (0.05) for 10m | [link](/docs/api-service/runbooks#easypgenerationerrorrate) |
+| EasypPanics | `increase(easyp_panics_total[5m]) > 0` | [link](/docs/api-service/runbooks#easyppanics) |
+| EasypAuthFailures | `rate(easyp_auth_failures_total[5m]) > authFailureRate` (0.5) for 10m | [link](/docs/api-service/runbooks#easypauthfailures) |
+
+The compose stack adds host and edge alerts, evaluated by its own Mimir from what
+Grafana Alloy collects — EasypHostDiskLow, EasypHostDiskFillingUp, EasypHostMemoryLow,
+EasypTargetDown, EasypServiceMissing, EasypCertificateExpiringSoon — in
+`deploy/observability/mimir/rules/anonymous/host.yaml`. They are also in
+[Runbooks](/docs/api-service/runbooks#the-host).
+
+`ServiceMonitor` (`serviceMonitor.enabled=true`) scrapes `/metrics` every 30 s.
