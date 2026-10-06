@@ -24,6 +24,22 @@ The <code>easyp.gen.yaml</code> file specifies **consumer-side code generation r
     },
     "generate.modules": {
       description: "Module identities or workspace-relative local module paths. Dependencies use the nearest protobuf.mod beside or above this config within the workspace and its lock. If omitted, that module is selected; without a manifest, the project directory is used.",
+      type: "(string | object)[]"
+    },
+    "generate.modules[].module": {
+      description: "Selected module identity or workspace-relative module directory. A plain string is shorthand without local filters.",
+      type: "string"
+    },
+    "generate.modules[].paths": {
+      description: "Literal files or directory subtrees relative to this module directory, intersected with global filters.",
+      type: "string[]"
+    },
+    "generate.modules[].packages": {
+      description: "Exact protobuf packages in this module, intersected with global filters.",
+      type: "string[]"
+    },
+    "generate.paths": {
+      description: "Literal files or subtrees relative to each selected module directory. Available without listing modules; omitted or empty selects all paths.",
       type: "string[]"
     },
     "generate.packages": {
@@ -72,7 +88,7 @@ The <code>easyp.gen.yaml</code> file specifies **consumer-side code generation r
       type: "object"
     },
     "options.go.package_prefix": {
-      description: "Computes go_package, changing Go options only. Full managed mode requires generate.managed.enabled: true.",
+      description: "Optional. Omitted permits inheritance; explicit empty blocks prefix inheritance. A nonempty value computes go_package, changing Go options only.",
       type: "string"
     },
     "generate.managed": {
@@ -85,6 +101,41 @@ The <code>easyp.gen.yaml</code> file specifies **consumer-side code generation r
 ---
 
 ## Example Configurations
+
+### Global and module-specific source selection
+
+Global filters work without repeating the local module declared in <code>protobuf.mod</code>:
+
+~~~yaml
+version: v1
+generate:
+  paths: [api/easyp]
+~~~
+
+With <code>roots api</code>, this selects <code>api/easyp</code> on disk while protobuf import names
+start with <code>easyp/</code>. Paths are relative to the selected module directory, even
+when the generator config is elsewhere. Import roots and plugin output paths
+remain unchanged.
+
+Different modules can restrict their own sources:
+
+~~~yaml
+generate:
+  modules:
+    - module: proto/users
+      paths: [schemas/api]
+      packages: [users.v1]
+    - proto/orders
+  packages: [users.v1, orders.v1]
+~~~
+
+Global and module-specific filters intersect. Every global selector must match
+a resulting source across the selected modules; each module-specific selector
+must match within that module. Missing selectors fail before plugins or descriptor
+writes, including projects without plugins. Required imports stay available.
+Identical repeated module selections are idempotent; conflicting filters for
+the same resolved module in one project fail. Filter order and repeated values
+do not change their meaning.
 
 ### Project-Level Generator (<code>backend/easyp.gen.yaml</code>)
 

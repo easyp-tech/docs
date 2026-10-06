@@ -49,7 +49,7 @@ Modified legacy policy and manifest files receive byte-identical <code>.v0.bak</
 
 ## What is preserved
 
-The converter preserves the effective selected lint rules, exceptions, rule settings, and explicit legacy comment-suppression setting. It converts literal ignores and rule-specific prefix ignores to the corresponding v1 exclusions. Generation preserves plugin sources, argv, options, <code>with_imports</code>, and supported managed settings. Relative paths remain relative to the configuration directory.
+The converter preserves the effective selected lint rules, exceptions, rule settings, and explicit legacy comment-suppression setting. It converts literal ignores and rule-specific prefix ignores to the corresponding v1 exclusions. Generation preserves plugin sources, argv, options, <code>with_imports</code>, and supported managed settings. Plugin output paths remain relative to the configuration directory.
 
 Legacy <code>direct</code> and <code>indirect</code> requirements are converted to native <code>require</code> directives. The tool proves that local generation keeps the same protobuf files and import paths, using whole roots, literal generation paths or exact package selectors.
 
@@ -72,11 +72,15 @@ plugins:
 
 Import roots stay unchanged and generated files keep their source-relative paths. The wizard first tries whole-root equality, then literal directory paths, then complete package selectors for mixed-root cases. Each choice must select exactly the same physical files with the same import names. Paths can preserve part of a package: ignored Gradle build copies outside `mcp` stay out of generation. Hidden/vendor/nested-module boundary changes and inferred local filters mixed with whole-module Git inputs remain blocked. Sources and fixed paths/packages are checked again before apply.
 
-`generate.paths` matches literal import-relative files or directory subtrees, with `.` meaning all sources; `mcp` does not select `mcp-copy`. Paths intersect optional package selectors, and every selector must match a resulting source across the selected modules. Unknown selectors fail before plugins or descriptor writes, even without plugins or under `--all`. Required imports outside these paths remain available. These paths are separate from plugin `opts.paths`, which controls output layout.
+`generate.paths` matches literal module-directory-relative files or directory subtrees, with `.` meaning all sources; `mcp` does not select `mcp-copy`. Paths intersect optional package selectors, and every selector must match a resulting source across the selected modules. Unknown selectors fail before plugins or descriptor writes, even without plugins or under `--all`. Required imports outside these paths remain available. These paths are separate from plugin `opts.paths`, which controls output layout.
 
 Path selection requires an updated v1 build; the initial <code>v1.0.0-nightly.20261005.1</code> and commit <code>8be79c7</code> do not provide it. When migration uses the complete-package fallback, the preview still warns that future files in those packages become targets regardless of their directory.
 
 Variable placeholders are not expanded into saved values. If a placeholder or selector prevents safe analysis, conversion fails rather than persisting credentials or guessing its meaning.
+
+For a sole local input, migration does not repeat its module in `generate.modules`: it is inferred from the generator location. With `root: api, path: easyp`, the output is `generate.paths: [api/easyp]` and protobuf import names stay unchanged. Global filters remain available without listing modules; each module object can also add its own `paths`/`packages`, intersected with global filters.
+
+Migration does not create an empty `options.go.package_prefix`. This field is optional: omission allows normal v1 inheritance, while an explicitly empty value blocks prefix inheritance.
 
 ## Historical lock integrity
 
