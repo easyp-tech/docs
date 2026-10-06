@@ -86,9 +86,13 @@ Git's annotated-tag spelling, such as `v0.4.0^{}`, is accepted for a full SemVer
 
 Released v0 installers archived Git's <code>*.proto</code> pathspec and stripped legacy root prefixes before hashing. Migration reproduces that archive at the pinned revision; it also retains verification of the existing whole-tree hash format. Git archive attributes that omit or alter proto files require manual migration because a native checkout would change the contract.
 
-The v1 content hash is then calculated independently over the tracked repository files. Old and new hashes cover different path layouts and cannot be copied or compared as interchangeable values. A missing historical dependency pin is not replaced with current HEAD.
+The v1 content hash is then calculated independently over the materialized logical snapshot. Old and new hashes cover different path layouts and cannot be copied or compared as interchangeable values. A missing historical dependency pin is not replaced with current HEAD.
 
-Auxiliary Git symlinks, such as PGV's `example-workspace/.bazelrc`, are omitted without reading their targets. This also permits dangling links and links materialized as text by `core.symlinks=false`. Links affecting proto files, dependency metadata or configured source roots remain errors. When auxiliary links are omitted, historical verification requires the actual v0 proto archive hash; a whole-tree hash calculated after dropping links is not accepted as historical proof. The native hash covers regular tracked files and excludes the omitted links.
+Internal symlinks to files, directories, import roots and metadata are supported. Protobuf import names follow the logical path of the alias. Local targets must remain inside their owning source boundary; Git targets must be relative and resolve entirely from the pinned tree. Selected dangling links, cycles, submodule crossings and undeclared nested repositories fail. Invalid unused auxiliary links are omitted. Git snapshots contain regular resolved bytes, including safe non-proto aliases, regardless of `core.symlinks`.
+
+If the legacy configuration file itself is a symlink, migration replaces that logical file with regular v1 content and creates a regular backup of its original contents. The former target stays unchanged; rollback restores the original link. Inputs and link topology are checked again before applying.
+
+Historical v0 archive verification remains a separate migration step. A valid historical file alias must preserve both its installed import name and resolved contents. Its target must exist in the archived inputs; the verifier cannot use current files or unarchived Git blobs. The v1 hash is calculated independently from the materialized snapshot.
 
 ## Explicit limitations
 
