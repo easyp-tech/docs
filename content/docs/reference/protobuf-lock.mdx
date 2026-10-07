@@ -35,6 +35,10 @@ description: "Specification for protobuf.lock, the generated lockfile securing r
     "modules[].hash": {
       description: "Go dirhash.Hash1 digest (h1:...) of the materialized logical snapshot at the locked commit.",
       type: "string"
+    },
+    "modules[].roots": {
+      description: "Optional verified fallback import-root directories relative to a metadata-free dependency module. Replayed on cold-cache and frozen operations; does not override authoritative dependency metadata.",
+      type: "string[]"
     }
   }}
 />
@@ -57,6 +61,8 @@ modules:
 
 ## Lifecycle commands
 
+Resolved `roots` are canonical portable relative directories, with `.` allowed. Absolute paths, traversal, backslashes, globs and duplicates are rejected. These fields describe dependency resolution and are generated from unambiguous imports or checked `get --import-root`/migration hints. They are independent of generation `paths` and package selectors.
+
 - <code>easyp get</code> adds a direct requirement, records transitive requirements as indirect, and updates the lock.
 - <code>easyp mod tidy</code> resolves declared requirements, updates indirect entries and the lock, and preserves an existing lock pin for a requirement that remains unconstrained.
 - <code>easyp mod update</code> refreshes SemVer dependencies within their current major versions, refreshes still-unconstrained requirements to HEAD, and preserves explicit commit pins.
@@ -68,7 +74,7 @@ During <code>tidy</code>, <code>get</code>, and <code>update</code>, every fetch
 
 <code>mod download</code> uses the locked commit even after a tag moves, provided that commit remains available.
 
-The <code>hash</code> uses Go's <code>dirhash.Hash1</code> over the materialized logical snapshot at the commit, with repository-relative paths. Safe internal aliases contribute their resolved bytes under their logical names; Git objects are read directly, without checkout filters. Buf filters apply before hashing and installation. Invalid unused auxiliary links are omitted. Cache identity includes the source, commit and hash. EasyP verifies it on download and when reusing an installed module; corrupt installations are rejected.
+The <code>hash</code> uses Go's <code>dirhash.Hash1</code> over the materialized logical snapshot at the commit, with repository-relative paths. Safe internal aliases contribute their resolved bytes under their logical names; Git objects are read directly, without checkout filters. Buf filters apply before hashing and installation. Invalid unused auxiliary links are omitted. Installed-cache identity includes the source, commit, hash and canonical root selection. EasyP verifies it on download and when reusing an installed module; corrupt installations are rejected.
 
 The v1 cache reuses an object store per Git remote. A known exact commit can be fetched without contacting the remote. A cold request first tries a depth-one fetch of the exact commit; if the server rejects that request, EasyP falls back to advertised reachable history. The original commit is still required: HEAD is never substituted. Tag lookups are refreshed separately so cache reuse cannot hide a retag. A commit absent from cache can still require access to its source.
 
