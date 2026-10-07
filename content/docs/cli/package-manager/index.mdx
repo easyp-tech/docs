@@ -37,7 +37,7 @@ Major versions use Go-style identities: v0/v1 are unsuffixed; v2+ requires match
 
 Roots normally come from the pinned dependency's `protobuf.mod`, Buf or legacy EasyP config. A native manifest with omitted roots still declares `.`. Invalid metadata is an error.
 
-For an already declared dependency without root metadata, resolution can identify roots from a unique match between imports and tracked proto files. `import "svc.proto"` can match `api/svc/v1/svc.proto` under root `api/svc/v1`. Ambiguous layouts require an explicit hint:
+For an already declared dependency without root metadata, resolution identifies roots only from imports inside that dependency. If `api/service/v1/a.proto` imports `service/v1/b.proto`, the matching dependency file `api/service/v1/b.proto` establishes root `api`. External consumer imports only validate the resolved namespace; they never choose its roots. Without enough internal evidence, the default `.` remains or an explicit hint is required:
 
 ~~~bash
 easyp get --import-root api/svc/v1 gitlab/products/svc
@@ -56,6 +56,14 @@ plugins: []
 ~~~
 
 Resolved roots determine protobuf filenames. Module-local `paths` and `packages` restrict generation; paths refer to the external module directory. Add your local module to `modules` when both should generate. Root selection does not rewrite source imports or require a generation filter repeating the root.
+
+## Root changes during dependency updates
+
+When a new revision introduces authoritative roots, EasyP compares their protobuf filenames with the prior pinned fallback namespace. This also covers the metadata-free default `.`, even when the old lock omits `roots`. Moving physical directories while keeping the same import names is valid. A namespace shift stops implicit update before writing manifest/lock and reports old/new revisions, roots and representative renamed imports.
+
+To accept the new revision, change its requirement in `protobuf.mod` and run `easyp mod tidy`. Tidy updates consumer import declarations when the old and new pinned namespaces prove one source binding, including when another file has taken the old import name. It validates the proposed imports before committing source edits and manifest/lock together, then reports applied renames. Comments, line endings and unrelated strings remain intact. Tidy uses declared versions; it does not upgrade them by itself.
+
+An ambiguous mapping or deleted imported source stops before project writes and explains which import needs attention. Dependencies and cached source files are never rewritten. Review generation selectors and SDK output paths separately. If imports are already adjusted, explicitly adopt with `easyp get --import-root api gitlab/products/svc@<new-version>`, or keep the prior version. Producer metadata remains authoritative; hints must match it and import/integrity checks still pass.
 
 ## Commands
 
