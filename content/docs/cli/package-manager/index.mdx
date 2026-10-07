@@ -33,6 +33,30 @@ Module commands and <code>get</code> find the nearest ancestor <code>protobuf.mo
 
 Major versions use Go-style identities: v0/v1 are unsuffixed; v2+ requires matching <code>/vN</code>. The <code>+incompatible</code> exception requires verified pre-native metadata; it never bypasses a native manifest. See [exact grammar and Git mapping](/docs/reference/protobuf-mod).
 
+## Dependencies without import-root metadata
+
+Roots normally come from the pinned dependency's `protobuf.mod`, Buf or legacy EasyP config. A native manifest with omitted roots still declares `.`. Invalid metadata is an error.
+
+For an already declared dependency without root metadata, resolution can identify roots from a unique match between imports and tracked proto files. `import "svc.proto"` can match `api/svc/v1/svc.proto` under root `api/svc/v1`. Ambiguous layouts require an explicit hint:
+
+~~~bash
+easyp get --import-root api/svc/v1 gitlab/products/svc
+~~~
+
+Repeat `--import-root` for multiple module-relative directories. Hints must remain inside the external module and agree with authoritative roots. Verified fallback roots are recorded in the dependency's `protobuf.lock` entry. Frozen and cold-cache operations replay that choice; resolution failures leave the manifest and lock unchanged.
+
+To generate the required dependency, select its identity in `easyp.gen.yaml`:
+
+~~~yaml
+version: v1
+generate:
+  modules:
+    - gitlab/products/svc
+plugins: []
+~~~
+
+Resolved roots determine protobuf filenames. Module-local `paths` and `packages` restrict generation; paths refer to the external module directory. Add your local module to `modules` when both should generate. Root selection does not rewrite source imports or require a generation filter repeating the root.
+
 ## Commands
 
 | Command | Behavior |
