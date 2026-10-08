@@ -37,7 +37,7 @@ description: "Specification for protobuf.lock, the generated lockfile securing r
       type: "string"
     },
     "modules[].roots": {
-      description: "Optional verified fallback import-root directories relative to a metadata-free dependency module. Replayed on cold-cache and frozen operations; does not override authoritative dependency metadata.",
+      description: "Optional verified fallback import-root directories relative to a metadata-free dependency's pinned Git repository snapshot. Replayed on cold-cache and frozen operations; does not override authoritative dependency metadata.",
       type: "string[]"
     }
   }}

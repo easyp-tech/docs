@@ -116,7 +116,7 @@ A full commit SHA is preserved, including a full SHA embedded in an old pseudo-v
 
 Git's annotated-tag spelling, such as `v0.4.0^{}`, is accepted for a full SemVer tag in the historical lock. The tag, commit and original hash are still verified, and the old lock stays byte-identical. Peeled branches, abbreviated refs, repeated suffixes and pseudo-version-shaped peeled tags are rejected.
 
-Released v0 installers archived Git's <code>*.proto</code> pathspec and stripped legacy root prefixes before hashing. Migration reproduces that archive at the pinned revision; it also retains verification of the existing whole-tree hash format. Git archive attributes that omit or alter proto files require manual migration because a native checkout would change the contract.
+Released v0 installers archived Git's <code>*.proto</code> pathspec and stripped legacy root prefixes before hashing. Migration reproduces that archive at the pinned revision; it also retains verification of the existing whole-tree hash format. Omitted selected or reachable proto sources and changes to verified archive bytes require manual migration. An unused <code>export-ignore</code> source outside a verified filtered Git selection is permitted when historical hash, target names and reachable bindings match. A whole input that would gain an extra target still fails.
 
 The v1 content hash is then calculated independently over the materialized logical snapshot. Old and new hashes cover different path layouts and cannot be copied or compared as interchangeable values. A missing historical dependency pin is not replaced with current HEAD.
 
