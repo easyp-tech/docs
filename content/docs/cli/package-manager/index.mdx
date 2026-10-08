@@ -43,7 +43,7 @@ For an already declared dependency without root metadata, resolution identifies 
 easyp get --import-root api/svc/v1 gitlab/products/svc
 ~~~
 
-Repeat `--import-root` for multiple module-relative directories. Hints must remain inside the external module and agree with authoritative roots. Verified fallback roots are recorded in the dependency's `protobuf.lock` entry. Frozen and cold-cache operations replay that choice; resolution failures leave the manifest and lock unchanged.
+Repeat `--import-root` for multiple directories. Fetched Git hints are relative to the pinned repository snapshot: for `repo/sub/protobuf.mod` declaring `roots proto`, use `--import-root sub/proto`. Local replacement hints are relative to the replacement directory. Producer roots remain relative to their declaring manifest and are rebased by the Git adapter. Hints must stay within the source boundary and agree with authoritative roots. Verified fallback roots are recorded in the dependency's `protobuf.lock` entry. Frozen and cold-cache operations replay that choice; resolution failures leave the manifest and lock unchanged.
 
 To generate the required dependency, select its identity in `easyp.gen.yaml`:
 
@@ -91,7 +91,7 @@ Commit <code>protobuf.mod</code> and <code>protobuf.lock</code> for repeatable b
 
 ## Dependencies using Buf or older EasyP
 
-A Git dependency may declare its proto roots in <code>buf.work.yaml</code>, Buf v1 or v2 <code>buf.yaml</code>, or an older EasyP <code>easyp.yaml</code>. Older EasyP <code>protobuf.mod</code> requirements are also read transitively. If none of those files exists, its repository root is used. This compatibility applies to dependency metadata; the consuming project uses v1 <code>protobuf.mod</code>.
+A Git dependency may declare its proto roots in <code>buf.work.yaml</code>, Buf v1 or v2 <code>buf.yaml</code>, or an older EasyP <code>easyp.yaml</code>. Older EasyP <code>protobuf.mod</code> requirements are also read transitively. Without root metadata, dependency-internal import evidence or checked hints may establish fallback roots; otherwise its repository root is used. Recorded fallback roots are replayed from <code>protobuf.lock</code>. This compatibility applies to dependency metadata; the consuming project uses v1 <code>protobuf.mod</code>.
 
 When adapting an older <code>easyp.yaml</code>, both <code>deps</code> and generation Git inputs contribute requirements. Exact source/version duplicates are removed; different minimums remain visible to MVS, and malformed deps fail explicitly. A matching native <code>protobuf.mod</code> takes precedence. Only metadata is read; dependency plugins are never executed.
 
