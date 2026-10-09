@@ -39,15 +39,15 @@ title: "Установка EasyP"
 
 ## Явная установка v1 nightly
 
-Nightly-теги имеют формат `v1.0.0-nightly.YYYYMMDD.sequence`. Выберите точный опубликованный тег в [GitHub Releases](https://github.com/easyp-tech/easyp/releases). Тег `v1.0.0-nightly.20261005.1` ниже — пример, а не утверждение, что такой релиз существует; замените его опубликованным тегом перед запуском команд. Nightly не обновляет стабильную формулу Homebrew или Docker-образ `latest`.
+Nightly-теги имеют формат `v1.0.0-nightly.YYYYMMDD.sequence`. Команды ниже закреплены на [v1.0.0-nightly.20261009.1](https://github.com/easyp-tech/easyp/releases/tag/v1.0.0-nightly.20261009.1). Для другой версии выберите точный опубликованный тег в [GitHub Releases](https://github.com/easyp-tech/easyp/releases). Nightly не обновляет стабильную формулу Homebrew или Docker-образ `latest`.
 
 ### Go: CLI и MCP
 
 Для сборки v1 требуется **Go 1.26.6 или новее**. Установите оба бинарника в одной точной версии в отдельный каталог, чтобы сохранить стабильный CLI в `PATH`:
 
 ```bash
-# Только пример: замените тег реально опубликованным nightly.
-NIGHTLY_TAG='v1.0.0-nightly.20261005.1'
+# Выберите точный опубликованный nightly-тег.
+NIGHTLY_TAG='v1.0.0-nightly.20261009.1'
 NIGHTLY_BIN="$HOME/.local/share/easyp-nightly/bin"
 mkdir -p "$NIGHTLY_BIN"
 GOBIN="$NIGHTLY_BIN" go install "github.com/easyp-tech/easyp/cmd/easyp@${NIGHTLY_TAG}"
@@ -62,8 +62,8 @@ GOBIN="$NIGHTLY_BIN" go install "github.com/easyp-tech/easyp/cmd/easyp-mcp@${NIG
 Архив v1 содержит `easyp` и `easyp-mcp`. Скачайте файл для своей платформы и проверьте его по контрольным суммам релиза. Пример для Linux amd64:
 
 ```bash
-# Только пример: замените тег реально опубликованным nightly.
-NIGHTLY_TAG='v1.0.0-nightly.20261005.1'
+# Выберите точный опубликованный nightly-тег.
+NIGHTLY_TAG='v1.0.0-nightly.20261009.1'
 NIGHTLY_VERSION="${NIGHTLY_TAG#v}"
 NIGHTLY_ASSET="easyp-${NIGHTLY_VERSION}-linux-amd64.tar.gz"
 NIGHTLY_BIN="$HOME/.local/share/easyp-nightly/bin"
@@ -82,8 +82,8 @@ tar -xzf "$NIGHTLY_ASSET" --strip-components=1 -C "$NIGHTLY_BIN"
 Nightly-образ CLI в GHCR выбирается по точному тегу:
 
 ```bash
-# Только пример: замените тег реально опубликованным nightly.
-NIGHTLY_TAG='v1.0.0-nightly.20261005.1'
+# Выберите точный опубликованный nightly-тег.
+NIGHTLY_TAG='v1.0.0-nightly.20261009.1'
 docker run --rm -v "$PWD:/workspace" -w /workspace \
   "ghcr.io/easyp-tech/easyp:${NIGHTLY_TAG}" --version
 ```
