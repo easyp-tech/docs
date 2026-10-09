@@ -101,4 +101,49 @@ easyp generate --all
 
 Проекты, выбравшие один модуль, используют его манифест и lock зависимостей. У разных модулей графы зависимостей могут отличаться: проверяйте их lock-файлы и тестируйте сгенерированные клиенты вместе.
 
+## Профили для одного модуля
+
+Для модуля с пакетами <code>private.v1</code> и <code>public.v1</code> разместите оба профиля в каталоге модуля рядом с <code>protobuf.mod</code>. Его корни и зависимости применяются к обоим профилям.
+
+~~~yaml
+# private.easyp.gen.yaml
+version: v1
+generate:
+  packages: [private.v1]
+plugins:
+  - name: go
+    out: ./gen/go
+    opts:
+      paths: source_relative
+options:
+  go:
+    package_prefix: github.com/acme/app/gen/go
+~~~
+
+~~~yaml
+# public.easyp.gen.yaml
+version: v1
+generate:
+  packages: [public.v1]
+plugins:
+  - name: go
+    out: ./gen/go
+    opts:
+      paths: source_relative
+options:
+  go:
+    package_prefix: github.com/acme/app/gen/go
+~~~
+
+Запускайте каждый профиль из этого каталога:
+
+~~~bash
+easyp generate --gen-config private.easyp.gen.yaml
+easyp generate --gen-config public.easyp.gen.yaml
+~~~
+
+Выбранные пакеты становятся целями генерации; необходимые импорты остаются доступны для связывания. Каждый файл сохраняет обычные фильтры исходников от каталога модуля и пути результатов от каталога конфига, поэтому смена имени файла не требует правки путей. В примерах Go prefix явно повторён: стандартный <code>easyp.gen.yaml</code> в том же каталоге независим. Наследуемые опции задают только стандартные файлы в родительских каталогах.
+
+<code>--gen-config</code> выбирает один файл и несовместим с <code>--project</code> или <code>--all</code>. Рекурсивный поиск по-прежнему находит стандартные <code>easyp.gen.yaml</code>. Для нескольких именованных профилей используйте отдельные команды.
+
 См. [справочник генератора](/ru/docs/reference/easyp-gen-yaml) и [руководство по воспроизводимости](/ru/docs/guides/reproducibility).

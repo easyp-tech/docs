@@ -101,4 +101,49 @@ Do not combine <code>--all</code> and <code>--project</code>. Without either fla
 
 Projects selecting the same module use that module's manifest and dependency lock. Separate modules can have different dependency graphs, so review their locks and test the generated clients together.
 
+## Profiles for one module
+
+For a module containing <code>private.v1</code> and <code>public.v1</code> packages, keep both profiles in the module directory beside <code>protobuf.mod</code>. Its roots and dependencies apply to both profiles.
+
+~~~yaml
+# private.easyp.gen.yaml
+version: v1
+generate:
+  packages: [private.v1]
+plugins:
+  - name: go
+    out: ./gen/go
+    opts:
+      paths: source_relative
+options:
+  go:
+    package_prefix: github.com/acme/app/gen/go
+~~~
+
+~~~yaml
+# public.easyp.gen.yaml
+version: v1
+generate:
+  packages: [public.v1]
+plugins:
+  - name: go
+    out: ./gen/go
+    opts:
+      paths: source_relative
+options:
+  go:
+    package_prefix: github.com/acme/app/gen/go
+~~~
+
+Run each profile from that directory:
+
+~~~bash
+easyp generate --gen-config private.easyp.gen.yaml
+easyp generate --gen-config public.easyp.gen.yaml
+~~~
+
+The selected packages become generation targets; required imports remain available for linking. Each file keeps the usual module-relative source filters and file-relative plugin outputs, so changing the filename requires no path adjustments. These profiles explicitly repeat the Go prefix: a standard <code>easyp.gen.yaml</code> in the same directory is independent. Only standard files in ancestor directories provide inherited options.
+
+<code>--gen-config</code> selects one file and cannot be combined with <code>--project</code> or <code>--all</code>. Recursive discovery continues to look for standard <code>easyp.gen.yaml</code> files. Use separate commands to run multiple named profiles.
+
 See the [generator reference](/docs/reference/easyp-gen-yaml) and [build reproducibility guide](/docs/guides/reproducibility).

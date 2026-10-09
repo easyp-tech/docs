@@ -53,7 +53,24 @@ easyp generate --workspace ../.. --project ..
 
 <code>--project</code> is repeatable and cannot be combined with <code>--all</code>. Recursive discovery skips hidden directories, <code>easyp_vendor</code>, <code>node_modules</code>, and nested Git repositories. Select a project in a skipped directory explicitly. Automatic selection rejects a symlink configuration file; an explicit project selection is required to use it. Choosing <code>--all</code> authorizes plugins in the discovered projects, including command plugins.
 
-The nearest Git repository, including a worktree with a <code>.git</code> file, supplies the workspace boundary. Without Git, enclosing EasyP configuration and manifest files establish the boundary; <code>--workspace</code> sets it explicitly. Project paths and descriptor destinations are relative to the invocation directory. Plugin output paths are relative to their <code>easyp.gen.yaml</code>. The command has no <code>--path</code> or <code>--root</code> flag.
+The nearest Git repository, including a worktree with a <code>.git</code> file, supplies the workspace boundary. Without Git, enclosing EasyP configuration and manifest files establish the boundary; <code>--workspace</code> sets it explicitly. Project paths and descriptor destinations are relative to the invocation directory. Plugin output paths are relative to the selected generation file. The command has no <code>--path</code> or <code>--root</code> flag.
+
+## Named generation configs
+
+Keep profiles such as <code>private.easyp.gen.yaml</code> and <code>public.easyp.gen.yaml</code> beside the same <code>protobuf.mod</code>, then select one file with <code>--gen-config</code>:
+
+~~~bash
+easyp generate --gen-config private.easyp.gen.yaml
+easyp generate --gen-config public.easyp.gen.yaml
+# The selected profile can also export descriptors.
+easyp generate --gen-config public.easyp.gen.yaml --descriptor_set_out build/public.pb
+~~~
+
+The flag accepts one relative or absolute file path inside the workspace. Relative paths start at the invocation directory; <code>--workspace</code> can set the boundary explicitly. The file uses the native <code>version: v1</code> generation format. Missing, empty or invalid selections fail without falling back to <code>easyp.gen.yaml</code>.
+
+Do not combine <code>--gen-config</code> with <code>--project</code> or <code>--all</code>. Automatic selection and <code>--all</code> still discover only standard <code>easyp.gen.yaml</code> files. The global <code>--config</code>/<code>--cfg</code> flag selects a policy file and does not select a generation profile.
+
+Colocated profiles keep the same source, module and output path rules; no directory relocation or extra <code>../</code> is needed. Plugin outputs remain relative to the selected file's directory. Options inherit from standard <code>easyp.gen.yaml</code> files in ancestor directories; a standard file in the same directory is an independent profile and is not inherited. See [profiles for one module](/docs/guides/multi-target-generation#profiles-for-one-module) for complete examples.
 
 ## Frozen generation
 
@@ -64,7 +81,7 @@ easyp --frozen generate --all --descriptor_set_out_dir build/descriptors
 
 Each selected local native module must have <code>protobuf.mod</code> and <code>protobuf.lock</code>, including an empty lock without dependencies. An explicit workspace-relative path uses the selected module's files: <code>backend/easyp.gen.yaml</code> with <code>generate.modules: [proto/user]</code> validates <code>proto/user/protobuf.mod</code> and <code>proto/user/protobuf.lock</code>. The generator-only <code>backend</code> directory needs neither file. Frozen rejects all root replacements, even unused ones, and validates the locked direct and transitive graph before any plugin executes. A failure in a later selected project therefore prevents plugins in earlier projects from running. The same preflight applies to both descriptor export modes and pluginless exports.
 
-A dependency selected by identity through <code>generate.modules</code> requires its consumer's manifest and lock; the downloaded dependency does not need its own lock. Unselected projects are ignored. <code>--frozen</code> does not change the existing <code>--project</code>/<code>--all</code> selection and plugin authorization rules.
+A dependency selected by identity through <code>generate.modules</code> requires its consumer's manifest and lock; the downloaded dependency does not need its own lock. Unselected projects are ignored. <code>--frozen</code> does not change the existing <code>--gen-config</code>/<code>--project</code>/<code>--all</code> selection and plugin authorization rules.
 
 Exact locked commits may be downloaded into the cache and are hash-verified, including on cache reuse. Manifest and lock files are never rewritten, and dependency HEAD/tags are never resolved. Frozen is explicit, not inferred from CI, and does not make remote plugins offline or pin local plugin executables. See [frozen builds](/docs/cli/package-manager#frozen-builds).
 
