@@ -63,7 +63,7 @@ services:
       retries: 30
 
   service:
-    image: ghcr.io/easyp-tech/service:v1.0.2
+    image: ghcr.io/easyp-tech/service:v1.2.0
     command: ["service", "start"]
     depends_on:
       postgres:
@@ -99,16 +99,18 @@ curl -i http://localhost:23412/       # 200, как только отвечае�
 
 ```bash
 EASYP_TOKEN=<токен из шага 2> \
-go run ./cmd/easyp-svc plugins register \
+go run ./cmd/easyp-svc plugins publish \
+  --plugins-dir plugins \
   --addr localhost:23410 \
-  --insecure \
-  plugins
+  --insecure
 ```
 
-`register` обходит `plugins/` и для каждой версии вызывает `CreatePlugin` с путём
-к команде в том виде, в каком его видит сервис
-(`/plugins/protocolbuffers/go/v1.36.10/plugin`). Без токена каждая регистрация
-завершается ошибкой `Unauthenticated`.
+Без пути к реестру и без `--archives` источником для `publish` служит
+`--plugins-dir`: команда обходит `plugins/` и для каждой найденной версии
+вызывает `CreatePlugin`. Путь к команде сервис выводит сам
+(`/plugins/protocolbuffers/go/v1.36.10/plugin`), так что клиенту не нужно знать,
+куда смонтирован каталог. Без токена `publish` останавливается, ничего не
+зарегистрировав: сервис его отвергает. Нужен сервис v1.2.0 или новее.
 
 ## 5. Сгенерировать код
 
@@ -145,10 +147,8 @@ Grafana, Loki, Tempo, Mimir и Pyroscope. Им управляет `Taskfile.yml`
 репозитория сервиса:
 
 ```bash
-FILTER='protocolbuffers/go:v1.36.10' task build-plugins-filter
-task up                 # генерирует dev-сертификаты, поднимает стенд
-task push-plugins       # загружает архивы в хранилище
-task register-plugins   # регистрирует их через Traefik
+task up                                                     # генерирует dev-сертификаты, поднимает стенд
+FILTER='protocolbuffers/go:v1.36.10' task publish-plugins   # собирает, загружает и регистрирует через Traefik
 ```
 
 Там gRPC доступен через Traefik на `easyp.api.localhost:4443`, а Grafana — на

@@ -116,7 +116,7 @@ func main() {
 | `WithToken(token)` | — | `authorization: Bearer` в каждом вызове. Нужен для записи и для чтения, если сервис требует аутентификацию. |
 | `WithGenerateCodeTimeout(d)` | 30 с | Дедлайн вызова, если в контексте его нет. Поднимайте к `generation_timeout` сервера. |
 | `WithListPluginsTimeout(d)` | 10 с | На весь постраничный обход. |
-| `WithCreatePluginTimeout(d)` | 120 с | Регистрация читает архив из хранилища. |
+| `WithCreatePluginTimeout(d)` | 120 с | Регистрация проверяет архив в хранилище и читает его, если у объекта нет контрольной суммы. |
 | `WithMaxRetries(n)`, `WithRetryBaseDelay(d)`, `WithRetryMaxDelay(d)` | 3, 100 мс, 5 с | Экспоненциальная задержка. |
 | `WithMaxRecvMsgSize(n)` | 64 МиБ | Совпадает с лимитом вывода сервера. |
 | `WithHealthCheck(interval)` | 30 с | Фоновая проверка состояния соединения. |
@@ -130,6 +130,16 @@ func main() {
 
 Методы: `GenerateCode`, `ListPlugins` (обходит все страницы), `CreatePlugin`,
 `UpdatePlugin`, `DeletePlugin`, `Close`.
+
+`CreatePlugin` и `UpdatePlugin` принимают структуру `config`. На сервисе v1.2.0
+или новее `command` можно не указывать: сервис выводит
+`{plugins_dir}/{group}/{name}/{version}/plugin`, так что клиенту не нужно знать
+`plugins_dir` сервера (более старые сервисы его требуют). Ключ `sha256` — это
+утверждение об архиве в хранилище: регистрация падает с `FAILED_PRECONDITION` /
+`CHECKSUM_MISMATCH`, если у архива в хранилище не ровно эта сумма; без него
+сервис сам записывает сумму архива из хранилища. Конфиг из одного `sha256` — это
+то, что отправляет `easyp-svc plugins publish`. Все ключи —
+[Плагины](/ru/docs/api-service/plugins#registered-configuration).
 
 ## gRPC напрямую
 
@@ -173,7 +183,8 @@ grpcurl -protoset api.protoset -plaintext localhost:23410 \
 | `SERVER_OVERLOADED` | `RESOURCE_EXHAUSTED` | Очередь воркеров или генераций заполнена. |
 | `MAX_PLUGINS_EXCEEDED` | `RESOURCE_EXHAUSTED` | Потолок Community в 10 версий. |
 | `ALREADY_EXISTS` | `ALREADY_EXISTS` | Версия уже зарегистрирована. |
-| `BINARY_NOT_UPLOADED` | `FAILED_PRECONDITION` | Регистрация до `plugins push`. |
+| `BINARY_NOT_UPLOADED` | `FAILED_PRECONDITION` | Регистрация версии, архива которой нет в хранилище. |
+| `CHECKSUM_MISMATCH` | `FAILED_PRECONDITION` | `sha256` в конфиге не совпадает с суммой архива в хранилище, или скачанный архив не совпадает с зарегистрированной суммой (до v1.2.0 во втором случае был `INTERNAL`). Перепубликуйте версию. |
 | `STORAGE_UNAVAILABLE` | `UNAVAILABLE` | Объектное хранилище недоступно или архив пропал. |
 | `SHUTTING_DOWN` | `UNAVAILABLE` | Сервис останавливается. |
 | `FEATURE_DENIED` | `PERMISSION_DENIED` | Функции нет в лицензии. |
