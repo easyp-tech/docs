@@ -89,13 +89,16 @@ sequenceDiagram
   participant S3 as S3
   participant Svc as EasyP service
   participant C as Client
-  B->>B: plugins build → plugins/group/name/version/
-  B->>S3: plugins push → plugin.tgz
-  B->>Svc: plugins register (CreatePlugin)
-  Svc->>S3: read archive, record sha256
-  Svc-->>B: registered
+  loop plugins publish, per version
+    B->>B: docker build, verify (unpack + smoke run)
+    B->>S3: upload plugin.tgz (sha256 in object metadata)
+    B->>Svc: CreatePlugin with config.sha256
+    Svc->>S3: check the archive is there with that sha256
+    Svc-->>B: registered (command derived)
+    B->>B: delete the local copy
+  end
   C->>Svc: GenerateCode
-  opt cache miss
+  opt cache miss, or archive republished
     Svc->>S3: download archive
     Svc->>Svc: verify sha256, unpack
   end
@@ -103,36 +106,54 @@ sequenceDiagram
   Svc-->>C: CodeGeneratorResponse
 ```
 
-1. **build** — `easyp-svc plugins build <registry-path>` runs a Docker build
-   per version and extracts the result to `--output` (`plugins/` by default).
-   Needs Docker. Produces Linux binaries.
-2. **push** — packs each version directory into `plugin.tgz` and uploads it.
-   Skipped in local mode. `plugins pack` + `plugins push --packed` split this
-   across machines.
-3. **register** — calls `CreatePlugin` for each version with the command path as
-   the service will see it (`--plugins-prefix`, default `/plugins`). Needs a
-   write token.
+`easyp-svc plugins publish <registry-path>` does the whole thing, one version at
+a time, so a catalogue never has to fit on the publishing machine and nothing is
+registered before its archive is in place:
 
-**Push before register.** With object storage enabled, registration of a version
-whose archive is absent fails with `FAILED_PRECONDITION` /
-`BINARY_NOT_UPLOADED`. The service computes the checksum itself, so a client
-cannot register a hash of its choosing.
+1. **build** — a Docker build of the version. Needs Docker. Produces Linux
+   binaries.
+2. **verify** — the bundle is packed and unpacked with the service's own
+   unpacker, and `plugin` is smoke-run in the service's base image. A version
+   that fails goes no further.
+3. **upload** — `plugin.tgz` goes to storage with its sha256 in the object
+   metadata. Skipped when storage already holds the same archive.
+4. **register** — `CreatePlugin` (or `UpdatePlugin`, if the service already has
+   the version) with the sha256 in the config. The service checks the archive is
+   in storage with that checksum and derives the command
+   (`{plugins_dir}/{group}/{name}/{version}/plugin`) itself. Needs a write token
+   and a v1.2.0 or newer service.
+5. **delete** the local copy.
 
-### `push --force` after register breaks the checksum [#push-force-after-register]
+Re-running is safe: a version that is registered and in storage is skipped, one
+in storage but not registered is only registered. `plugins build --archive` +
+`plugins publish --archives` split building and publishing across machines.
 
-The object changes under
-the recorded hash. A service that already has the version unpacked keeps running
-the old binary, because the checksum is checked only on download; one with a cold
-cache fails with `plugin archive checksum mismatch`. Registering again does not
-help — `CreatePlugin` answers `ALREADY_EXISTS` and `plugins register` counts the
-version as skipped. Either publish the change as a new version, or delete the
-version first (`DeletePlugin` removes the row, the archive and the cached copy),
-then push and register. `UpdatePlugin` with a config recomputes the checksum
-but leaves an already unpacked copy in place.
+With object storage enabled, a version whose archive is absent cannot be
+registered (`FAILED_PRECONDITION` / `BINARY_NOT_UPLOADED`), and one whose stored
+archive is not the `sha256` the config names fails with `FAILED_PRECONDITION` /
+`CHECKSUM_MISMATCH`. The client can name a checksum, but only the one the stored
+archive actually has.
 
-In **local mode** (no bucket) step 2 is skipped and the files must be present
-under `plugins_dir` on the service's disk — mounted, copied, or built into a
-derived image.
+### Republishing a version [#republishing]
+
+`plugins publish --force` rebuilds a version the service already has, uploads
+the new archive and replaces the version's config with the new checksum through
+`UpdatePlugin`. Every replica then refetches its unpacked copy on next use: each
+keeps a `.sha256` marker beside the unpacked directory and compares it with the
+registry. Directories unpacked before v1.2.0 have no marker and count as current.
+The config `publish` sends is the whole config, so a hand-edited `env` or
+`timeout` does not survive republishing.
+
+Overwriting an archive in storage any other way still breaks the version: the
+object no longer has the recorded checksum, and the next download fails with
+`FAILED_PRECONDITION` / `CHECKSUM_MISMATCH`. Run `publish --force` for it, or
+publish the change as a new version.
+
+In **local mode** (no bucket) the files must be present under `plugins_dir` on
+the service's disk. On the same host, `plugins publish --plugins-dir <dir>`
+unpacks each version there instead of uploading it; given no registry and no
+`--archives`, it registers what is already in that directory. Otherwise mount,
+copy, or build the files into a derived image, then register them.
 
 All commands and flags: [Operator CLI](/docs/api-service/operator-cli).
 
@@ -151,14 +172,15 @@ Each registered version is one row in the `plugins` table. Its `config` is:
 
 | Field | Meaning |
 |---|---|
-| `command` | Executable and arguments. `command[0]` must resolve inside `registry.plugins_dir`, checked at registration and again before each run after resolving symlinks. |
+| `command` | Executable and arguments. Optional since v1.2.0: when omitted, the service derives `{plugins_dir}/{group}/{name}/{version}/plugin`. When given — for a plugin that needs arguments — `command[0]` must resolve inside `registry.plugins_dir`, checked at registration and again before each run after resolving symlinks. |
 | `env` | The plugin's entire environment. Nothing from the service is inherited. |
 | `timeout` | Optional per-plugin limit, applied inside `worker_pool.generation_timeout`. |
-| `sha256` | Written by the service from the archive in storage. Absent in local mode. |
+| `sha256` | The archive's checksum. When the request names one, registration fails with `CHECKSUM_MISMATCH` unless the stored archive has exactly it; when not, the service records the stored archive's checksum itself. Absent in local mode. |
 
-`UpdatePlugin` takes a field mask (`config`, `tags`); an update recomputes the
-checksum. `DeletePlugin` removes the row and, with object storage, the archive
-and the cached directory.
+`UpdatePlugin` takes a field mask (`config`, `tags`); a config update records the
+checksum the same way, and a changed `sha256` makes every replica refetch the
+archive. `DeletePlugin` removes the row and, with object storage, the archive and
+the cached directory.
 
 ## Adding a plugin
 

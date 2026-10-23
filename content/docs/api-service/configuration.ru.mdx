@@ -34,7 +34,7 @@ easyp-svc config print --cfg config.yml --changed     # только отлич�
 | Переменная | Кто читает | Смысл |
 |---|---|---|
 | `EASYP_CONFIG` | каждая команда с `--cfg` | Путь к YAML-файлу. Позволяет `HEALTHCHECK` образа (`easyp-svc health`) найти тот же файл, что и сервис. |
-| `EASYP_TOKEN` | `plugins register` | Токен записи, если не задан `--token`. |
+| `EASYP_TOKEN` | `plugins publish` | Токен записи, если не задан `--token`. |
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | сервис | Синоним `TELEMETRY_OTLP_ENDPOINT`. |
 
 ## Длительности и размеры
@@ -69,7 +69,7 @@ easyp-svc config print --cfg config.yml --changed     # только отлич�
 
 | Ключ YAML | Переменная | Тип | По умолчанию | Описание |
 |---|---|---|---|---|
-| `registry.plugins_dir` | `REGISTRY_PLUGINS_DIR` | string | `/plugins` | Где лежат исполняемые файлы плагинов (локальный режим) или куда они распаковываются (режим объектного хранилища). Должен быть доступен на запись. `command[0]` плагина обязан разрешаться внутрь него. |
+| `registry.plugins_dir` | `REGISTRY_PLUGINS_DIR` | string | `/plugins` | Где лежат исполняемые файлы плагинов (локальный режим) или куда они распаковываются (режим объектного хранилища). Должен быть доступен на запись. `command[0]` плагина обязан разрешаться внутрь него; регистрация без `command` получает `{plugins_dir}/{group}/{name}/{version}/plugin`. |
 | `registry.max_output_size` | `REGISTRY_MAX_OUTPUT_SIZE` | int64 | `67108864` | Максимальный stdout плагина, байт. Больше — генерация падает. |
 | `registry.cache_max_bytes` | `REGISTRY_CACHE_MAX_BYTES` | int64 | `21474836480` | Предел распакованных плагинов на диске; сверх него вытесняются давно не использованные версии. `0` отключает вытеснение. Имеет смысл только с объектным хранилищем. |
 | `registry.s3.endpoint` | `REGISTRY_S3_ENDPOINT` | string | — | URL S3-эндпоинта, например `http://minio:9000`. Пусто — AWS. |

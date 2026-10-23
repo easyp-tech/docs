@@ -34,6 +34,48 @@ A rename is handled without breaking anyone: the old configuration key keeps
 working for one release while warning, naming both spellings and the line to
 change, and only then stops.
 
+## v1.1.x → v1.2.0
+
+### `plugins publish` replaces `push`, `register` and `pack`
+
+The three commands, `--packed` and `--plugins-prefix` are gone, and so are the
+`push-plugins`, `register-plugins` and `push-archives` tasks. One command takes
+each version from source to registered:
+
+| Before | Now |
+|---|---|
+| `plugins build` → `plugins push` → `plugins register` | `plugins publish <registry>` |
+| `plugins pack --out <dir>` | `plugins build --archive --output <dir>` |
+| `plugins push <dir> --packed` + `plugins register <dir> --packed` | `plugins publish --archives <dir>` |
+| `plugins register` against a `plugins_dir` | `plugins publish --plugins-dir <dir>` |
+
+`publish` needs a v1.2.0 server: it registers without a `command`, which older
+servers refuse — it says so and stops. Upgrade the service first.
+
+### Registration derives the command and checks a claimed checksum
+
+`command` in a plugin config is optional and defaults to
+`{plugins_dir}/{group}/{name}/{version}/plugin`; an explicit one still works and
+is still held to `plugins_dir`. A `sha256` in the config is now checked against
+the stored archive instead of being overwritten, and a mismatch is
+`FAILED_PRECONDITION` with the new reason `CHECKSUM_MISMATCH`. The service takes
+the checksum from the object's `x-amz-meta-sha256` when the uploader set it, so
+registering no longer reads the whole archive.
+
+### A checksum mismatch is `FAILED_PRECONDITION`, not `INTERNAL`
+
+A download that does not match the registry used to reach clients as
+`INTERNAL`. It is now `FAILED_PRECONDITION` / `CHECKSUM_MISMATCH`: the fix is to
+republish, not to retry. A client matching on reasons gains one; one matching on
+`INTERNAL` for this case must change.
+
+### Republishing reaches every replica
+
+`plugins publish --force` replaces a version's config with the new checksum, and
+each replica refetches its unpacked copy on next use — it keeps a `.sha256`
+marker beside it. Copies unpacked by an older service have no marker and count
+as current; republish a version once to bring its copies in line.
+
 ## v1.0.0 → v1.0.2
 
 ### The image checks its own health

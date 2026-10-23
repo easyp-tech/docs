@@ -34,7 +34,7 @@ one `configuration resolved` line.
 | Variable | Read by | Meaning |
 |---|---|---|
 | `EASYP_CONFIG` | every command that takes `--cfg` | Path to the YAML file. Lets the image's `HEALTHCHECK` (`easyp-svc health`) find the same file as the service. |
-| `EASYP_TOKEN` | `plugins register` | Write token, when `--token` is not given. |
+| `EASYP_TOKEN` | `plugins publish` | Write token, when `--token` is not given. |
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | the service | Alias of `TELEMETRY_OTLP_ENDPOINT`. |
 
 ## Durations and sizes
@@ -69,7 +69,7 @@ Durations use Go syntax: `30s`, `10m`, `6h`. Sizes are bytes as integers.
 
 | YAML key | Environment | Type | Default | Description |
 |---|---|---|---|---|
-| `registry.plugins_dir` | `REGISTRY_PLUGINS_DIR` | string | `/plugins` | Where plugin executables live (local mode) or are unpacked (object storage mode). Must be writable. A plugin's `command[0]` must resolve inside it. |
+| `registry.plugins_dir` | `REGISTRY_PLUGINS_DIR` | string | `/plugins` | Where plugin executables live (local mode) or are unpacked (object storage mode). Must be writable. A plugin's `command[0]` must resolve inside it; a registration without `command` gets `{plugins_dir}/{group}/{name}/{version}/plugin`. |
 | `registry.max_output_size` | `REGISTRY_MAX_OUTPUT_SIZE` | int64 | `67108864` | Largest plugin stdout, bytes. Larger output fails the generation. |
 | `registry.cache_max_bytes` | `REGISTRY_CACHE_MAX_BYTES` | int64 | `21474836480` | Bound on unpacked plugins on disk; least-recently-used versions are evicted beyond it. `0` disables eviction. Meaningful only with object storage. |
 | `registry.s3.endpoint` | `REGISTRY_S3_ENDPOINT` | string | — | S3 endpoint URL, e.g. `http://minio:9000`. Empty uses AWS. |
