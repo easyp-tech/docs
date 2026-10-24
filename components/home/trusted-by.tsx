@@ -15,6 +15,8 @@ const partners: Partner[] = [
   { name: 'h3', url: 'https://h3llo.cloud/', logo: '/assets/partners/h3.png' },
   { name: 'OpenIDE', url: 'https://openide.ru/', logo: '/assets/partners/openide.svg' },
   { name: 'Positive Tech', url: 'https://ptsecurity.com/', logo: '/assets/partners/pt.svg' },
+  { name: 'Every', url: 'https://every.ru/', logo: '/assets/partners/every.svg' },
+  { name: 'Phoenix Pass', url: 'https://phoenixpass.space/', logo: '/assets/partners/phoenixpass.svg' },
 ]
 
 function PartnerItem({ partner }: { partner: Partner }) {
