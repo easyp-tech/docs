@@ -116,7 +116,7 @@ func main() {
 | `WithToken(token)` | — | `authorization: Bearer` on every call. Needed for writes, and for reads when the service requires authentication. |
 | `WithGenerateCodeTimeout(d)` | 30 s | Per-call deadline when the context has none. Raise it towards the server's `generation_timeout`. |
 | `WithListPluginsTimeout(d)` | 10 s | Spans the whole paginated walk. |
-| `WithCreatePluginTimeout(d)` | 120 s | Registration reads the archive from storage. |
+| `WithCreatePluginTimeout(d)` | 120 s | Registration checks the archive in storage, and reads it when the object carries no checksum. |
 | `WithMaxRetries(n)`, `WithRetryBaseDelay(d)`, `WithRetryMaxDelay(d)` | 3, 100 ms, 5 s | Exponential backoff. |
 | `WithMaxRecvMsgSize(n)` | 64 MiB | Matches the server's output limit. |
 | `WithHealthCheck(interval)` | 30 s | Background connection-state check. |
@@ -130,6 +130,16 @@ re-runs a generation that already used its full timeout.
 
 Methods: `GenerateCode`, `ListPlugins` (walks every page), `CreatePlugin`,
 `UpdatePlugin`, `DeletePlugin`, `Close`.
+
+`CreatePlugin` and `UpdatePlugin` take a `config` struct. On a v1.2.0 or newer
+service `command` may be omitted: the service derives
+`{plugins_dir}/{group}/{name}/{version}/plugin`, so a client need not know the
+server's `plugins_dir` (older services require it). A `sha256` key is a claim
+about the archive in storage — registration fails with `FAILED_PRECONDITION` /
+`CHECKSUM_MISMATCH` unless the stored archive has exactly that checksum; without
+it the service records the stored archive's checksum itself. A config holding
+only `sha256` is what `easyp-svc plugins publish` sends. All keys:
+[Plugins](/docs/api-service/plugins#registered-configuration).
 
 ## gRPC directly
 
@@ -173,7 +183,8 @@ stable `reason`. Branch on the reason, not the message.
 | `SERVER_OVERLOADED` | `RESOURCE_EXHAUSTED` | Worker or generation queue full. |
 | `MAX_PLUGINS_EXCEEDED` | `RESOURCE_EXHAUSTED` | Community ceiling of 10 versions. |
 | `ALREADY_EXISTS` | `ALREADY_EXISTS` | Version already registered. |
-| `BINARY_NOT_UPLOADED` | `FAILED_PRECONDITION` | Registering before `plugins push`. |
+| `BINARY_NOT_UPLOADED` | `FAILED_PRECONDITION` | Registering a version whose archive is not in storage. |
+| `CHECKSUM_MISMATCH` | `FAILED_PRECONDITION` | The config's `sha256` is not the stored archive's, or a downloaded archive does not match the registered checksum (before v1.2.0 the latter was `INTERNAL`). Republish the version. |
 | `STORAGE_UNAVAILABLE` | `UNAVAILABLE` | Object storage down, or the archive is gone. |
 | `SHUTTING_DOWN` | `UNAVAILABLE` | The service is draining. |
 | `FEATURE_DENIED` | `PERMISSION_DENIED` | Licence does not include the feature. |

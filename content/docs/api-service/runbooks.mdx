@@ -205,9 +205,12 @@ More than `prometheusRule.generationErrorRatio` of generations are failing.
    always one plugin, not a general fault. `error_type` is `transient` (the
    error text contained `connection refused` or `temporary failure` and was
    retried) or `permanent` (everything else).
-2. If the logs say `plugin archive checksum mismatch`, the archive in object
-   storage does not match what was recorded at registration. Do not "fix" it by
-   re-registering: find out why it changed.
+2. If the logs say `plugin archive checksum mismatch` (reason
+   `CHECKSUM_MISMATCH`), the archive in object storage does not match what was
+   recorded at registration. Find out why it changed first. If the stored
+   archive is the right one, `plugins publish --force --filter '<plugin>'`
+   records its checksum; if it is not, the same command with the right archive
+   (`--archives`) replaces it — every replica refetches on next use.
 3. `output limit exceeded` means the plugin wrote more than
    `config.registry.maxOutputSize`.
 4. Otherwise, run the plugin by hand with the same request. Plugin failures are

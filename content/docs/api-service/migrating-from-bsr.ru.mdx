@@ -43,14 +43,18 @@ description: "Перенос генерации кода с remote plugins Buf �
 Всегда фиксируйте версии. Незафиксированная ссылка EasyP разрешается в версию,
 последнюю при сравнении строк, а не в самый новый релиз.
 
-## 2. Собрать, загрузить и зарегистрировать
+## 2. Собрать и опубликовать
 
 ```bash
-easyp-svc plugins build registry --filter 'protocolbuffers/go:v1.36.10'
-easyp-svc plugins build registry --filter 'grpc/go:v1.5.1'
-easyp-svc plugins push plugins --cfg config.yml
-EASYP_TOKEN=… easyp-svc plugins register --addr plugins.example.com:443 plugins
+export EASYP_TOKEN=…
+easyp-svc plugins publish registry --filter 'protocolbuffers/go:v1.36.10' \
+  --cfg config.yml --addr plugins.example.com:443
+easyp-svc plugins publish registry --filter 'grpc/go:v1.5.1' \
+  --cfg config.yml --addr plugins.example.com:443
 ```
+
+`publish` собирает, проверяет, загружает и регистрирует каждую версию за один
+проход и пропускает то, что у сервиса уже есть. Нужен сервис v1.2.0 или новее.
 
 С лицензией Community можно зарегистрировать не больше 10 версий. Сначала
 посчитайте различные версии плагинов во всех ваших `buf.gen.yaml`.
