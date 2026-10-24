@@ -63,7 +63,7 @@ services:
       retries: 30
 
   service:
-    image: ghcr.io/easyp-tech/service:v1.0.2
+    image: ghcr.io/easyp-tech/service:v1.2.0
     command: ["service", "start"]
     depends_on:
       postgres:
@@ -99,15 +99,19 @@ without object storage, and a read-only mount stops it with
 
 ```bash
 EASYP_TOKEN=<token from step 2> \
-go run ./cmd/easyp-svc plugins register \
+go run ./cmd/easyp-svc plugins publish \
+  --plugins-dir plugins \
   --addr localhost:23410 \
-  --insecure \
-  plugins
+  --insecure
 ```
 
-`register` walks `plugins/`, and for each version calls `CreatePlugin` with the
-command path as the service sees it (`/plugins/protocolbuffers/go/v1.36.10/plugin`).
-Without the token every registration fails with `Unauthenticated`.
+With neither a registry path nor `--archives`, `publish` takes `--plugins-dir`
+as its source: it walks `plugins/` and calls `CreatePlugin` for each version
+found there. The service derives the command path itself
+(`/plugins/protocolbuffers/go/v1.36.10/plugin`), so the client never needs to
+know where the directory is mounted. Without the token `publish` stops before
+registering anything, because the service refuses it. Needs a v1.2.0 or newer
+service.
 
 ## 5. Generate code
 
@@ -143,10 +147,8 @@ mutual TLS, and Grafana, Loki, Tempo, Mimir and Pyroscope. The service
 repository's `Taskfile.yml` drives it:
 
 ```bash
-FILTER='protocolbuffers/go:v1.36.10' task build-plugins-filter
-task up                 # generates dev certificates, starts the stack
-task push-plugins       # uploads archives to the object store
-task register-plugins   # registers them through Traefik
+task up                                                     # generates dev certificates, starts the stack
+FILTER='protocolbuffers/go:v1.36.10' task publish-plugins   # builds, uploads and registers through Traefik
 ```
 
 There the gRPC port is reached through Traefik at `easyp.api.localhost:4443`,

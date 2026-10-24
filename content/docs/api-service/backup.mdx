@@ -25,13 +25,16 @@ matters: a `plugins` row without its archive fails generation with
 the missing key. An archive with no row is merely orphaned. **So prefer a bucket snapshot slightly newer than the database
 one** — never older.
 
-"Newer" is safe only while archives are never overwritten. If an archive was
-re-pushed with `--force` between the two snapshots, the newer bucket holds an
-object whose sha256 is not the one the restored row recorded, and that plugin
-fails with `plugin archive checksum mismatch` on its first download. Two ways to
-rule it out: never overwrite a registered version (publish a new one instead),
-or enable object versioning on the bucket and restore the object version that
-existed at the database snapshot's time.
+"Newer" is safe only while archives are never overwritten. If a version was
+republished with `plugins publish --force` between the two snapshots, the newer
+bucket holds an object whose sha256 is not the one the restored row recorded,
+and that plugin fails with `FAILED_PRECONDITION` / `CHECKSUM_MISMATCH` on its
+first download. Republishing it once more after the restore —
+`plugins publish --force --filter '<group>/<name>:<version>'` — records the
+checksum of what the bucket holds. To rule it out instead: never overwrite a
+registered version (publish a new one), or enable object versioning on the
+bucket and restore the object version that existed at the database snapshot's
+time.
 
 ## How much history to keep
 

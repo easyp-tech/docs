@@ -100,8 +100,9 @@ attempts, and only when the error text contains `connection refused` or
 ## Executing the plugin
 
 - The executable is `command[0]` from the plugin's registered config, with
-  `command[1:]` as arguments. It must resolve (after symlinks) to a path inside
-  `registry.plugins_dir`.
+  `command[1:]` as arguments. When the registration left `command` out, the
+  service recorded `{plugins_dir}/{group}/{name}/{version}/plugin`. It must
+  resolve (after symlinks) to a path inside `registry.plugins_dir`.
 - The environment is empty except for the `env` map in the plugin's config. The
   service's own credentials are not inherited.
 - The request is written to stdin. Stdout is read up to
@@ -117,31 +118,38 @@ what it does not cover.
 ## Plugin storage
 
 **Local mode** (no `registry.s3.bucket`): plugin binaries must already be under
-`plugins_dir` — built there, mounted, or baked into an image. The registry row
-only points at them.
+`plugins_dir` — unpacked there by `easyp-svc plugins publish --plugins-dir`,
+mounted, or baked into an image. The registry row only points at them.
 
 **Object storage mode**: `plugins_dir` is a cache.
 
-1. The operator packs each version directory into
-   `{group}/{name}/{version}/plugin.tgz` and uploads it (`easyp-svc plugins push`).
-2. Registration (`CreatePlugin`) reads the archive from storage and records its
-   sha256 in the plugin config. If the archive is missing, registration fails
-   with `FAILED_PRECONDITION` / `BINARY_NOT_UPLOADED`. The client cannot supply
-   the hash.
+1. `easyp-svc plugins publish` packs each version directory into
+   `{group}/{name}/{version}/plugin.tgz` and uploads it with its sha256 in the
+   object metadata, then registers it — one version at a time, so nothing is
+   registered before its archive is in place.
+2. Registration (`CreatePlugin`, or `UpdatePlugin` on a republish) checks the
+   archive is in storage, takes its sha256 from the object metadata (or reads
+   the object when there is none), and records it in the plugin config along
+   with the derived command. If the archive is missing, registration fails with
+   `FAILED_PRECONDITION` / `BINARY_NOT_UPLOADED`. A `sha256` in the request is a
+   claim: if the stored archive has a different one, registration fails with
+   `FAILED_PRECONDITION` / `CHECKSUM_MISMATCH`.
 3. On the first request for that version, the archive is downloaded to
-   `plugins_dir/.tmp`, its sha256 compared with the recorded one, and unpacked.
-   Concurrent misses for the same key share one download.
+   `plugins_dir/.tmp`, its sha256 compared with the recorded one, and unpacked;
+   a `.sha256` marker beside the unpacked directory records which archive it
+   came from. A download that does not match fails with `FAILED_PRECONDITION` /
+   `CHECKSUM_MISMATCH` (before v1.2.0, `INTERNAL`). Concurrent misses for the
+   same key share one download.
 4. The unpacked directories are evicted least-recently-used once they exceed
    `registry.cache_max_bytes` (20 GiB). The archive stays in storage.
 
-The order is therefore **build → push → register**. Re-pushing an archive with
-`--force` after registration changes the object under a recorded checksum. A
-host that already has the version unpacked keeps running the old binary — the
-checksum is checked only on download — while a cold cache fails with
-`plugin archive checksum mismatch`. Registering again does not help: the
-version already exists and `plugins register` skips it. Publish a new version
-instead, or `DeletePlugin` the version (which removes the row, the archive and
-the cached copy), push, and register.
+Republishing a version (`plugins publish --force`) uploads the new archive and
+replaces the recorded checksum through `UpdatePlugin`. On next use every replica
+sees that its `.sha256` marker no longer matches the registry and refetches; a
+directory without a marker (unpacked before v1.2.0) counts as current. An
+archive overwritten in storage any other way no longer has the recorded
+checksum, and its next download fails with `CHECKSUM_MISMATCH` — republish it
+with `publish --force`, or publish a new version.
 
 A storage outage, or an archive that has disappeared from the bucket, fails
 generation with `UNAVAILABLE` / `STORAGE_UNAVAILABLE`.
