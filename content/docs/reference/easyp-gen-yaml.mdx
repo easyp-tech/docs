@@ -243,6 +243,10 @@ The separate <code>version</code> field is also unavailable for <code>path</code
 
 By default, <code>easyp generate</code> selects the closest config in the current directory or a workspace ancestor. Repeat <code>--project</code> to choose multiple consumers explicitly; <code>--all</code> separately opts into recursive selection. <code>--workspace</code> sets the boundary for module paths and inheritance.
 
+Use <code>easyp generate --gen-config private.easyp.gen.yaml</code> to select one native generation file with a different name. The path is relative to the invocation directory, or absolute, and must remain inside the workspace. This flag is mutually exclusive with <code>--project</code> and <code>--all</code>; the global policy selector <code>--config</code> cannot replace it. A missing or invalid file fails without a fallback. Defaults and recursive discovery still use <code>easyp.gen.yaml</code>.
+
+The selected file's directory remains the base for plugin output paths. Module selectors and source filters keep their existing workspace/module coordinates. Options inherit only from standard <code>easyp.gen.yaml</code> files in ancestor directories, not a sibling file in the same directory. See [named generation configs](/docs/cli/generator#named-generation-configs).
+
 <code>plugins[].with_imports</code> defaults to false. True adds transitive imports to that plugin's files to generate. Import descriptors remain available for linking when false. The <code>--descriptor_set_out</code> and <code>--descriptor_set_out_dir</code> flags are mutually exclusive; <code>--include_imports</code> controls exported contents only, independently of <code>with_imports</code>. See [project selection and descriptor export](/docs/cli/generator).
 
 ## Managed-option validation

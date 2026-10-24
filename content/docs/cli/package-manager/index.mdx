@@ -134,6 +134,19 @@ There is no dependency re-resolution, HEAD/tag lookup, or manifest/lock creation
 
 ## Cache and revision-access errors
 
+Git commands and cache-lock acquisition have a default limit of **five minutes per operation**. This is not a deadline for the whole dependency graph. Set <code>EASYP_GIT_TIMEOUT</code> to a positive duration such as <code>10m</code> to change the limit; caller cancellation and earlier deadlines still take precedence. A timeout stops further repository candidates and full-history fallback.
+
+~~~bash
+easyp --debug migrate
+easyp --debug mod tidy
+# Increase the limit for one invocation.
+EASYP_GIT_TIMEOUT=10m easyp --debug mod tidy
+~~~
+
+Long dependency phases report progress every 15 seconds even without <code>--debug</code>. Debug logs add the dependency, revision, Git operation, snapshot/archive phases, elapsed times and file counts, so network access can be distinguished from source processing or waiting for a cache lock.
+
 A hash mismatch in an installed module identifies the exact cache directory. Preserve it for investigation or quarantine only that entry, then retry <code>easyp mod download</code>. Do not rewrite <code>protobuf.lock</code> to hide the mismatch; the command does not automatically delete or repair the cache.
+
+Producer policies explicitly selected through <code>extends</code> are read from verified Git objects at their locked revision. Validation does not fetch missing policy objects or write cache verification stamps. If that object source is missing or corrupt, run <code>easyp mod download</code> to restore it. A cached native snapshot remains usable for generation when no missing external policy fragment is requested.
 
 An inaccessible Git repository is not evidence that a tag is absent. If history was fetched but the pinned commit is unavailable, restore access to the original revision instead of substituting HEAD. Tag revalidation and integrity checks remain enabled; no automatic offline fallback is introduced.

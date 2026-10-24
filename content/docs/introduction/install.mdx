@@ -39,15 +39,15 @@ points to the same image as `ghcr.io/easyp-tech/easyp:v0.17.0`.
 
 ## Opt into v1 nightly
 
-Nightly tags use `v1.0.0-nightly.YYYYMMDD.sequence`. Choose an exact published tag from [GitHub Releases](https://github.com/easyp-tech/easyp/releases). The tag `v1.0.0-nightly.20261005.1` below is an example, not a promise that this release exists; replace it with a published tag before running any command. Nightly releases do not update the stable Homebrew formula or Docker `latest` image.
+Nightly tags use `v1.0.0-nightly.YYYYMMDD.sequence`. The commands below pin [v1.0.0-nightly.20261009.1](https://github.com/easyp-tech/easyp/releases/tag/v1.0.0-nightly.20261009.1). To select another version, choose an exact published tag from [GitHub Releases](https://github.com/easyp-tech/easyp/releases). Nightly releases do not update the stable Homebrew formula or Docker `latest` image.
 
 ### Go: CLI and MCP
 
 Building v1 requires **Go 1.26.6 or later**. Install both binaries at the same exact version in a separate directory to keep your stable CLI on `PATH`:
 
 ```bash
-# Example only: replace with an actual published nightly tag.
-NIGHTLY_TAG='v1.0.0-nightly.20261005.1'
+# Select an exact published nightly tag.
+NIGHTLY_TAG='v1.0.0-nightly.20261009.1'
 NIGHTLY_BIN="$HOME/.local/share/easyp-nightly/bin"
 mkdir -p "$NIGHTLY_BIN"
 GOBIN="$NIGHTLY_BIN" go install "github.com/easyp-tech/easyp/cmd/easyp@${NIGHTLY_TAG}"
@@ -62,8 +62,8 @@ Invoke the nightly CLI by its full path. Configure your MCP client to run the `e
 The v1 archive contains both `easyp` and `easyp-mcp`. Download the asset matching your platform and verify it with the release checksums. For Linux amd64:
 
 ```bash
-# Example only: replace with an actual published nightly tag.
-NIGHTLY_TAG='v1.0.0-nightly.20261005.1'
+# Select an exact published nightly tag.
+NIGHTLY_TAG='v1.0.0-nightly.20261009.1'
 NIGHTLY_VERSION="${NIGHTLY_TAG#v}"
 NIGHTLY_ASSET="easyp-${NIGHTLY_VERSION}-linux-amd64.tar.gz"
 NIGHTLY_BIN="$HOME/.local/share/easyp-nightly/bin"
@@ -82,8 +82,8 @@ Invoke the CLI and MCP binaries by their full paths in this separate directory. 
 The nightly CLI image uses its exact tag in GHCR:
 
 ```bash
-# Example only: replace with an actual published nightly tag.
-NIGHTLY_TAG='v1.0.0-nightly.20261005.1'
+# Select an exact published nightly tag.
+NIGHTLY_TAG='v1.0.0-nightly.20261009.1'
 docker run --rm -v "$PWD:/workspace" -w /workspace \
   "ghcr.io/easyp-tech/easyp:${NIGHTLY_TAG}" --version
 ```

@@ -102,7 +102,7 @@ Import roots stay unchanged and generated files keep their source-relative paths
 
 `generate.paths` matches literal module-directory-relative files or directory subtrees, with `.` meaning all sources; `mcp` does not select `mcp-copy`. Paths intersect optional package selectors, and every selector must match a resulting source across the selected modules. Unknown selectors fail before plugins or descriptor writes, even without plugins or under `--all`. Required imports outside these paths remain available. These paths are separate from plugin `opts.paths`, which controls output layout.
 
-Path selection requires an updated v1 build; the initial <code>v1.0.0-nightly.20261005.1</code> and commit <code>8be79c7</code> do not provide it. When migration uses the complete-package fallback, the preview still warns that future files in those packages become targets regardless of their directory.
+When migration uses the complete-package fallback, the preview warns that future files in those packages become targets regardless of their directory.
 
 Variable placeholders are not expanded into saved values. If a placeholder or selector prevents safe analysis, conversion fails rather than persisting credentials or guessing its meaning.
 
@@ -116,11 +116,13 @@ A full commit SHA is preserved, including a full SHA embedded in an old pseudo-v
 
 Git's annotated-tag spelling, such as `v0.4.0^{}`, is accepted for a full SemVer tag in the historical lock. The tag, commit and original hash are still verified, and the old lock stays byte-identical. Peeled branches, abbreviated refs, repeated suffixes and pseudo-version-shaped peeled tags are rejected.
 
+Keep <code>easyp.lock</code> when it is available; deleting it before migration is unnecessary. Without an old lock digest, migration skips historical whole-repository/archive hashing. An explicit <code>git_repo.url</code> pin such as <code>gitlab/products/svc@&lt;full-commit-SHA&gt;</code> still selects that revision and is never replaced with HEAD. Long dependency phases report progress; use <code>easyp --debug migrate</code> for operation timings and file counts. See [dependency timeouts and diagnostics](/docs/cli/package-manager#cache-and-revision-access-errors).
+
 Released v0 installers archived Git's <code>*.proto</code> pathspec and stripped legacy root prefixes before hashing. Migration reproduces that archive at the pinned revision; it also retains verification of the existing whole-tree hash format. Omitted selected or reachable proto sources and changes to verified archive bytes require manual migration. An unused <code>export-ignore</code> source outside a verified filtered Git selection is permitted when historical hash, target names and reachable bindings match. A whole input that would gain an extra target still fails.
 
 The v1 content hash is then calculated independently over the materialized logical snapshot. Old and new hashes cover different path layouts and cannot be copied or compared as interchangeable values. A missing historical dependency pin is not replaced with current HEAD.
 
-Internal symlinks to files, directories, import roots and metadata are supported. Protobuf import names follow the logical path of the alias. Local targets must remain inside their owning source boundary; Git targets must be relative and resolve entirely from the pinned tree. Selected dangling links, cycles, submodule crossings and undeclared nested repositories fail. Invalid unused auxiliary links are omitted. Git snapshots contain regular resolved bytes, including safe non-proto aliases, regardless of `core.symlinks`.
+Internal symlinks to files, directories, import roots and metadata are supported. Protobuf import names follow the logical path of the alias. Local targets must remain inside their owning source boundary; Git targets must be relative and resolve entirely from the pinned tree. Selected dangling links, cycles, submodule crossings and undeclared nested repositories fail. Invalid unused auxiliary links are omitted. Native Git snapshots contain regular resolved bytes for selected proto files and canonical metadata, regardless of `core.symlinks`; unrelated code and build aliases are omitted. Explicitly extended policy fragments with arbitrary names are read separately from pinned Git objects.
 
 If the legacy configuration file itself is a symlink, migration replaces that logical file with regular v1 content and creates a regular backup of its original contents. The former target stays unchanged; rollback restores the original link. Inputs and link topology are checked again before applying.
 
