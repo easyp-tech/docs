@@ -110,7 +110,7 @@ Docker. Каждая версия из `plugin.yaml` собирается с `--
 | `--region` | — | Регион. |
 | `--prefix` | — | Префикс ключей. |
 | `--force-path-style` | false | Path-style адресация (MinIO, RustFS). |
-| `--addr` | `localhost:23410` | gRPC-адрес сервиса. |
+| `--addr` | `localhost:23410` | gRPC-адрес сервиса; `host:port` разрешает системный резолвер, `dns:///…` — резолвер grpc-go. |
 | `--token` | `$EASYP_TOKEN` | Токен записи. |
 | `--tls-ca` | системное хранилище | CA, подписавший сертификат сервера. |
 | `--tls-cert`, `--tls-key` | — | Клиентский сертификат и ключ для взаимного TLS. |
