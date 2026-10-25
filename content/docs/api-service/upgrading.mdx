@@ -34,6 +34,43 @@ A rename is handled without breaking anyone: the old configuration key keeps
 working for one release while warning, naming both spellings and the line to
 change, and only then stops.
 
+## v1.2.0 → v1.2.1
+
+### Unpacked copies without a checksum marker are fetched once
+
+A version directory with no `.sha256` marker beside it — unpacked before
+v1.2.0, or bind-mounted from a `plugins build` tree — used to count as current.
+It is now fetched again the first time it is used, once per replica, and gets a
+marker. Plan for the disk: each replica downloads every version it serves once
+more, within `registry.cache_max_bytes`. Versions registered without a checksum
+(`plugins publish --plugins-dir`) are unaffected.
+
+### A relative `plugins_dir` is resolved at start
+
+`plugins_dir: ./plugins` now resolves to an absolute path before commands are
+derived. Versions registered with a relative command under v1.2.0 still fail
+with `no such file or directory`; repair them with
+`easyp-svc plugins publish --plugins-dir <dir> --force`.
+
+### The plugin limit holds under concurrent registrations
+
+The licence plugin limit is now counted and enforced in the same transaction as
+the insert. Before, parallel `CreatePlugin` calls could pass the check together
+and land more versions than the limit allows; such extra rows stay, but no new
+version is accepted until the count is below the limit.
+
+### Clients resolve plain addresses with the system resolver
+
+The SDK, `easyp-svc` and `easyp generate` dial a plain `host:port` through
+`passthrough:///`, so the operating system resolves the name when connecting. A
+host without a port gets 443, as before. Prefix `dns:///` to use grpc-go's own
+resolver.
+
+### The rate limit says how long to wait
+
+A refused request reads `rate limit exceeded for <ip>, retry after <n>s`. The
+`x-ratelimit-reset` trailer still carries the unix time the bucket refills by.
+
 ## v1.1.x → v1.2.0
 
 ### `plugins publish` replaces `push`, `register` and `pack`
@@ -74,7 +111,8 @@ republish, not to retry. A client matching on reasons gains one; one matching on
 `plugins publish --force` replaces a version's config with the new checksum, and
 each replica refetches its unpacked copy on next use — it keeps a `.sha256`
 marker beside it. Copies unpacked by an older service have no marker and count
-as current; republish a version once to bring its copies in line.
+as current; republish a version once to bring its copies in line. From v1.2.1 a
+copy without a marker is fetched once on its own.
 
 ## v1.0.0 → v1.0.2
 
