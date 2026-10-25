@@ -61,10 +61,11 @@ version is accepted until the count is below the limit.
 
 ### Clients resolve plain addresses with the system resolver
 
-The SDK, `easyp-svc` and `easyp generate` dial a plain `host:port` through
-`passthrough:///`, so the operating system resolves the name when connecting. A
-host without a port gets 443, as before. Prefix `dns:///` to use grpc-go's own
-resolver.
+The SDK and `easyp-svc` dial a plain `host:port` through `passthrough:///`, so
+the operating system resolves the name when connecting. A host without a port
+gets 443, as before. Prefix `dns:///` to use grpc-go's own resolver. The `easyp`
+CLI gets the same change for remote plugins in its next release; until then
+`easyp generate` still uses grpc-go's resolver.
 
 ### The rate limit says how long to wait
 
