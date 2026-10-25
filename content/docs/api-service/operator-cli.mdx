@@ -110,7 +110,7 @@ service accepts the token, and which versions the service already has.
 | `--region` | — | Region. |
 | `--prefix` | — | Key prefix. |
 | `--force-path-style` | false | Path-style addressing (MinIO, RustFS). |
-| `--addr` | `localhost:23410` | Service gRPC address. |
+| `--addr` | `localhost:23410` | Service gRPC address; `host:port` is resolved by the system resolver, `dns:///…` by grpc-go's. |
 | `--token` | `$EASYP_TOKEN` | Write token. |
 | `--tls-ca` | system store | CA that signed the server certificate. |
 | `--tls-cert`, `--tls-key` | — | Client certificate and key, for mutual TLS. |
