@@ -111,12 +111,15 @@ a time, so a catalogue never has to fit on the publishing machine and nothing is
 registered before its archive is in place:
 
 1. **build** — a Docker build of the version. Needs Docker. Produces Linux
-   binaries.
+   binaries for the platform the service reports, e.g. `linux/amd64`, whatever
+   the publishing machine is; `--platform` overrides it. A service older than
+   v1.3.0 reports none, and the build is for the publishing machine.
 2. **verify** — the bundle is packed and unpacked with the service's own
    unpacker, and `plugin` is smoke-run in the service's base image. A version
    that fails goes no further.
 3. **upload** — `plugin.tgz` goes to storage with its sha256 in the object
-   metadata. Skipped when storage already holds the same archive.
+   metadata. Skipped when storage already holds the same archive; archives are
+   packed reproducibly, so an unchanged rebuild is the same archive.
 4. **register** — `CreatePlugin` (or `UpdatePlugin`, if the service already has
    the version) with the sha256 in the config. The service checks the archive is
    in storage with that checksum and derives the command
@@ -140,7 +143,8 @@ archive actually has.
 the new archive and replaces the version's config with the new checksum through
 `UpdatePlugin`. Every replica then refetches its unpacked copy on next use: each
 keeps a `.sha256` marker beside the unpacked directory and compares it with the
-registry. Directories unpacked before v1.2.0 have no marker and count as current.
+registry. A directory without a marker, unpacked before v1.2.0, is fetched once
+and gets one.
 The config `publish` sends is the whole config, so a hand-edited `env` or
 `timeout` does not survive republishing.
 

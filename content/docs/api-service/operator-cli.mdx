@@ -57,6 +57,7 @@ from another.
 | `--keep-going` | **true** | Continue after a failed build. |
 | `--runtime-image` | `debian:trixie-slim` | Image each built plugin is smoke-tested in; must match the base of the service image. |
 | `--no-smoke` | false | Skip the smoke run. The archive is still checked to unpack the way the service unpacks it. |
+| `--platform` | this machine's | Platform to build and smoke-test for, e.g. `linux/amd64`. A smoke run for another architecture goes through Docker's emulation. |
 
 ## plugins publish
 
@@ -91,6 +92,12 @@ everything it matches (see [Plugins](/docs/api-service/plugins#republishing)).
 Before anything is built, `publish` checks that storage answers, that the
 service accepts the token, and which versions the service already has.
 
+Plugins are built and smoke-tested for the platform the service reports, e.g.
+`linux/amd64`, so a Mac on Apple silicon publishes binaries the service can run;
+`--platform` overrides it. A service older than v1.3.0 reports none: `publish`
+warns and builds for the machine it runs on. Archives are packed reproducibly,
+so an unchanged rebuild is byte-identical and is not uploaded again.
+
 | Flag | Default | Meaning |
 |---|---|---|
 | `--archives` | — | Publish this `plugin.tgz` tree instead of building. |
@@ -104,6 +111,7 @@ service accepts the token, and which versions the service already has.
 | `--dry-run` | false | List what would be published without building or contacting anything. |
 | `--non-interactive` | false | No interactive UI. |
 | `--runtime-image`, `--no-smoke` | as for `build` | Verification. |
+| `--platform` | the service's | Platform to build and smoke-test for, instead of the one the service reports. |
 | `--cfg` | — | A **full** service config; `registry.s3` fills settings not given as flags. A fragment containing only `registry.s3` is refused. |
 | `--bucket` | — | Bucket (overrides the config). |
 | `--endpoint` | — | Endpoint URL, e.g. `http://localhost:9000`. |

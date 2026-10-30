@@ -34,6 +34,26 @@ A rename is handled without breaking anyone: the old configuration key keeps
 working for one release while warning, naming both spellings and the line to
 change, and only then stops.
 
+## v1.2.1 → v1.3.0
+
+### `plugins publish` builds for the service's platform
+
+`PluginsResponse` gains `platform`, the `os/arch` the service runs plugins on,
+and `plugins publish` builds and smoke-tests for it. Before, it built for the
+machine it ran on: published from a Mac on Apple silicon, a version was an arm64
+binary that an amd64 service fails to start with `exec format error`.
+Republish such versions with `plugins publish --force`. Upgrade the service
+before the CLI, or pass `--platform linux/amd64`: against an older service
+`publish` warns and builds for its own machine, as before.
+
+### Archives are reproducible
+
+`plugins publish` packs a version with fixed timestamps, owners and modes, so
+rebuilding an unchanged version produces the same archive and its upload is
+skipped. Archives already in storage were packed the old way: the first
+`publish --force` after upgrading uploads every version once more, and each
+replica refetches what it serves.
+
 ## v1.2.0 → v1.2.1
 
 ### Unpacked copies without a checksum marker are fetched once
