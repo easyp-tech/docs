@@ -1,5 +1,5 @@
 import { i18n, type AppLocale, isAppLocale } from './i18n'
-import { docsRoute } from './shared'
+import { docsRoute, localizedPages } from './shared'
 
 /** Strip a leading /{locale} segment if it is a known app locale. */
 export function stripLocalePrefix(pathname: string): {
@@ -38,12 +38,17 @@ export function hrefForLocale(locale: AppLocale, path: string): string {
 /**
  * Map current browser pathname to the equivalent URL in `next` locale.
  * - Docs paths: preserve slug under /docs or /ru/docs
+ * - /plugins, /roadmap: same page in the other language
  * - Home / other: go to /docs (en) or /ru/docs (ru) — never bare /ru
  */
 export function switchLocalePath(next: AppLocale, pathname: string): string {
   const { path } = stripLocalePrefix(pathname)
 
   if (path === docsRoute || path.startsWith(`${docsRoute}/`)) {
+    return hrefForLocale(next, path)
+  }
+
+  if ((localizedPages as readonly string[]).includes(path)) {
     return hrefForLocale(next, path)
   }
 

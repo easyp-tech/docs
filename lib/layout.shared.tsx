@@ -7,6 +7,7 @@ import { EasyPLogo } from '@/components/easyp-logo'
 export function baseOptions(locale: AppLocale = i18n.defaultLanguage): BaseLayoutProps {
   const docsBase = locale === i18n.defaultLanguage ? '/docs' : `/${locale}/docs`
   const blogUrl = `${docsBase}/blog/finally-give-up-gin-echo`
+  const pageBase = locale === i18n.defaultLanguage ? '' : `/${locale}`
 
   return {
     // Pass plain config only — the full defineI18n() API includes functions
@@ -33,6 +34,16 @@ export function baseOptions(locale: AppLocale = i18n.defaultLanguage): BaseLayou
         text: locale === 'ru' ? 'Документация' : 'Docs',
         url: docsBase,
         active: 'nested-url',
+      },
+      {
+        text: locale === 'ru' ? 'Плагины' : 'Plugins',
+        url: pageBase + '/plugins',
+        active: 'url',
+      },
+      {
+        text: locale === 'ru' ? 'Роадмап' : 'Roadmap',
+        url: pageBase + '/roadmap',
+        active: 'url',
       },
       {
         text: locale === 'ru' ? 'Блог' : 'Blog',
