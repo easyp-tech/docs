@@ -12,14 +12,16 @@ A plugin is addressed as `group/name:version`, for example
 - `version`: `vX.Y` or `vX.Y.Z` (protobuf's own releases are `v33.1`-style), or
   `latest`.
 
-`latest` picks the registered version that sorts last **as a string**. With
-`v1.36.9` and `v1.36.10` registered it returns `v1.36.9`. Pin versions in every
-configuration that matters.
+`latest` picks the highest registered version, comparing the numbers part by
+part; a missing patch counts as zero, so `v33.1` is `v33.1.0`. With `v1.36.9`
+and `v1.36.11` registered it returns `v1.36.11`. It moves as soon as a newer
+version is published, so pin versions in every configuration that has to be
+reproducible.
 
 ## The catalogue
 
 The service repository's `registry/` directory holds a build recipe for every
-plugin easyp-tech publishes. In v1.0.2 that is **80 plugins that build 1522 distinct versions** (1743 are listed; see the [catalog](/docs/api-service/plugin-catalog) for why)
+plugin easyp-tech publishes. In v1.3.2 that is **80 plugins that build 1522 distinct versions** (1743 are listed; see the [catalog](/docs/api-service/plugin-catalog) for why)
 in ten groups:
 
 | Group | Plugins |

@@ -7,7 +7,7 @@ description: "Remote code generation compared: where the Buf Schema Registry is 
 Information about Buf is current as of **23 September 2026** and taken from the
 linked pages of buf.build and github.com/bufbuild. Buf's plans, prices and
 limits change; check the linked page before deciding. Information about EasyP
-refers to API Service v1.0.2.
+refers to API Service v1.3.2.
 </Callout>
 
 This page compares **remote code generation**: running protobuf plugins on a
@@ -78,8 +78,9 @@ and accept that plugins are not sandboxed.
   [⁹](#sources). The EasyP service runs as one replica per cache and scales
   vertically only.
 - **Semantics of "latest".** An unpinned BSR plugin resolves to the latest
-  version [²](#sources). EasyP's `latest` is the version that sorts last as a
-  string (`v1.36.9` before `v1.36.10`) — pin versions.
+  version [²](#sources). EasyP's `latest` is the same: the highest registered
+  version, compared by number (`v1.36.11` over `v1.36.9`). On both, it moves
+  when a new version is published — pin versions.
 
 ## Where the EasyP API Service is stronger
 

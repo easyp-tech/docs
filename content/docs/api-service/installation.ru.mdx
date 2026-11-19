@@ -4,7 +4,7 @@ description: "Теги образа, Helm-чарт и его обязатель�
 ---
 
 Каждый релиз публикует образ контейнера, Helm-чарт и бинарники. Текущий релиз —
-**v1.0.2** (версия чарта 1.0.2).
+**v1.3.2** (версия чарта 1.3.2).
 
 ## Что нужно сервису
 
@@ -21,7 +21,7 @@ description: "Теги образа, Helm-чарт и его обязатель�
 
 | Тег | Значение |
 |---|---|
-| `v1.0.2` | Релиз. Неизменяемый. |
+| `v1.3.2` | Релиз. Неизменяемый. |
 | `latest` | Последний релиз. Двигается только при теге релиза. |
 | `edge` | Вершина ветки `master`. Двигается при каждом пуше. |
 | `sha-<short>` | Один коммит. Неизменяемый. |
@@ -49,7 +49,7 @@ kubectl create secret generic easyp-env \
   --from-literal=DB_POSTGRES_DSN='postgres://user:pass@host:5432/easyp?sslmode=require'
 
 helm install easyp oci://ghcr.io/easyp-tech/charts/easyp-service \
-  --version 1.0.2 \
+  --version 1.3.2 \
   --set secrets.existingSecret=easyp-env \
   --set tls.enabled=false
 ```
@@ -143,4 +143,4 @@ Tempo/Mimir/Pyroscope. Им управляет `task up`; это образец 
 | `github.com/easyp-tech/service/api` | Apache-2.0 | Сгенерированный gRPC-контракт. |
 | `github.com/easyp-tech/service/sdk` | Apache-2.0 | Go-клиент. |
 
-Они тегируются вместе: `v1.0.2`, `api/v1.0.2`, `sdk/v1.0.2`.
+Они тегируются вместе: `v1.3.2`, `api/v1.3.2`, `sdk/v1.3.2`.

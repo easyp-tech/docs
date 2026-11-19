@@ -13,6 +13,22 @@ description: "Необязательный эндпоинт Model Context Protoc
 `group`, `name`, `version` и `tags`, постранично — как gRPC-вызов `Plugins`. Он
 сгенерирован из того же proto-описания и возвращает те же данные.
 
+В результате:
+
+| Поле | Что это |
+|---|---|
+| `plugins[]` | `id`, `group`, `name`, `version`, `tags`, `createdAt` (RFC 3339) каждой зарегистрированной версии. |
+| `nextPageToken` | Пустой на последней странице; иначе передайте его как `pageToken`, чтобы получить следующую. |
+| `platform` | `os/arch`, на котором сервис запускает плагины, например `linux/amd64`. |
+
+Все поля в lowerCamelCase — и в аргументах (`pageSize`, `pageToken`), и в
+результате. Один и тот же JSON приходит в `structuredContent` и в текстовом
+содержимом. Фильтр `version` ищет точную версию, `latest` здесь не разрешается.
+
+Ответ на `initialize` называет сервер `easyp-service-mcp` и сообщает версию
+самого сервиса в `serverInfo.version` — `1.3.2` у релизной сборки, — так что
+клиент видит, с каким релизом говорит.
+
 Только чтение. Генерировать код, регистрировать, менять и удалять плагины через
 него нельзя.
 
@@ -54,20 +70,19 @@ gRPC, и без него отвечает 401.
 
 ## Проверка
 
-В репозитории сервиса есть smoke-клиент:
+Попросите эндпоинт выполнить initialize:
 
 ```bash
-go run ./cmd/mcp-smoke --endpoint http://localhost:23413/mcp
+curl -s http://localhost:23413/mcp \
+  -H 'Content-Type: application/json' \
+  -H 'Accept: application/json, text/event-stream' \
+  -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"check","version":"0"}}}'
 ```
 
-<Callout type="warn">
-В теге v1.0.2 этот клиент всё ещё требует инструмент `easyp_config_describe`,
-который сервис перестал отдавать в v0.14.0, поэтому на исправном v1.0.2 он
-падает с `missing required tool "easyp_config_describe"; got: plugins_list`.
-Исправление (коммит `d5e0e43`) есть в `master`, но не в релизе; запускайте клиент
-из `master` или проверьте любым MCP-клиентом, что `tools/list` возвращает
-`plugins_list`.
-</Callout>
+Исправный эндпоинт отвечает `"serverInfo":{"name":"easyp-service-mcp","version":"1.3.2"}`
+(версия — тот релиз, который вы развернули; локальный `go build` отвечает `dev`,
+edge-образ — `sha-<commit>`). Любой MCP-клиент затем покажет в `tools/list` один
+инструмент — `plugins_list`.
 
 У реестра Buf тоже есть MCP-сервер, но с другим охватом: он отдаёт Registry API
 BSR (модули, коммиты, метки), включая запись. См.

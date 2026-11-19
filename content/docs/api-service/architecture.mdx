@@ -43,11 +43,11 @@ A `GenerateCode` call passes through these interceptors, outermost first:
 | 4 | Prometheus | `easyp_api_grpc_server_*` metrics. |
 | 5 | logging | Structured request log. |
 | 6 | panic recovery | Turns a panic into `INTERNAL` and counts it in `easyp_panics_total`. |
-| 7 | validation | Calls `Validate()` on messages that implement it. The generated `easyp.generator.v1` messages do not, so in v1.0.2 this is a pass-through; names, versions and plugin configs are validated in the core instead. |
+| 7 | validation | Calls `Validate()` on messages that implement it. The generated `easyp.generator.v1` messages do not, so this is a pass-through; names, versions and plugin configs are validated in the core instead. |
 | 8 | rate limit | Token bucket per client address: `rate_limit.requests_per_second`, `rate_limit.burst`. Refusal: `RESOURCE_EXHAUSTED`. |
 | 9 | concurrency limit | At most `rate_limit.max_concurrent_per_ip` requests in flight per address. Refusal: `RESOURCE_EXHAUSTED`. |
 | 10 | auth | Bearer token check: always for writes, for everything when `auth.require_authentication` is set. Refusal: `UNAUTHENTICATED`. |
-| 11 | licence | Refuses methods mapped to a feature the licence does not include (`PERMISSION_DENIED`). In v1.0.2 no method is mapped, so it passes everything; the licence is enforced in the core (audit, plugin count) and at start (worker ceilings). |
+| 11 | licence | Refuses methods mapped to a feature the licence does not include (`PERMISSION_DENIED`). No method is mapped, so it passes everything; the licence is enforced in the core (audit, plugin count) and at start (worker ceilings). |
 | 12 | error code conversion | Innermost. Maps domain errors from the handler to gRPC codes and adds `google.rpc.ErrorInfo`. |
 
 The code converter is deliberately last: interceptors already produce gRPC
@@ -63,10 +63,12 @@ The plugin name is `group/name:version`. `group` and `name` match
 `latest`. The service itself requires the `:version` part — the easyp CLI adds
 `:latest` when a `remote:` entry omits it.
 
-<Callout type="warn">
-`latest` selects the registered version that sorts last **as a string**
-(`ORDER BY version DESC` on a text column). With `v1.36.9` and `v1.36.10` both
-registered, `latest` is `v1.36.9`. Pin versions.
+<Callout type="info">
+`latest` selects the highest registered version: the registry reads the
+plugin's versions and compares them as numbers part by part, a missing patch
+counting as zero. With `v1.36.9` and `v1.36.11` both registered, `latest` is
+`v1.36.11`. It changes when a newer version is published — pin versions where
+the output has to be reproducible.
 </Callout>
 
 ## Worker pool: two limits, one queue size

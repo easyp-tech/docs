@@ -2,8 +2,8 @@
   "generatedBy": "scripts/sync-plugin-catalog.mjs",
   "service": {
     "repository": "https://github.com/easyp-tech/service",
-    "ref": "v1.0.2",
-    "commit": "c28252fffc88324cbfa59c5230edf7fc587e44cb"
+    "ref": "v1.3.2",
+    "commit": "397ceffc9496657947bd7680623217719c4912a5"
   },
   "counts": {
     "plugins": 80,

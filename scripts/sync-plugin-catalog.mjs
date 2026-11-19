@@ -156,7 +156,7 @@ const text = {
       'register them, and [Client usage](/docs/api-service/client-usage) for `easyp.yaml`.',
     ],
     usage: 'Once a version is registered on your service, reference it as:',
-    pin: 'Always pin the version. Without one the service picks the registered version that sorts last *as a string*, so `v1.36.9` wins over `v1.36.10`. The versions below are sorted by semantic version, newest first.',
+    pin: 'Pin the version. Without one the service uses `latest`, the highest registered version compared by number (`v1.36.11` over `v1.36.9`), which changes whenever a newer version is published. The versions below are sorted newest first.',
     pinnedTitle: 'Recipes that build one version only',
     pinned: [
       `${pinnedPlugins.length} recipes — ${pinnedNames} — list several versions in \`plugin.yaml\` (${versionCount - buildableCount + pinnedPlugins.length} in total), but their`,
@@ -184,7 +184,7 @@ const text = {
       '[Использовании клиентами](/ru/docs/api-service/client-usage).',
     ],
     usage: 'Когда версия зарегистрирована на вашем сервисе, ссылайтесь на неё так:',
-    pin: 'Всегда фиксируйте версию. Без неё сервис выбирает зарегистрированную версию, последнюю *при сравнении строк*, так что `v1.36.9` побеждает `v1.36.10`. Версии ниже отсортированы по семантической версии, самые новые первыми.',
+    pin: 'Фиксируйте версию. Без неё сервис берёт `latest` — самую новую зарегистрированную версию при сравнении номеров как чисел (`v1.36.11` новее `v1.36.9`), а она меняется при каждой публикации более новой версии. Версии ниже отсортированы от новых к старым.',
     pinnedTitle: 'Рецепты, которые собирают только одну версию',
     pinned: [
       `${pinnedPlugins.length} рецептов — ${pinnedNames} — перечисляют в \`plugin.yaml\` несколько версий (всего ${versionCount - buildableCount + pinnedPlugins.length}), но их`,
