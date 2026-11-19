@@ -40,6 +40,16 @@ export function Footer() {
                 </Link>
               </li>
               <li>
+                <Link href="/plugins" className="transition-colors hover:text-fd-primary">
+                  {t.product.registry}
+                </Link>
+              </li>
+              <li>
+                <Link href="/roadmap" className="transition-colors hover:text-fd-primary">
+                  {t.product.roadmap}
+                </Link>
+              </li>
+              <li>
                 <Link href="/docs" className="transition-colors hover:text-fd-primary">
                   {t.product.documentation}
                 </Link>

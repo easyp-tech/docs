@@ -83,7 +83,8 @@ export const en = {
       title: "Product",
       cliTool: "CLI Tool",
       apiService: "API Service",
-      registry: "Registry",
+      registry: "Plugin registry",
+      roadmap: "Roadmap",
       documentation: "Documentation",
       enterprise: "Enterprise"
     },
