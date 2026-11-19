@@ -13,6 +13,22 @@ One tool, `plugins_list`: the plugin catalogue, with optional `group`, `name`,
 `version` and `tags` filters, paginated like the gRPC `Plugins` call. It is
 generated from the same proto definition, so it returns the same data.
 
+A result carries:
+
+| Field | Meaning |
+|---|---|
+| `plugins[]` | `id`, `group`, `name`, `version`, `tags`, `createdAt` (RFC 3339) of each registered version. |
+| `nextPageToken` | Empty on the last page; otherwise pass it back as `pageToken` to get the next one. |
+| `platform` | The `os/arch` the service runs plugins on, e.g. `linux/amd64`. |
+
+Every field is lowerCamelCase, in the arguments (`pageSize`, `pageToken`) as in
+the result. The same JSON arrives as `structuredContent` and as the text content.
+`version` filters on an exact version; `latest` is not resolved here.
+
+The `initialize` response names the server `easyp-service-mcp` and reports the
+service's own version in `serverInfo.version` — `1.3.2` on a release build — so a
+client can tell which release it is talking to.
+
 It is read-only. It cannot generate code and cannot register, change or delete
 plugins.
 
@@ -55,20 +71,19 @@ Serve it inside a trusted network, or behind an ingress that terminates TLS.
 
 ## Checking it
 
-The service repository has a smoke client:
+Ask the endpoint to initialize:
 
 ```bash
-go run ./cmd/mcp-smoke --endpoint http://localhost:23413/mcp
+curl -s http://localhost:23413/mcp \
+  -H 'Content-Type: application/json' \
+  -H 'Accept: application/json, text/event-stream' \
+  -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"check","version":"0"}}}'
 ```
 
-<Callout type="warn">
-In the v1.0.2 tag this client still requires the `easyp_config_describe` tool,
-which the service stopped serving in v0.14.0, so against a healthy v1.0.2 it
-fails with `missing required tool "easyp_config_describe"; got: plugins_list`.
-The fix (commit `d5e0e43`) is on `master` but not in a release; run the client
-from `master`, or check with any MCP client that `tools/list` returns
-`plugins_list`.
-</Callout>
+A healthy endpoint answers with `"serverInfo":{"name":"easyp-service-mcp","version":"1.3.2"}`
+(the version is the release you deployed; a local `go build` says `dev`, an edge
+image `sha-<commit>`). Any MCP client then shows a single tool, `plugins_list`,
+in `tools/list`.
 
 Buf's registry also has an MCP server, with a different scope: it exposes the
 BSR Registry API (modules, commits, labels), including writes. See

@@ -36,7 +36,7 @@ generate:
 | host | A host containing `localhost` or `127.0.0.1` is always plaintext unless `https://` is given. |
 | port | Optional. Without it the gRPC client's default applies (443 for TLS); the Helm chart's ingress serves on 443, a bare service listens on 23410. |
 | group/name | Must match a registered plugin. |
-| version | Optional. Omitted → `latest`, which is the version that sorts last as a string, not the newest semantic version. |
+| version | Optional. Omitted → `latest`, the highest registered version compared by number (`v1.36.11` over `v1.36.9`). |
 
 `opts` are joined into the `CodeGeneratorRequest` parameter
 (`paths=source_relative,require_unimplemented_servers=false`), exactly as for

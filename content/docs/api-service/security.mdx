@@ -94,7 +94,7 @@ time; the cache is a separate volume). Beyond that:
 - Keep `resources.limits`; the chart refuses limits that cannot hold the output
   buffers.
 - Use a sandboxed runtime class (gVisor, Kata) for the pod if your cluster has
-  one. The chart does not expose `runtimeClassName` in v1.0.2; it would need a
+  one. The chart does not expose `runtimeClassName` in v1.3.2; it would need a
   post-render patch.
 - Give the service account no Kubernetes API permissions it does not need.
 
@@ -119,6 +119,6 @@ time; the cache is a separate volume). Beyond that:
 
 ## Reporting vulnerabilities
 
-As of v1.0.2 the service repository publishes no security policy and has
+As of v1.3.2 the service repository publishes no security policy and has
 GitHub's private vulnerability reporting turned off. Contact the maintainers
 privately before opening a public issue about a vulnerability.

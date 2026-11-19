@@ -4,7 +4,7 @@ description: "Container image tags, the Helm chart and its required values, the 
 ---
 
 Every release publishes a container image, a Helm chart and binaries. The
-current release is **v1.0.2** (chart version 1.0.2).
+current release is **v1.3.2** (chart version 1.3.2).
 
 ## What the service needs
 
@@ -21,7 +21,7 @@ current release is **v1.0.2** (chart version 1.0.2).
 
 | Tag | Meaning |
 |---|---|
-| `v1.0.2` | A release. Immutable. |
+| `v1.3.2` | A release. Immutable. |
 | `latest` | The newest release. Moves only when a release is tagged. |
 | `edge` | The tip of the `master` branch. Moves on every push. |
 | `sha-<short>` | One commit. Immutable. |
@@ -49,7 +49,7 @@ kubectl create secret generic easyp-env \
   --from-literal=DB_POSTGRES_DSN='postgres://user:pass@host:5432/easyp?sslmode=require'
 
 helm install easyp oci://ghcr.io/easyp-tech/charts/easyp-service \
-  --version 1.0.2 \
+  --version 1.3.2 \
   --set secrets.existingSecret=easyp-env \
   --set tls.enabled=false
 ```
@@ -143,4 +143,4 @@ running natively on macOS can register them but not execute them
 | `github.com/easyp-tech/service/api` | Apache-2.0 | Generated gRPC contract. |
 | `github.com/easyp-tech/service/sdk` | Apache-2.0 | Go client. |
 
-They are tagged together: `v1.0.2`, `api/v1.0.2`, `sdk/v1.0.2`.
+They are tagged together: `v1.3.2`, `api/v1.3.2`, `sdk/v1.3.2`.
