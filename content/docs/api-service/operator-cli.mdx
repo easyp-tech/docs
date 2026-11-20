@@ -193,10 +193,10 @@ then the environment, then the default 23412.
 
 ## Taskfile shortcuts
 
-The service repository's `Taskfile.yml` wraps these for development:
-`task build-plugins`, `FILTER=… task build-plugins-filter`, `task publish-plugins`
-(build, upload and register into the development stack; `FILTER=…` for a slice),
-`task publish-archives` (a `build --archive` tree to any service and storage),
-`task up`, `task up-minimal`, `task run`, `task run-local`. Except
-`publish-archives`, they assume the development stack's addresses and
-credentials.
+The service repository's `Taskfile.yml` has three tasks: `task build-plugins`
+(`plugins build` over the whole registry into `plugins/`),
+`FILTER=… task build-plugins-filter` (one slice, e.g.
+`FILTER='grpc/go:v1.6.2'`) and `task generate` (regenerates `api/`). Publishing
+is `easyp-svc plugins publish` itself; the repository has no development stack
+to publish into. Running the service from a checkout is in the README's
+[From source](https://github.com/easyp-tech/service#from-source) section.

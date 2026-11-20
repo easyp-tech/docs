@@ -1,6 +1,6 @@
 ---
 title: "Установка"
-description: "Теги образа, Helm-чарт и его обязательные значения, compose-стек и бинарники релизов."
+description: "Теги образа, Helm-чарт и его обязательные значения, Docker Compose и бинарники релизов."
 ---
 
 Каждый релиз публикует образ контейнера, Helm-чарт и бинарники. Текущий релиз —
@@ -90,7 +90,7 @@ helm install easyp oci://ghcr.io/easyp-tech/charts/easyp-service \
 
 | Значение | По умолчанию | Почему важно |
 |---|---|---|
-| `replicaCount` | `1` | Не увеличивайте на общем томе. См. [Архитектура](/ru/docs/api-service/architecture#single-replica). |
+| `replicaCount` | `1` | У каждой реплики свой том; больше одной — только с `config.registry.s3.bucket`. См. [Архитектура](/ru/docs/api-service/architecture#scaling-out). |
 | `image.tag` | `""` (appVersion чарта) | Зафиксируйте. |
 | `ports.grpc` / `metric` / `health` / `mcp` | `8080` / `8081` / `8082` / `8083` | Чарт переопределяет порты бинарника 23410–23413. |
 | `mcp.enabled` | `false` | MCP стоит вне цепочки gRPC-интерсепторов. |
@@ -98,7 +98,7 @@ helm install easyp oci://ghcr.io/easyp-tech/charts/easyp-service \
 | `config.workerPool.*` | значения бинарника | `workers: 4`, `queueSize: 16`, `maxConcurrentGenerations: 16`, `generationTimeoutSeconds: 120`. |
 | `config.registry.s3.bucket` | `""` | Пусто — локальный режим. |
 | `config.license.publicKeys` | ключ easyp.tech `2026-08` | Якорь доверия лицензий. Меняйте, только если выпускаете лицензии сами. |
-| `tls.enabled` / `tls.clientCASecret` | `true` / `""` | С CA listener требует клиентские сертификаты (mTLS). `"-"` отключает проверку клиента. |
+| `tls.enabled` / `tls.clientCASecret` | `true` / `""` | С включённым TLS mTLS тоже включён: при пустом значении клиентские сертификаты проверяются по `ca.crt` из секрета серверного сертификата (`tls.serverSecret` или выпущенного cert-manager). `"-"` отключает проверку клиента. |
 | `certManager.enabled` | `false` | Выпуск серверного и клиентского (для ingress) сертификатов через cert-manager. |
 | `ingress.*` | выключен, Traefik | По умолчанию под Traefik: он умеет декларативно описать mTLS до бэкенда (`ServersTransport`). |
 | `persistence.size` | `25Gi` | Должен быть больше `cacheMaxBytes`. |
@@ -119,11 +119,11 @@ helm install easyp oci://ghcr.io/easyp-tech/charts/easyp-service \
 
 ## Docker Compose
 
-`deploy/docker-compose.yml` в репозитории сервиса — стенд для разработки:
-PostgreSQL, RustFS как S3, Traefik со взаимным TLS спереди и набор Grafana/Loki/
-Tempo/Mimir/Pyroscope. Им управляет `task up`; это образец того, как всё
-соединяется, а не шаблон для продакшена. Минимальный compose-файл — в
-[Быстром старте](/ru/docs/api-service/quickstart).
+Готового compose-стека в репозитории сервиса нет. Минимальный compose-файл —
+PostgreSQL и опубликованный образ — есть в
+[быстром старте API Service](/ru/docs/api-service/quickstart), а запуск бинарника
+из исходников описан в разделе
+[From source](https://github.com/easyp-tech/service#from-source) README сервиса.
 
 ## Бинарники
 

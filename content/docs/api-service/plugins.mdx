@@ -67,6 +67,19 @@ Optional keys in `plugin.yaml`: `build_args` (passed to every build),
 version entry may be a mapping that overrides these for itself or sets
 `skip: true`.
 
+`smoke` tunes the smoke run that `plugins build` and `plugins publish` make on
+every built version, for all versions of the plugin at once.
+`smoke: {parameter: "…"}` passes that string as the `CodeGeneratorRequest`
+parameter, for a plugin that will not answer without options;
+`smoke: {skip: true}` turns the run off for a plugin that cannot be exercised
+with a synthetic request. Leave a comment saying why: skipping removes the only
+check that the archive actually runs.
+
+```yaml
+smoke:
+  parameter: "extern_path=.=crate::proto"
+```
+
 ### What the Dockerfile must produce
 
 - **An executable at `/plugin`.** It reads a `CodeGeneratorRequest` on stdin,

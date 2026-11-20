@@ -34,6 +34,37 @@ A rename is handled without breaking anyone: the old configuration key keeps
 working for one release while warning, naming both spellings and the line to
 change, and only then stops.
 
+## v1.3.0 → v1.3.1
+
+v1.3.1 was tagged but never published: the release job's image scan stopped it
+before anything left the runner. v1.3.2 carries the same changes plus a
+dependency fix, so upgrade from v1.3.0 straight to v1.3.2. Only the `api/v1.3.1`
+and `sdk/v1.3.1` Go modules exist under that number.
+
+### `latest` resolves to the highest version number
+
+`latest` used to be chosen by sorting version strings, which ranks `v1.36.9`
+above `v1.36.11`. It now compares versions component by component, a missing
+patch counting as zero. **A registry holding such versions serves a different
+`latest` after the upgrade**: on plugins.easyp.tech `protocolbuffers/go:latest`
+moved from v1.36.9 to v1.36.11 and `bufbuild/es:latest` from v2.9.0 to v2.12.0,
+nine plugins of 80 in all. An unpinned `remote:` generates different code from
+the first run after the upgrade; pin the version to keep the old output.
+
+### MCP `plugins_list` items carry `createdAt`
+
+Each item in `plugins` had `created_at` while everything else in the result —
+`nextPageToken`, `platform` — was lowerCamelCase. The field is now `createdAt`.
+A client reading `created_at` gets nothing and must switch. Only the MCP JSON
+changed: the gRPC wire, the Go SDK and the database are as before.
+
+### MCP reports the service's real version
+
+`serverInfo.version` in the `initialize` response was the literal `v1.0.0`
+whatever was running. It is now the version the release build stamps, so a
+deployed service can be identified from outside. Anything that compared it
+with `v1.0.0` must change.
+
 ## v1.2.1 → v1.3.0
 
 ### `plugins publish` builds for the service's platform
@@ -93,6 +124,82 @@ A refused request reads `rate limit exceeded for <ip>, retry after <n>s`. The
 `x-ratelimit-reset` trailer still carries the unix time the bucket refills by.
 
 ## v1.1.x → v1.2.0
+
+### The Helm chart runs a StatefulSet
+
+Chart 1.2.0 renders a StatefulSet instead of a Deployment. Each replica gets a
+`ReadWriteOnce` claim of its own from a claim template,
+`plugins-<release>-easyp-service-N`, and upgrades roll instead of using
+`Recreate`. Along with it:
+
+- `persistence.existingClaim` is removed. An upgrade that still sets it fails
+  before any pod starts, naming the claim to rebind the volume to.
+- `persistence.accessMode` must be `ReadWriteOnce` or `ReadWriteOncePod`; a
+  shared mode is refused.
+- More than one replica, or `autoscaling.enabled` with `maxReplicas` above 1,
+  needs `config.registry.s3.bucket`.
+- New values: `autoscaling.*` and `persistence.retentionPolicy`.
+
+The old standalone claim, `<release>-easyp-service-plugins`, is no longer
+mounted. It carries `helm.sh/resource-policy: keep`, so Helm leaves it in place,
+and the install notes name it. What to do with it depends on object storage:
+
+- **With S3** nothing is lost. Upgrade, let the new claims fill on demand — a
+  cold start per replica — and delete the old claim once the pods are serving.
+- **Without S3** the old claim holds the only copy of every plugin. Before
+  upgrading, rebind its PersistentVolume to the name the StatefulSet looks for;
+  the StatefulSet then adopts it as replica 0's claim instead of creating an
+  empty one. For a release named `easyp`:
+
+```bash
+release=easyp
+old=easyp-easyp-service-plugins            # or the claim existingClaim named
+new=plugins-easyp-easyp-service-0
+
+pv="$(kubectl get pvc "$old" -o jsonpath='{.spec.volumeName}')"
+class="$(kubectl get pvc "$old" -o jsonpath='{.spec.storageClassName}')"
+size="$(kubectl get pvc "$old" -o jsonpath='{.spec.resources.requests.storage}')"
+
+# Keep the volume when its claim goes away, and stop the pod that mounts it.
+kubectl patch pv "$pv" -p '{"spec":{"persistentVolumeReclaimPolicy":"Retain"}}'
+kubectl scale deploy/easyp-easyp-service --replicas=0
+kubectl delete pvc "$old"
+
+# Free the volume, then claim it under the StatefulSet's name.
+kubectl patch pv "$pv" --type=json -p '[{"op":"remove","path":"/spec/claimRef"}]'
+kubectl create -f - <<YAML
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: $new
+spec:
+  accessModes: [ReadWriteOnce]
+  storageClassName: "$class"
+  resources: {requests: {storage: "$size"}}
+  volumeName: "$pv"
+YAML
+
+# Give the chart the volume's real size, so its check against cacheMaxBytes
+# compares the disk that is actually there.
+helm upgrade "$release" oci://ghcr.io/easyp-tech/charts/easyp-service \
+  --version <version> --reuse-values \
+  --set persistence.existingClaim=null --set persistence.size="$size"
+```
+
+`--reuse-values` works here, with one catch: it replaces the new chart's
+defaults with the old release's values, so `autoscaling` and
+`persistence.retentionPolicy` arrive absent and are read as off and `Retain`.
+To turn autoscaling on in the same upgrade use `--reset-then-reuse-values`
+(Helm 3.14+); `--set autoscaling.enabled=true` alone is refused.
+
+If the pod already started on an empty claim, the same steps apply with
+`kubectl scale statefulset/easyp-easyp-service --replicas=0` instead of the
+Deployment, deleting the empty `plugins-easyp-easyp-service-0` along with the
+old claim, and scaling back to one afterwards. Anything that addressed
+`deploy/<release>-easyp-service` — `kubectl rollout`, `kubectl logs`,
+dashboards, alerts on `kube_deployment_*` — needs `statefulset/` instead. The
+chart README has the full procedure:
+[Upgrading from a release that rendered a Deployment](https://github.com/easyp-tech/service/blob/master/deploy/charts/easyp-service/README.md#upgrading-from-a-release-that-rendered-a-deployment).
 
 ### `plugins publish` replaces `push`, `register` and `pack`
 

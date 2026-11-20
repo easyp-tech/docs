@@ -140,12 +140,12 @@ Prometheus Operator). У каждого алерта есть `runbook_url`: э�
 | EasypPanics | `increase(easyp_panics_total[5m]) > 0` | [ссылка](/ru/docs/api-service/runbooks#easyppanics) |
 | EasypAuthFailures | `rate(easyp_auth_failures_total[5m]) > authFailureRate` (0.5) 10 мин | [ссылка](/ru/docs/api-service/runbooks#easypauthfailures) |
 
-Compose-стек добавляет алерты хоста и edge, которые считает его собственный Mimir
-по тому, что собирает Grafana Alloy, — EasypHostDiskLow, EasypHostDiskFillingUp,
-EasypHostMemoryLow, EasypTargetDown, EasypServiceMissing,
-EasypCertificateExpiringSoon — в
-`deploy/observability/mimir/rules/anonymous/host.yaml`. Они тоже есть в
-[Ранбуках](/ru/docs/api-service/runbooks#the-host).
+Алерты хоста и edge в поставку не входят: машина, прокси перед сервисом и их
+мониторинг — забота оператора. В [Ранбуках](/ru/docs/api-service/runbooks#the-host)
+остались процедуры для шести алертов, которые мейнтейнеры держат на своём
+compose-хосте, — EasypHostDiskLow, EasypHostDiskFillingUp, EasypHostMemoryLow,
+EasypTargetDown, EasypServiceMissing, EasypCertificateExpiringSoon, — на случай,
+если вы заведёте алерты с теми же именами.
 
 `ServiceMonitor` (`serviceMonitor.enabled=true`) опрашивает `/metrics` каждые
 30 с.

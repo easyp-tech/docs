@@ -34,6 +34,38 @@ description: "Заметки по обновлению API Service от рели
 работать один релиз, предупреждая и называя оба написания и строку, которую надо
 поправить, и только после этого перестаёт.
 
+## v1.3.0 → v1.3.1
+
+Тег v1.3.1 поставлен, но релиз так и не вышел: сканер образа в релизной сборке
+остановил его до того, как что-либо было опубликовано. В v1.3.2 те же изменения
+плюс исправленная зависимость, так что обновляйтесь с v1.3.0 сразу на v1.3.2.
+Под номером v1.3.1 существуют только Go-модули `api/v1.3.1` и `sdk/v1.3.1`.
+
+### `latest` — самая новая версия по номеру
+
+Раньше `latest` выбирался сортировкой строк версий, и `v1.36.9` оказывался
+старше `v1.36.11`. Теперь версии сравниваются покомпонентно, отсутствующий патч
+считается нулём. **Реестр с такими версиями после обновления отдаёт другой
+`latest`**: на plugins.easyp.tech `protocolbuffers/go:latest` сменился с v1.36.9
+на v1.36.11, а `bufbuild/es:latest` — с v2.9.0 на v2.12.0, всего девять плагинов
+из 80. Незафиксированный `remote:` с первого запуска после обновления
+сгенерирует другой код; чтобы оставить прежний результат, зафиксируйте версию.
+
+### Элементы `plugins_list` в MCP несут `createdAt`
+
+У каждого элемента `plugins` было поле `created_at`, хотя всё остальное в
+результате — `nextPageToken`, `platform` — в lowerCamelCase. Теперь поле
+называется `createdAt`. Клиент, читающий `created_at`, ничего не получит — его
+нужно поправить. Изменился только JSON в MCP: gRPC, Go SDK и база данных
+прежние.
+
+### MCP сообщает настоящую версию сервиса
+
+`serverInfo.version` в ответе на `initialize` всегда был `v1.0.0`, что бы ни
+работало на самом деле. Теперь это версия, которую проставляет релизная сборка,
+так что развёрнутый сервис можно опознать снаружи. Всё, что сравнивало это поле
+с `v1.0.0`, нужно поправить.
+
 ## v1.2.1 → v1.3.0
 
 ### `plugins publish` собирает под платформу сервиса
@@ -95,6 +127,83 @@ SDK и `easyp-svc` подключаются к обычному `host:port` че
 наполнится.
 
 ## v1.1.x → v1.2.0
+
+### Helm-чарт запускает StatefulSet
+
+Чарт 1.2.0 рендерит StatefulSet вместо Deployment. Каждая реплика получает
+собственный claim `ReadWriteOnce` из шаблона, `plugins-<release>-easyp-service-N`,
+а обновление идёт по одному поду вместо `Recreate`. Вместе с этим:
+
+- `persistence.existingClaim` убран. Обновление, где он ещё задан, падает до
+  запуска пода и называет claim, к которому нужно перепривязать том.
+- `persistence.accessMode` — только `ReadWriteOnce` или `ReadWriteOncePod`;
+  общий режим чарт отвергает.
+- Для нескольких реплик или `autoscaling.enabled` с `maxReplicas` больше 1
+  нужен `config.registry.s3.bucket`.
+- Новые значения: `autoscaling.*` и `persistence.retentionPolicy`.
+
+Старый отдельный claim, `<release>-easyp-service-plugins`, больше не
+монтируется. У него стоит `helm.sh/resource-policy: keep`, поэтому Helm его не
+удаляет, а заметки установки его называют. Что с ним делать, зависит от
+объектного хранилища:
+
+- **С S3** ничего не теряется. Обновитесь, дайте новым claim'ам заполниться по
+  мере обращений — по холодному старту на реплику — и удалите старый claim,
+  когда поды начнут обслуживать запросы.
+- **Без S3** старый claim хранит единственную копию всех плагинов. До
+  обновления перепривяжите его PersistentVolume к имени, которое ищет
+  StatefulSet; тогда StatefulSet возьмёт его как claim реплики 0 вместо пустого.
+  Для релиза с именем `easyp`:
+
+```bash
+release=easyp
+old=easyp-easyp-service-plugins            # или claim, названный в existingClaim
+new=plugins-easyp-easyp-service-0
+
+pv="$(kubectl get pvc "$old" -o jsonpath='{.spec.volumeName}')"
+class="$(kubectl get pvc "$old" -o jsonpath='{.spec.storageClassName}')"
+size="$(kubectl get pvc "$old" -o jsonpath='{.spec.resources.requests.storage}')"
+
+# Сохранить том, когда его claim удалят, и остановить под, который его монтирует.
+kubectl patch pv "$pv" -p '{"spec":{"persistentVolumeReclaimPolicy":"Retain"}}'
+kubectl scale deploy/easyp-easyp-service --replicas=0
+kubectl delete pvc "$old"
+
+# Освободить том и занять его под именем, которое ждёт StatefulSet.
+kubectl patch pv "$pv" --type=json -p '[{"op":"remove","path":"/spec/claimRef"}]'
+kubectl create -f - <<YAML
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: $new
+spec:
+  accessModes: [ReadWriteOnce]
+  storageClassName: "$class"
+  resources: {requests: {storage: "$size"}}
+  volumeName: "$pv"
+YAML
+
+# Передать чарту настоящий размер тома, чтобы проверка против cacheMaxBytes
+# сравнивала с реально существующим диском.
+helm upgrade "$release" oci://ghcr.io/easyp-tech/charts/easyp-service \
+  --version <version> --reuse-values \
+  --set persistence.existingClaim=null --set persistence.size="$size"
+```
+
+`--reuse-values` здесь работает, но с оговоркой: он подменяет значения по
+умолчанию нового чарта значениями старого релиза, поэтому `autoscaling` и
+`persistence.retentionPolicy` приходят пустыми и читаются как «выключено» и
+`Retain`. Чтобы включить автоскейлинг в том же обновлении, используйте
+`--reset-then-reuse-values` (Helm 3.14+); один `--set autoscaling.enabled=true`
+чарт отвергнет.
+
+Если под уже запустился на пустом claim, шаги те же, только вместо Deployment —
+`kubectl scale statefulset/easyp-easyp-service --replicas=0`, вместе со старым
+claim удаляется пустой `plugins-easyp-easyp-service-0`, а в конце реплику
+возвращают обратно. Всё, что обращалось к `deploy/<release>-easyp-service`, —
+`kubectl rollout`, `kubectl logs`, дашборды, алерты на `kube_deployment_*` —
+теперь должно указывать `statefulset/`. Полная процедура — в README чарта:
+[Upgrading from a release that rendered a Deployment](https://github.com/easyp-tech/service/blob/master/deploy/charts/easyp-service/README.md#upgrading-from-a-release-that-rendered-a-deployment).
 
 ### `plugins publish` вместо `push`, `register` и `pack`
 

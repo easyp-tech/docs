@@ -138,10 +138,11 @@ Prometheus Operator CRDs). Every alert carries a `runbook_url` pointing at
 | EasypPanics | `increase(easyp_panics_total[5m]) > 0` | [link](/docs/api-service/runbooks#easyppanics) |
 | EasypAuthFailures | `rate(easyp_auth_failures_total[5m]) > authFailureRate` (0.5) for 10m | [link](/docs/api-service/runbooks#easypauthfailures) |
 
-The compose stack adds host and edge alerts, evaluated by its own Mimir from what
-Grafana Alloy collects — EasypHostDiskLow, EasypHostDiskFillingUp, EasypHostMemoryLow,
-EasypTargetDown, EasypServiceMissing, EasypCertificateExpiringSoon — in
-`deploy/observability/mimir/rules/anonymous/host.yaml`. They are also in
-[Runbooks](/docs/api-service/runbooks#the-host).
+Host and edge alerts are not shipped: the machine, the proxy in front and their
+monitoring are the operator's own. [Runbooks](/docs/api-service/runbooks#the-host)
+keeps procedures for the six the maintainers run on a compose host —
+EasypHostDiskLow, EasypHostDiskFillingUp, EasypHostMemoryLow, EasypTargetDown,
+EasypServiceMissing, EasypCertificateExpiringSoon — for anyone who defines
+alerts under the same names.
 
 `ServiceMonitor` (`serviceMonitor.enabled=true`) scrapes `/metrics` every 30 s.

@@ -25,6 +25,11 @@ Every field is lowerCamelCase, in the arguments (`pageSize`, `pageToken`) as in
 the result. The same JSON arrives as `structuredContent` and as the text content.
 `version` filters on an exact version; `latest` is not resolved here.
 
+Paging works as in gRPC: `pageSize` defaults to 100 and is capped at 1000 —
+values outside that range are normalised rather than rejected. To read past the
+first page, call again with the same filters and `pageToken` set to the previous
+`nextPageToken`, until `nextPageToken` comes back empty.
+
 The `initialize` response names the server `easyp-service-mcp` and reports the
 service's own version in `serverInfo.version` — `1.3.2` on a release build — so a
 client can tell which release it is talking to.

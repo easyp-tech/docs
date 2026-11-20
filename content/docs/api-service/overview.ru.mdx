@@ -63,6 +63,10 @@ sequenceDiagram
 
 Полный путь запроса — в [Архитектуре](/ru/docs/api-service/architecture).
 
+Сервис масштабируется горизонтально. У каждого пода свой кеш плагинов, который
+наполняется из объектного хранилища, поэтому для нескольких реплик нужен S3 —
+см. [Горизонтальное масштабирование](/ru/docs/api-service/architecture#scaling-out).
+
 ## Чем он не является
 
 - **Это не песочница.** Плагины выполняются обычными процессами на хосте
@@ -76,8 +80,6 @@ sequenceDiagram
   [Менеджер пакетов](/ru/docs/cli/package-manager).
 - **Это не публикатор пакетов.** Он возвращает сгенерированные файлы вызывающему
   и не публикует Go-модули, npm- или Maven-пакеты.
-- **Он не масштабируется горизонтально.** Одна реплика на том кеша плагинов.
-  Масштабируйте, давая поду больше CPU и поднимая лимит генераций.
 - **Это не облачный сервис, на который можно зарегистрироваться.** Документация
   описывает ПО, которое разворачиваете вы.
 
@@ -121,7 +123,7 @@ sequenceDiagram
 | Запустить локально и сгенерировать код | [Быстрый старт](/ru/docs/api-service/quickstart) |
 | Развернуть | [Установка](/ru/docs/api-service/installation), [Конфигурация](/ru/docs/api-service/configuration) |
 | Добавить плагины | [Плагины](/ru/docs/api-service/plugins), [CLI оператора](/ru/docs/api-service/operator-cli) |
-| Подключить клиентов | [Использование клиентами](/ru/docs/api-service/client-usage) |
+| Подключить клиентов | [Подключение клиентов](/ru/docs/api-service/client-usage) |
 | Эксплуатировать | [Наблюдаемость](/ru/docs/api-service/observability), [Ранбуки](/ru/docs/api-service/runbooks), [Резервное копирование](/ru/docs/api-service/backup), [Обновление](/ru/docs/api-service/upgrading) |
 | Сравнить с Buf | [EasyP и Buf BSR](/ru/docs/api-service/vs-buf-bsr), [Миграция с BSR](/ru/docs/api-service/migrating-from-bsr) |
 
