@@ -196,10 +196,11 @@ PostgreSQL, а перезапуск контейнера при каждом с�
 
 ## Сокращения в Taskfile
 
-`Taskfile.yml` репозитория сервиса оборачивает эти команды для разработки:
-`task build-plugins`, `FILTER=… task build-plugins-filter`, `task publish-plugins`
-(собрать, загрузить и зарегистрировать на стенде разработки; `FILTER=…` — для
-части каталога), `task publish-archives` (дерево `build --archive` в любой сервис
-и хранилище), `task up`, `task up-minimal`, `task run`, `task run-local`. Все,
-кроме `publish-archives`, рассчитаны на адреса и учётные данные стенда
-разработки.
+В `Taskfile.yml` репозитория сервиса три задачи: `task build-plugins`
+(`plugins build` по всему реестру в `plugins/`),
+`FILTER=… task build-plugins-filter` (часть каталога, например
+`FILTER='grpc/go:v1.6.2'`) и `task generate` (перегенерирует `api/`).
+Публикация — это сама команда `easyp-svc plugins publish`: стенда для
+разработки, куда публиковать, в репозитории нет. Как запустить сервис из
+исходников, описано в разделе
+[From source](https://github.com/easyp-tech/service#from-source) README.

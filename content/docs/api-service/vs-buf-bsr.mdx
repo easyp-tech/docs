@@ -75,8 +75,8 @@ and accept that plugins are not sandboxed.
   version is ready to use. EasyP's catalogue is a set of recipes: each deployment
   builds and registers the versions it wants.
 - **Availability and scale.** A SaaS with published uptime SLAs on paid plans
-  [⁹](#sources). The EasyP service runs as one replica per cache and scales
-  vertically only.
+  [⁹](#sources). The EasyP service scales horizontally: each replica keeps its
+  own plugin cache, and more than one replica needs S3.
 - **Semantics of "latest".** An unpinned BSR plugin resolves to the latest
   version [²](#sources). EasyP's `latest` is the same: the highest registered
   version, compared by number (`v1.36.11` over `v1.36.9`). On both, it moves

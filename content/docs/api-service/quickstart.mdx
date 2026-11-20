@@ -1,5 +1,5 @@
 ---
-title: "Quickstart"
+title: "API Service quickstart"
 description: "From nothing to a first remote code generation: PostgreSQL, the service image, one plugin, easyp generate."
 ---
 
@@ -63,7 +63,7 @@ services:
       retries: 30
 
   service:
-    image: ghcr.io/easyp-tech/service:v1.3.0
+    image: ghcr.io/easyp-tech/service:v1.3.2
     command: ["service", "start"]
     depends_on:
       postgres:
@@ -93,6 +93,12 @@ default, and warns that gRPC is running without TLS.
 Mount `plugins/` read-write. The service creates `plugins/.tmp` on start even
 without object storage, and a read-only mount stops it with
 `mkdir /plugins/.tmp: read-only file system`.
+
+The image runs as UID and GID 65532, not as root. On Linux the bind-mounted
+directory keeps its host owner, so it must be writable by that user:
+`sudo chown -R 65532:65532 plugins`, or set `user:` on the service to your own
+UID and GID (`id -u`, `id -g`), for example `user: "1000:1000"`. Docker Desktop
+on macOS maps ownership itself.
 </Callout>
 
 ## 4. Register the plugin
@@ -135,25 +141,18 @@ generate:
 easyp generate
 ```
 
-The CLI talks plaintext to `localhost` and TLS to any other host. Always pin the
-version in `remote:` — see [Client usage](/docs/api-service/client-usage) for
-why `latest` is not "newest" in the semantic-version sense.
+The CLI talks plaintext to `localhost` and TLS to any other host. `latest` is
+the highest registered version, but pin the version in `remote:` anyway:
+`latest` moves when a newer version is registered, and generated code changes
+with it. See [Client usage](/docs/api-service/client-usage).
 
-## The full development stack
+## Running from source
 
-`service/deploy/docker-compose.yml` is the stack the maintainers develop
-against: PostgreSQL, an S3-compatible store (RustFS), Traefik in front with
-mutual TLS, and Grafana, Loki, Tempo, Mimir and Pyroscope. The service
-repository's `Taskfile.yml` drives it:
-
-```bash
-task up                                                     # generates dev certificates, starts the stack
-FILTER='protocolbuffers/go:v1.36.10' task publish-plugins   # builds, uploads and registers through Traefik
-```
-
-There the gRPC port is reached through Traefik at `easyp.api.localhost:4443`,
-and Grafana is on `localhost:3000`. See the service
-[README](https://github.com/easyp-tech/service#quick-start) for details.
+The service repository carries no development stack of its own. To run the
+binary from a checkout against your own PostgreSQL instead of the image, see
+[From source](https://github.com/easyp-tech/service#from-source) in its README.
+On macOS keep the image: plugins built by `plugins build` are Linux binaries,
+and a service running natively fails them with `exec format error`.
 
 ## Next
 

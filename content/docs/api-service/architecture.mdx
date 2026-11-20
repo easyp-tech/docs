@@ -188,16 +188,30 @@ reports 503 while the database does not answer; `/live` checks nothing and stays
   `audit.partition_check_interval`; partitions older than
   `audit.retention_months` are dropped.
 
-## Single replica
+## Scaling out
 
-The plugin cache on disk is not safe to share between processes: unpacking ends
-with a remove and a rename serialised only by an in-process lock, and each
-process accounts `cache_max_bytes` separately. The Helm chart runs one replica
-with a `ReadWriteOnce` volume and the `Recreate` strategy. It *permits*
-`replicaCount > 1` with a `ReadWriteMany` volume; that combination is not
-supported and corrupts the cache under concurrent misses. The database side is
-safe for several processes (migrations and partition maintenance take locks),
-which is what makes a restart into a new version safe. Scale vertically:
-more CPU and a higher `max_concurrent_generations`, keeping
-`max_concurrent_generations × max_output_size` inside the memory limit (the
-chart refuses an install where it is not).
+The service scales horizontally, with a plugin cache per pod. The cache on disk
+is not safe to share between processes: unpacking ends with a remove and a
+rename serialised only by an in-process lock, and each process accounts
+`cache_max_bytes` separately, so two pods on one `ReadWriteMany` volume corrupt
+it under concurrent misses.
+
+Since v1.2.0 the Helm chart runs a StatefulSet that gives every replica a
+`ReadWriteOnce` claim of its own, `plugins-<release>-easyp-service-N` (or an
+`emptyDir` with `persistence.enabled=false`), and refuses a shared access mode.
+Upgrades roll one pod at a time. `autoscaling.enabled` adds a
+HorizontalPodAutoscaler on CPU.
+
+Every replica's cache starts empty and is filled from object storage, so more
+than one replica — `replicaCount` above 1, or an autoscaler whose
+`maxReplicas` is — needs `config.registry.s3.bucket`, and the chart refuses the
+install without it. Without S3 the plugins directory is the only copy of every
+plugin, and only one replica can hold it.
+
+The database side is safe for several processes: migrations and partition
+maintenance take locks, which is also what makes a restart into a new version
+safe. Everything else a replica enforces is its own — the worker pool,
+`max_concurrent_generations` and the per-client rate limit — so capacity grows
+with the replica count, and a client spread across N pods gets up to N times its
+limit. Within one pod, keep `max_concurrent_generations × max_output_size`
+inside the memory limit (the chart refuses an install where it is not).

@@ -1,6 +1,6 @@
 ---
 title: "Installation"
-description: "Container image tags, the Helm chart and its required values, the compose stack, and release binaries."
+description: "Container image tags, the Helm chart and its required values, Docker Compose, and release binaries."
 ---
 
 Every release publishes a container image, a Helm chart and binaries. The
@@ -90,7 +90,7 @@ Helm release history.
 
 | Value | Default | Why it matters |
 |---|---|---|
-| `replicaCount` | `1` | Do not raise it on a shared volume. See [Architecture](/docs/api-service/architecture#single-replica). |
+| `replicaCount` | `1` | Each replica gets its own volume; above 1 needs `config.registry.s3.bucket`. See [Architecture](/docs/api-service/architecture#scaling-out). |
 | `image.tag` | `""` (chart appVersion) | Pin it. |
 | `ports.grpc` / `metric` / `health` / `mcp` | `8080` / `8081` / `8082` / `8083` | The chart overrides the binary's 23410–23413. |
 | `mcp.enabled` | `false` | MCP sits outside the gRPC interceptor chain. |
@@ -98,7 +98,7 @@ Helm release history.
 | `config.workerPool.*` | binary defaults | `workers: 4`, `queueSize: 16`, `maxConcurrentGenerations: 16`, `generationTimeoutSeconds: 120`. |
 | `config.registry.s3.bucket` | `""` | Empty means local mode. |
 | `config.license.publicKeys` | easyp.tech key `2026-08` | The licence trust anchor. Replace only if you issue your own licences. |
-| `tls.enabled` / `tls.clientCASecret` | `true` / `""` | With a CA the listener requires client certificates (mTLS). `"-"` disables the client check. |
+| `tls.enabled` / `tls.clientCASecret` | `true` / `""` | With TLS on, mTLS is on by default: an empty value checks client certificates against `ca.crt` in the server certificate's secret (`tls.serverSecret` or cert-manager's). `"-"` disables the client check. |
 | `certManager.enabled` | `false` | Let cert-manager issue server and ingress client certificates. |
 | `ingress.*` | disabled, Traefik | Defaults target Traefik because it can express an mTLS backend leg (`ServersTransport`). |
 | `persistence.size` | `25Gi` | Must exceed `cacheMaxBytes`. |
@@ -119,11 +119,11 @@ same pod. See [Security](/docs/api-service/security).
 
 ## Docker Compose
 
-`deploy/docker-compose.yml` in the service repository is the development stack:
-PostgreSQL, RustFS as S3, Traefik with mutual TLS in front, and a Grafana/Loki/
-Tempo/Mimir/Pyroscope suite. It is driven by `task up` and is the reference for
-how the pieces fit, not a production template. A minimal compose file is in the
-[Quickstart](/docs/api-service/quickstart).
+The service repository ships no compose stack. A minimal compose file —
+PostgreSQL and the released image — is in the
+[API Service quickstart](/docs/api-service/quickstart); running the binary from
+a checkout is in the service README's
+[From source](https://github.com/easyp-tech/service#from-source) section.
 
 ## Binaries
 

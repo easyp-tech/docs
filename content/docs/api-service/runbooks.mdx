@@ -3,10 +3,11 @@ title: "Runbooks"
 description: "One procedure per alert the API Service ships: what the alert means, what is actually broken, and what to do about it."
 ---
 
-One section per alert in `deploy/charts/easyp-service/templates/prometheusrule.yaml`
-and in `deploy/observability/mimir/rules/anonymous/`. Each alert's `runbook_url`
-annotation points at the matching anchor here, so the heading text is
-load-bearing: renaming one breaks the link from the alert.
+One section per alert in `deploy/charts/easyp-service/templates/prometheusrule.yaml`,
+plus the host alerts at the end, which are not shipped (see
+[The host](#the-host)). Each alert's `runbook_url` annotation points at the
+matching anchor here, so the heading text is load-bearing: renaming one breaks
+the link from the alert.
 
 Most of what follows is environment-independent: configuration keys, PromQL, and
 what a number means. Where a procedure needs to read logs it is written twice,
@@ -84,9 +85,11 @@ intended. Note that CI runners behind one NAT share an address.
 Work has been queued continuously for ten minutes. Same knobs as above; the
 difference is that this is sustained rather than bursty, so it is a capacity
 statement, not a spike. Add capacity rather than a deeper queue — a longer queue
-only moves the latency around. Capacity here means a bigger pod: more CPU and a
-higher `maxConcurrentGenerations` (with the memory to match). More replicas on a
-shared cache volume are not supported.
+only moves the latency around. Capacity here means more replicas — each runs
+its own worker pool, and with S3 configured `replicaCount` or
+`autoscaling.maxReplicas` can go above 1 — or a bigger pod: more CPU and a
+higher `maxConcurrentGenerations` (with the memory to match). See
+[Scaling out](/docs/api-service/architecture#scaling-out).
 
 ## EasypPluginCacheAtLimit
 
@@ -254,11 +257,12 @@ digest).
 
 ## The host
 
-These six exist only on the compose stack, in
-`deploy/observability/mimir/rules/anonymous/host.yaml`. The disk and memory
-alerts come from `prometheus.exporter.unix` in `config.alloy`, the target and
-discovery alerts from Alloy's own scraping, and the certificate alert from
-Traefik. On Kubernetes the cluster's own node monitoring owns this
+The service repository does not ship these six. They are host-level alerts the
+maintainers run on their own compose host, where the disk and memory alerts come
+from a node exporter, the target and discovery alerts from the scraper's own
+view of its targets, and the certificate alert from the Traefik edge in front.
+On a compose deployment, host monitoring is the operator's own; the procedures
+apply to alerts defined under these names. On Kubernetes the cluster's own node monitoring owns this
 ground, so the chart does not ship them.
 
 The commands assume `ssh user@host` and the stack in `~/easyp`.
@@ -366,8 +370,8 @@ Two ways to get here, and they need different answers.
 The edge certificate expires within 21 days and Traefik has not replaced it.
 
 Traefik attempts renewal at 30 days, so reaching 21 means an attempt has already
-failed. Note that on this stand issuance was proven once, at setup, and renewal
-has never run — the first attempt is due around 7 October 2026.
+failed. A first renewal is the one most likely to fail: issuance at setup proves
+the challenge worked once, not that it still does.
 
 1. `docker logs easyp-traefik 2>&1 | grep -i acme | tail -30`. The reason is
    almost always the HTTP-01 challenge.

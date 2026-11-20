@@ -1,5 +1,5 @@
 ---
-title: "Использование клиентами"
+title: "Подключение клиентов"
 description: "Как направить easyp CLI на сервис, как пользоваться Go SDK и как вызывать gRPC API напрямую."
 ---
 
@@ -128,8 +128,9 @@ func main() {
 добавляет нагрузки ровно тогда, когда у сервера её некуда девать, а повтор
 второго заново запускает генерацию, уже потратившую весь таймаут.
 
-Методы: `GenerateCode`, `ListPlugins` (обходит все страницы), `CreatePlugin`,
-`UpdatePlugin`, `DeletePlugin`, `Close`.
+Методы: `GenerateCode`, `ListPlugins` (обходит все страницы), `Platform`
+(`os/arch`, на которой сервис запускает плагины; сервер старше v1.3.0 отдаёт
+пустую строку), `CreatePlugin`, `UpdatePlugin`, `DeletePlugin`, `Close`.
 
 `CreatePlugin` и `UpdatePlugin` принимают структуру `config`. На сервисе v1.2.0
 или новее `command` можно не указывать: сервис выводит
@@ -171,8 +172,10 @@ grpcurl -protoset api.protoset -plaintext localhost:23410 \
 
 ### Ошибки
 
-Каждый не-OK статус несёт `google.rpc.ErrorInfo` с доменом `easyp.tech` и
-стабильным `reason`. Ветвитесь по reason, а не по тексту.
+Каждая ошибка, которую возвращают обработчики, несёт `google.rpc.ErrorInfo` с
+доменом `easyp.tech` и стабильным `reason`. Проверяйте `reason`, а не текст
+сообщения. У отказов от интерсепторов, стоящих перед обработчиками, `ErrorInfo`
+нет — они перечислены под таблицей.
 
 | Reason | Код gRPC | Типичная причина |
 |---|---|---|
@@ -189,7 +192,7 @@ grpcurl -protoset api.protoset -plaintext localhost:23410 \
 | `SHUTTING_DOWN` | `UNAVAILABLE` | Сервис останавливается. |
 | `FEATURE_DENIED` | `PERMISSION_DENIED` | Функции нет в лицензии. |
 | `DEADLINE_EXCEEDED` | `DEADLINE_EXCEEDED` | Плагин не уложился в таймаут. |
-| `CANCELED` | `CANCELLED` | Клиент ушёл. |
+| `CANCELED` | `CANCELLED` | Клиент отменил запрос. |
 | `INTERNAL` | `INTERNAL` | Всё остальное. |
 
 Отказы rate limit и лимита одновременных запросов на клиента приходят от

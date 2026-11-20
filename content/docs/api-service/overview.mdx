@@ -64,6 +64,10 @@ sequenceDiagram
 
 The full request path is in [Architecture](/docs/api-service/architecture).
 
+The service scales horizontally. Each pod keeps its own plugin cache and fills it
+from object storage, so more than one replica needs S3 — see
+[Scaling out](/docs/api-service/architecture#scaling-out).
+
 ## What it is not
 
 - **Not a sandbox.** Plugins run as ordinary processes on the service host.
@@ -76,8 +80,6 @@ The full request path is in [Architecture](/docs/api-service/architecture).
   [Package manager](/docs/cli/package-manager).
 - **Not a package publisher.** It returns generated files to the caller; it does
   not publish Go modules, npm or Maven packages.
-- **Not horizontally scalable.** One replica per plugin cache volume. Scale by
-  giving the pod more CPU and raising the generation limit.
 - **Not a hosted service you can sign up for.** The documentation describes the
   software you deploy.
 

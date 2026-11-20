@@ -128,8 +128,9 @@ ceiling) and `DEADLINE_EXCEEDED` are returned immediately: retrying the first
 adds load exactly when the server has none to spare, and retrying the second
 re-runs a generation that already used its full timeout.
 
-Methods: `GenerateCode`, `ListPlugins` (walks every page), `CreatePlugin`,
-`UpdatePlugin`, `DeletePlugin`, `Close`.
+Methods: `GenerateCode`, `ListPlugins` (walks every page), `Platform` (the
+`os/arch` the service runs plugins on, empty from a server older than v1.3.0),
+`CreatePlugin`, `UpdatePlugin`, `DeletePlugin`, `Close`.
 
 `CreatePlugin` and `UpdatePlugin` take a `config` struct. On a v1.2.0 or newer
 service `command` may be omitted: the service derives
@@ -171,8 +172,10 @@ grpcurl -protoset api.protoset -plaintext localhost:23410 \
 
 ### Errors
 
-Every non-OK status carries `google.rpc.ErrorInfo` with domain `easyp.tech` and a
-stable `reason`. Branch on the reason, not the message.
+Every error the handlers return carries `google.rpc.ErrorInfo` with domain
+`easyp.tech` and a stable `reason`. Branch on the reason, not the message.
+Refusals from the interceptors in front of the handlers carry none; they are
+listed below the table.
 
 | Reason | gRPC code | Typical cause |
 |---|---|---|

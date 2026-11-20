@@ -1,11 +1,11 @@
 ---
-title: "Быстрый старт"
+title: "Быстрый старт API Service"
 description: "С нуля до первой удалённой генерации: PostgreSQL, образ сервиса, один плагин, easyp generate."
 ---
 
 Здесь сервис запускается с минимальным окружением: один контейнер PostgreSQL,
-релизный образ, без объектного хранилища и без TLS. Это чтобы увидеть, из чего
-всё состоит, а не чтобы выставлять в сеть.
+релизный образ, без объектного хранилища и без TLS. Конфигурация для
+знакомства, не для продакшена.
 
 ## Что понадобится
 
@@ -63,7 +63,7 @@ services:
       retries: 30
 
   service:
-    image: ghcr.io/easyp-tech/service:v1.3.0
+    image: ghcr.io/easyp-tech/service:v1.3.2
     command: ["service", "start"]
     depends_on:
       postgres:
@@ -93,6 +93,12 @@ curl -i http://localhost:23412/       # 200, как только отвечае�
 Монтируйте `plugins/` на запись. Сервис при старте создаёт `plugins/.tmp` даже
 без объектного хранилища, и с томом только для чтения падает с
 `mkdir /plugins/.tmp: read-only file system`.
+
+Образ работает не от root, а с UID и GID 65532. На Linux примонтированный
+каталог сохраняет владельца с хоста, поэтому у этого пользователя должно быть
+право записи: `sudo chown -R 65532:65532 plugins` или `user:` у сервиса с вашими
+UID и GID (`id -u`, `id -g`), например `user: "1000:1000"`. Docker Desktop на
+macOS подстраивает права сам.
 </Callout>
 
 ## 4. Зарегистрировать плагин
@@ -135,25 +141,18 @@ easyp generate
 ```
 
 С `localhost` CLI работает без шифрования, с любым другим хостом — по TLS.
-Всегда фиксируйте версию в `remote:` — почему `latest` не значит «самая новая» в
-смысле семантических версий, объяснено в
-[Использовании клиентами](/ru/docs/api-service/client-usage).
+`latest` — самая новая зарегистрированная версия, но версию в `remote:` всё
+равно фиксируйте: `latest` сдвигается, как только регистрируют более новую, и
+сгенерированный код меняется вместе с ней. Подробнее — в
+[Подключении клиентов](/ru/docs/api-service/client-usage).
 
-## Полный стенд для разработки
+## Запуск из исходников
 
-`service/deploy/docker-compose.yml` — стенд, на котором работают мейнтейнеры:
-PostgreSQL, S3-совместимое хранилище (RustFS), Traefik с взаимным TLS спереди и
-Grafana, Loki, Tempo, Mimir и Pyroscope. Им управляет `Taskfile.yml`
-репозитория сервиса:
-
-```bash
-task up                                                     # генерирует dev-сертификаты, поднимает стенд
-FILTER='protocolbuffers/go:v1.36.10' task publish-plugins   # собирает, загружает и регистрирует через Traefik
-```
-
-Там gRPC доступен через Traefik на `easyp.api.localhost:4443`, а Grafana — на
-`localhost:3000`. Подробности — в
-[README сервиса](https://github.com/easyp-tech/service#quick-start).
+Своего стенда для разработки в репозитории сервиса нет. Как запустить бинарник
+из рабочей копии против своего PostgreSQL вместо образа, описано в разделе
+[From source](https://github.com/easyp-tech/service#from-source) README
+сервиса. На macOS оставайтесь на образе: `plugins build` собирает плагины под
+Linux, и сервис, запущенный нативно, падает на них с `exec format error`.
 
 ## Дальше
 
