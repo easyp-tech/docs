@@ -1,6 +1,8 @@
 import './global.css'
 import { Inter, JetBrains_Mono } from 'next/font/google'
 import Script from 'next/script'
+import { Analytics } from '@/components/analytics'
+import { siteHost, umamiHost, umamiWebsiteId } from '@/lib/analytics'
 import type { ReactNode } from 'react'
 import { I18nRootProvider } from '@/components/i18n-root'
 import { i18n } from '@/lib/i18n'
@@ -47,13 +49,18 @@ export default function Layout({ children }: { children: ReactNode }) {
       <body className="flex min-h-screen flex-col antialiased">
         <I18nRootProvider locale={i18n.defaultLanguage}>{children}</I18nRootProvider>
         {/* Umami on sipki.tech (pulse.sipki.tech, team EasyP). data-domains keeps
-            local runs and previews out of the stats. */}
+            local runs and previews out of the stats. Performance: Web Vitals of
+            real visits; errors: uncaught JS errors. What is collected is listed
+            on /privacy. */}
         <Script
-          src="https://pulse.sipki.tech/u.js"
-          data-website-id="6a3c3583-67aa-49ed-8c19-837751e72374"
-          data-domains="easyp.tech"
+          src={`${umamiHost}/u.js`}
+          data-website-id={umamiWebsiteId}
+          data-domains={siteHost}
+          data-performance="true"
+          data-errors="true"
           strategy="afterInteractive"
         />
+        <Analytics />
       </body>
     </html>
   )

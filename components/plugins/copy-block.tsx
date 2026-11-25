@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { Check, Copy } from 'lucide-react'
+import { track } from '@/lib/analytics'
 
 /** A code block with a copy button; `label` names it for screen readers. */
 export function CopyBlock({ code, label, copiedLabel }: { code: string; label: string; copiedLabel: string }) {
@@ -11,6 +12,7 @@ export function CopyBlock({ code, label, copiedLabel }: { code: string; label: s
     try {
       await navigator.clipboard.writeText(code)
       setCopied(true)
+      track('copy-plugins-config', { what: label })
       window.setTimeout(() => setCopied(false), 1600)
     } catch {
       setCopied(false)

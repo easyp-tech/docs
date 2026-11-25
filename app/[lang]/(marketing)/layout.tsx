@@ -4,7 +4,7 @@ import { HomeLayout } from 'fumadocs-ui/layouts/home'
 import { baseOptions } from '@/lib/layout.shared'
 import { isAppLocale } from '@/lib/i18n'
 
-/** Standalone pages outside the docs tree (/plugins, /roadmap), in both languages. */
+/** Standalone pages outside the docs tree (/plugins, /roadmap, /privacy), in both languages. */
 export default async function MarketingLayout({
   children,
   params,
