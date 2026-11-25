@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import { Shield, ChevronRight, ChevronDown, Copy, CheckCircle } from 'lucide-react'
 import Link from 'next/link'
 import { en } from '@/lib/home-copy'
+import { track } from '@/lib/analytics'
 
 interface InstallOption {
   id: string
@@ -57,6 +58,7 @@ export function Hero({ version = 'vX.X.X' }: { version?: string }) {
     try {
       await navigator.clipboard.writeText(activeOption.cmd)
       setCopied(true)
+      track('copy-install', { method: activeOption.id })
       window.setTimeout(() => setCopied(false), 2000)
     } catch {
       setCopied(false)
@@ -148,6 +150,7 @@ export function Hero({ version = 'vX.X.X' }: { version?: string }) {
                         onClick={() => {
                           setInstallMethod(opt.id)
                           setIsDropdownOpen(false)
+                          track('install-method', { method: opt.id })
                         }}
                         className={`group flex w-full cursor-pointer items-center justify-between px-4 py-3 text-left text-sm transition-colors ${
                           installMethod === opt.id

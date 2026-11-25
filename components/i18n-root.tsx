@@ -4,7 +4,8 @@ import { RootProvider } from 'fumadocs-ui/provider/next'
 import { usePathname, useRouter } from 'next/navigation'
 import { useCallback, type ReactNode } from 'react'
 import { i18n, i18nUI, type AppLocale } from '@/lib/i18n'
-import { switchLocalePath } from '@/lib/locale-path'
+import { stripLocalePrefix, switchLocalePath } from '@/lib/locale-path'
+import { track } from '@/lib/analytics'
 
 const locales = i18n.languages.map((locale) => ({
   locale,
@@ -31,6 +32,10 @@ export function I18nRootProvider({
   const onLocaleChange = useCallback(
     (next: string) => {
       const target = switchLocalePath(next as AppLocale, pathname || '/')
+      track('locale-switch', {
+        from: stripLocalePrefix(pathname || '/').locale ?? i18n.defaultLanguage,
+        to: next,
+      })
       router.push(target)
     },
     [pathname, router],

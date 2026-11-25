@@ -84,6 +84,9 @@ export function Footer() {
         </div>
         <div className="mt-16 flex flex-col items-center justify-between border-t border-fd-border pt-8 text-xs text-fd-muted-foreground md:flex-row">
           <p>{t.rights}</p>
+          <Link href="/privacy" className="mt-4 transition-colors hover:text-fd-primary md:mt-0">
+            {t.privacy}
+          </Link>
         </div>
       </div>
     </footer>

@@ -1,10 +1,11 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Check, ChevronDown, Copy, ExternalLink, FileCode2, Package, Search, X } from 'lucide-react'
 import type { AppLocale } from '@/lib/i18n'
 import { pluginsCopy } from '@/lib/plugins-copy'
 import { cn } from '@/lib/cn'
+import { track } from '@/lib/analytics'
 
 export interface BrowserPlugin {
   id: string
@@ -27,6 +28,8 @@ function useCopy() {
     try {
       await navigator.clipboard.writeText(text)
       setCopied(key)
+      const at = key.lastIndexOf(':')
+      track('copy-plugin', { plugin: key.slice(0, at), version: key.slice(at + 1) })
       window.setTimeout(() => setCopied((current) => (current === key ? null : current)), 1600)
     } catch {
       setCopied(null)
@@ -61,6 +64,19 @@ export function PluginBrowser({
     })
   }, [plugins, query, group])
 
+  // What people look for in the catalog, including what is not there yet.
+  // One event per pause in typing, not per keystroke.
+  const found = useRef(0)
+  found.current = visible.length
+  useEffect(() => {
+    const q = query.trim()
+    if (!q) return
+    const timer = window.setTimeout(() => {
+      track('plugins-search', { query: q.slice(0, 50), found: found.current })
+    }, 1000)
+    return () => window.clearTimeout(timer)
+  }, [query])
+
   const toggle = (id: string) =>
     setOpen((current) => {
       const next = new Set(current)
@@ -94,7 +110,10 @@ export function PluginBrowser({
               <GroupChip
                 key={g.name}
                 active={group === g.name}
-                onClick={() => setGroup(group === g.name ? null : g.name)}
+                onClick={() => {
+                  if (group !== g.name) track('plugins-filter', { group: g.name })
+                  setGroup(group === g.name ? null : g.name)
+                }}
                 label={g.name}
                 count={g.count}
               />
