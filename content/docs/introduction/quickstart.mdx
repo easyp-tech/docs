@@ -1,15 +1,13 @@
 ---
 title: "Quickstart"
-description: "Create a protobuf module and generate code with EasyP v1 nightly."
+description: "Create a protobuf module and generate code with EasyP v1."
 ---
 
-Install an [explicit v1 nightly](/docs/introduction/install#opt-into-v1-nightly) and make sure Git is available. The `go` plugin uses `protoc-gen-go` from `PATH` when installed, otherwise EasyP uses its bundled WASM generator.
+[Install EasyP v1](/docs/introduction/install) and make sure Git is available. The `go` plugin uses `protoc-gen-go` from `PATH` when installed, otherwise EasyP uses its bundled WASM generator.
 
 ## 1. Initialize a module
 
 ```bash
-# Use the nightly installed in the installation guide for this terminal session.
-export PATH="$HOME/.local/share/easyp-nightly/bin:$PATH"
 easyp --version
 
 mkdir contracts && cd contracts
