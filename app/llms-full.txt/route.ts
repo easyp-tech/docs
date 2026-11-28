@@ -1,7 +1,7 @@
 import { getLLMText, source } from '@/lib/source'
 import { i18n } from '@/lib/i18n'
 
-export const revalidate = false
+export const dynamic = 'force-dynamic'
 
 export async function GET(req: Request) {
   const url = new URL(req.url)
@@ -27,5 +27,9 @@ export async function GET(req: Request) {
     }),
   )
 
-  return new Response(sections.join('\n\n---\n\n'))
+  return new Response(sections.join('\n\n---\n\n'), {
+    headers: {
+      'Content-Type': 'text/markdown; charset=utf-8',
+    },
+  })
 }

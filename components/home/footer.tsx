@@ -27,7 +27,7 @@ export function Footer() {
             <h4 className="mb-4 font-medium text-fd-foreground">{t.product.title}</h4>
             <ul className="space-y-3 text-sm text-fd-muted-foreground">
               <li>
-                <Link href="/docs/cli/linter" className="transition-colors hover:text-fd-primary">
+                <Link href="/docs/cli" className="transition-colors hover:text-fd-primary">
                   {t.product.cliTool}
                 </Link>
               </li>

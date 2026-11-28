@@ -10,3 +10,9 @@ export const gitConfig = {
   repo: 'easyp',
   branch: 'main',
 }
+
+export const docsGitConfig = {
+  user: 'easyp-tech',
+  repo: 'docs',
+  branch: 'main',
+}

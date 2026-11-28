@@ -2,7 +2,7 @@ import type { AppLocale } from './i18n'
 
 /**
  * The public roadmap. Statuses were checked against releases and merged PRs on
- * 2026-11-19: "shipped" means in a published release, "now" means being worked
+ * 2026-11-28: "shipped" means in a published release, "now" means being worked
  * on or merged but not yet released. Order inside "next" is the order of work;
  * there are no dates on purpose.
  */
@@ -54,6 +54,29 @@ const en = {
   shippedBody: 'Released and available today, newest first.',
   shipped: [
     {
+      date: '2026-11-28',
+      product: 'cli',
+      version: 'v1.0.0',
+      title: 'easyp 1.0 stable',
+      body: 'First stable v1 release: protobuf.mod / protobuf.lock, easyp.yaml and easyp.gen.yaml, 44 lint rules, 69 compiler-backed breaking rules across 4 profiles (FILE, PACKAGE, WIRE_JSON, WIRE) with Line/Column positions, 15 built-in WASM plugins, remote registry support, and the easyp-mcp stdio server.',
+      url: 'https://github.com/easyp-tech/easyp/releases',
+    },
+    {
+      date: '2026-11-27',
+      product: 'cli',
+      version: 'v0.1.1',
+      title: 'easyprotoc — pure-Go Protobuf compiler',
+      body: 'EasyP’s own pure-Go Protobuf compiler replacing protocompile and go-protoparser across lint, breaking, and generate, with Protobuf Editions 2023 support and zero external protoc dependency.',
+      url: 'https://github.com/easyp-tech/easyprotoc/releases/tag/v0.1.1',
+    },
+    {
+      date: '2026-11-20',
+      product: 'agents',
+      title: 'easyp-mcp: v1 config reference for AI agents',
+      body: 'Standalone stdio MCP server shipping with easyp 1.0. Exposes the easyp_config_describe tool with JSON Schema, protobuf.mod grammar, field docs, and valid v1 examples for easyp.yaml, easyp.gen.yaml, protobuf.mod, and protobuf.lock.',
+      url: 'https://github.com/easyp-tech/easyp/tree/main/cmd/easyp-mcp',
+    },
+    {
       date: '2026-11-19',
       product: 'service',
       version: 'v1.3.2',
@@ -73,7 +96,7 @@ const en = {
       date: '2026-11-10',
       product: 'service',
       title: 'Public plugin registry: plugins.easyp.tech',
-      body: '80 plugins and 1,700+ versions — Go, gRPC, Connect, TypeScript, Python, Java, Rust, Swift and more — ready to use from easyp.yaml without installing anything.',
+      body: '80 plugins and 1,700+ versions — Go, gRPC, Connect, TypeScript, Python, Java, Rust, Swift and more — ready to use from easyp.gen.yaml without installing anything.',
     },
     {
       date: '2026-10-30',
@@ -130,11 +153,6 @@ const en = {
       product: 'cli',
       tagline: 'A drop-in buf replacement',
       now: [
-        {
-          title: 'easyp 1.0 stable',
-          body: 'The v1 configuration and commands from the nightlies, as a stable release.',
-        },
-        { title: 'breaking — the same findings as buf', body: 'Including positions.' },
         { title: 'easyp build', body: 'Compile to descriptor sets without a generate config.' },
         { title: 'easyp format', body: '-w, --diff, --exit-code, --stdin-filepath.' },
         {
@@ -143,7 +161,7 @@ const en = {
         },
         {
           title: 'Compatibility checked every night',
-          body: 'Against the latest buf and protoc; editions 2023 and 2024; Windows in CI.',
+          body: 'Against the latest buf and protoc (lint, breaking, descriptors); editions 2023 shipped, editions 2024 next; Windows in CI.',
         },
       ],
       next: [
@@ -206,13 +224,13 @@ const en = {
     {
       product: 'agents',
       tagline: 'Schemas your agent checks itself',
-      now: [],
-      nowNote: 'Starts together with the language server: both need the same diagnostics, symbol search and formatting.',
-      next: [
+      now: [
         {
-          title: 'easyp mcp',
-          body: 'An MCP server in the CLI: lint, breaking, build, format, generate, symbol search — answers in JSON.',
+          title: 'easyp-mcp: CLI tools beyond easyp_config_describe',
+          body: 'easyp-mcp already ships easyp_config_describe for v1 config schemas, grammar, and examples; expanding it with lint, breaking, build, format, generate, and symbol search alongside the language server.',
         },
+      ],
+      next: [
         {
           title: 'Skills, hooks and ready-made commands',
           body: 'An agent that edits a .proto file formats and lints it, and fixes its own mistakes.',
@@ -258,6 +276,29 @@ const ru: typeof en = {
   shippedBody: 'Вышло и доступно уже сейчас, от новых к старым.',
   shipped: [
     {
+      date: '2026-11-28',
+      product: 'cli',
+      version: 'v1.0.0',
+      title: 'Стабильный easyp 1.0',
+      body: 'Первый стабильный релиз v1: protobuf.mod / protobuf.lock, easyp.yaml и easyp.gen.yaml, 44 правила линтера, 69 правил breaking на базе компилятора в 4 профилях (FILE, PACKAGE, WIRE_JSON, WIRE) с точными позициями Line/Column, 15 встроенных WASM-плагинов, поддержка удалённого реестра и stdio-сервер easyp-mcp.',
+      url: 'https://github.com/easyp-tech/easyp/releases',
+    },
+    {
+      date: '2026-11-27',
+      product: 'cli',
+      version: 'v0.1.1',
+      title: 'easyprotoc — собственный Protobuf-компилятор на Go',
+      body: 'Собственный pure-Go компилятор Protobuf, заменивший protocompile и go-protoparser в lint, breaking и generate — с поддержкой Protobuf Editions 2023 и без внешней зависимости от protoc.',
+      url: 'https://github.com/easyp-tech/easyprotoc/releases/tag/v0.1.1',
+    },
+    {
+      date: '2026-11-20',
+      product: 'agents',
+      title: 'easyp-mcp: справочник v1-конфигов для AI-агентов',
+      body: 'Отдельный stdio MCP-сервер в составе easyp 1.0. Предоставляет инструмент easyp_config_describe с JSON Schema, грамматикой protobuf.mod, документацией полей и валидными v1-примерами для easyp.yaml, easyp.gen.yaml, protobuf.mod и protobuf.lock.',
+      url: 'https://github.com/easyp-tech/easyp/tree/main/cmd/easyp-mcp',
+    },
+    {
       date: '2026-11-19',
       product: 'service',
       version: 'v1.3.2',
@@ -277,7 +318,7 @@ const ru: typeof en = {
       date: '2026-11-10',
       product: 'service',
       title: 'Публичный реестр плагинов: plugins.easyp.tech',
-      body: '80 плагинов и больше 1700 версий — Go, gRPC, Connect, TypeScript, Python, Java, Rust, Swift и другие — подключаются из easyp.yaml без установки.',
+      body: '80 плагинов и больше 1700 версий — Go, gRPC, Connect, TypeScript, Python, Java, Rust, Swift и другие — подключаются из easyp.gen.yaml без установки.',
     },
     {
       date: '2026-10-30',
@@ -334,8 +375,6 @@ const ru: typeof en = {
       product: 'cli',
       tagline: 'Замена buf один в один',
       now: [
-        { title: 'Стабильный easyp 1.0', body: 'Конфигурация и команды v1 из ночных сборок — в стабильном релизе.' },
-        { title: 'breaking — те же замечания, что у buf', body: 'Включая позиции.' },
         { title: 'easyp build', body: 'Сборка дескрипторов без конфига генерации.' },
         { title: 'easyp format', body: '-w, --diff, --exit-code, --stdin-filepath.' },
         {
@@ -344,7 +383,7 @@ const ru: typeof en = {
         },
         {
           title: 'Совместимость проверяется каждую ночь',
-          body: 'С последними buf и protoc; editions 2023 и 2024; Windows в CI.',
+          body: 'С последними buf и protoc (lint, breaking, дескрипторы); editions 2023 уже вышли, editions 2024 дальше; Windows в CI.',
         },
       ],
       next: [
@@ -413,13 +452,13 @@ const ru: typeof en = {
     {
       product: 'agents',
       tagline: 'Схемы, которые агент проверяет сам',
-      now: [],
-      nowNote: 'Начнём вместе с языковым сервером: им нужны одни и те же диагностики, поиск символов и форматирование.',
-      next: [
+      now: [
         {
-          title: 'easyp mcp',
-          body: 'MCP-сервер в CLI: lint, breaking, build, format, generate, поиск символов — ответы в JSON.',
+          title: 'easyp-mcp: инструменты CLI поверх easyp_config_describe',
+          body: 'easyp-mcp уже поставляет easyp_config_describe со схемами, грамматикой и примерами v1-конфигов; расширяем его инструментами lint, breaking, build, format, generate и поиском символов вместе с языковым сервером.',
         },
+      ],
+      next: [
         {
           title: 'Навыки, хуки и готовые команды',
           body: 'Агент поменял .proto — файл сразу форматируется и проверяется, агент исправляет свои ошибки сам.',

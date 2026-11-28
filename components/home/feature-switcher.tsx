@@ -94,7 +94,7 @@ export function FeatureSwitcher() {
                 <ul className="space-y-4">
                   {(
                     [
-                      t.server.dockerNative,
+                      t.server.isolatedRuntime,
                       t.server.airGap,
                       t.server.costEffective,
                     ] as const
@@ -119,29 +119,32 @@ export function FeatureSwitcher() {
               aria-hidden
               className="pointer-events-none absolute -inset-1 rounded-2xl bg-gradient-to-r from-blue-500 to-violet-500 opacity-20 blur transition duration-1000 group-hover:opacity-40 group-hover:duration-200"
             />
-            <div className="relative flex h-[400px] flex-col overflow-hidden rounded-xl border border-fd-border bg-fd-card shadow-2xl">
+            <div className="relative flex min-h-[400px] flex-col overflow-hidden rounded-xl border border-fd-border bg-fd-card shadow-2xl">
               <div className="flex items-center gap-2 border-b border-fd-border bg-fd-muted/50 px-4 py-3">
                 <div className="h-3 w-3 rounded-full bg-fd-border" />
                 <div className="h-3 w-3 rounded-full bg-fd-border" />
               </div>
               <div className="flex-grow overflow-hidden p-6 font-mono text-sm">
                 {activeTab === 'cli' ? (
-                  <div className="animate-fade-in-up space-y-2">
+                  <div className="animate-fade-in-up space-y-1">
                     <div className="text-fd-muted-foreground"># easyp.yaml configuration</div>
                     <div className="text-purple-600 dark:text-purple-400">
                       version: <span className="text-emerald-600 dark:text-green-400">v1</span>
                     </div>
-                    <div className="text-purple-600 dark:text-purple-400">deps:</div>
-                    <div className="pl-4 text-fd-foreground">
-                      - github.com/googleapis/googleapis@v1.0
+                    <div className="pt-1 text-purple-600 dark:text-purple-400">linters:</div>
+                    <div className="pl-4 text-blue-600 dark:text-blue-400">
+                      default: <span className="text-fd-foreground">STANDARD</span>
                     </div>
-                    <div className="mt-2 text-purple-600 dark:text-purple-400">lint:</div>
-                    <div className="pl-4 text-blue-600 dark:text-blue-400">use:</div>
-                    <div className="pl-8 text-fd-foreground">- STANDARD</div>
+                    <div className="pl-4 text-blue-600 dark:text-blue-400">enable:</div>
                     <div className="pl-8 text-fd-foreground">- COMMENTS</div>
-                    <div className="mt-4 text-purple-600 dark:text-purple-400">breaking:</div>
+                    <div className="pt-2 text-purple-600 dark:text-purple-400">breaking:</div>
+                    <div className="pl-4 text-blue-600 dark:text-blue-400">
+                      baseline: <span className="text-fd-foreground">git:main</span>
+                    </div>
+                    <div className="pl-4 text-blue-600 dark:text-blue-400">categories:</div>
+                    <div className="pl-8 text-fd-foreground">- FILE</div>
                     <div className="pl-4 text-blue-600 dark:text-blue-400">ignore:</div>
-                    <div className="pl-8 text-fd-foreground">- &quot;proto/alfa/v1&quot;</div>
+                    <div className="pl-8 text-fd-foreground">- &quot;proto/alpha/v1&quot;</div>
                   </div>
                 ) : (
                   <div className="animate-fade-in-up space-y-2">
@@ -155,8 +158,8 @@ export function FeatureSwitcher() {
                     </div>
                     <div className="mt-3 space-y-3 border-l border-fd-border pl-4">
                       {[
-                        ['Registry:', 'Local Docker'],
-                        ['Plugins:', '14 Loaded'],
+                        ['Runtime:', 'Isolated Process'],
+                        ['Plugins:', '80+ Available'],
                         ['Uptime:', '42d 12h'],
                       ].map(([k, v]) => (
                         <div key={k} className="flex items-center gap-2">

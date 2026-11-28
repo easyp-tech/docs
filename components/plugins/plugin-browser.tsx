@@ -19,7 +19,7 @@ export interface BrowserPlugin {
 }
 
 function remoteLine(host: string, id: string, version: string): string {
-  return `- remote: "${host}/${id}:${version}"`
+  return `- remote: ${host}/${id}\n  version: ${version}`
 }
 
 function useCopy() {
@@ -86,7 +86,7 @@ export function PluginBrowser({
     })
 
   return (
-    <section aria-label="Plugins" className="mx-auto w-full min-w-0 max-w-7xl px-6 pb-24">
+    <section aria-label={t.ariaPlugins} className="mx-auto w-full min-w-0 max-w-7xl px-6 pb-24">
       <div className="sticky top-14 z-20 -mx-2 mb-8 rounded-2xl border border-fd-border bg-fd-background/85 p-3 shadow-xl backdrop-blur-xl">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
           <label className="relative flex w-full shrink-0 items-center lg:w-80">
@@ -103,7 +103,7 @@ export function PluginBrowser({
           <div
             className="no-scrollbar flex min-w-0 flex-1 gap-1.5 overflow-x-auto"
             role="group"
-            aria-label="Publishers"
+            aria-label={t.ariaPublishers}
           >
             <GroupChip active={group === null} onClick={() => setGroup(null)} label={t.all} count={plugins.length} />
             {groups.map((g) => (
@@ -168,12 +168,12 @@ export function PluginBrowser({
                 <button
                   type="button"
                   onClick={() => copy(latestKey, remoteLine(host, plugin.id, plugin.latest))}
-                  title={`${t.copy}: ${host}/${plugin.id}:${plugin.latest}`}
+                  title={`${t.copy}: ${host}/${plugin.id} (${plugin.latest})`}
                   className="mb-4 flex w-full cursor-pointer items-center gap-2 rounded-lg border border-fd-border bg-fd-background/60 px-3 py-2 text-left font-mono text-xs text-fd-muted-foreground transition-colors hover:border-fd-primary/50 hover:text-fd-foreground"
                 >
                   <code className="no-scrollbar flex-1 overflow-x-auto whitespace-nowrap">
                     <span className="opacity-50">remote: </span>
-                    {plugin.id}:{plugin.latest}
+                    {plugin.id} <span className="opacity-50">·</span> {plugin.latest}
                   </code>
                   {copied === latestKey ? (
                     <Check size={14} className="shrink-0 text-emerald-400" aria-label={t.copied} />
