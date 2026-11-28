@@ -60,8 +60,10 @@ failure, after the fact.
 
 The plugin name is `group/name:version`. `group` and `name` match
 `^[a-z][a-z0-9-]*$`; `version` matches `^v\d+\.\d+(\.\d+)?$` or is the literal
-`latest`. The service itself requires the `:version` part — the easyp CLI adds
-`:latest` when a `remote:` entry omits it.
+`latest`. The service itself requires the `:version` part — EasyP v1 CLI
+combines `remote:` and `version:` from `easyp.gen.yaml` into
+`group/name:version` (EasyP v0.17 appended `:latest` when a `remote:` entry
+omitted it).
 
 <Callout type="info">
 `latest` selects the highest registered version: the registry reads the
@@ -112,7 +114,8 @@ attempts, and only when the error text contains `connection refused` or
   Stderr is kept up to 1 MiB for the error message.
 - The process gets its own process group, and on timeout the whole group is
   killed with `SIGKILL`.
-- The working directory is not set; it is the service's.
+- Each invocation gets a fresh temporary working directory under
+  `plugins_dir/.tmp` (`run-*`), which is removed when the process exits.
 
 That is the whole containment. See [Security](/docs/api-service/security) for
 what it does not cover.
@@ -147,9 +150,10 @@ mounted, or baked into an image. The registry row only points at them.
 
 Republishing a version (`plugins publish --force`) uploads the new archive and
 replaces the recorded checksum through `UpdatePlugin`. On next use every replica
-sees that its `.sha256` marker no longer matches the registry and refetches; a
-directory without a marker (unpacked before v1.2.0) counts as current. An
-archive overwritten in storage any other way no longer has the recorded
+sees that its `.sha256` marker no longer matches the registry and refetches;
+since v1.2.1, a directory without a marker (unpacked before v1.2.0) is also
+refetched once whenever the registry has a recorded checksum, and gets a marker.
+An archive overwritten in storage any other way no longer has the recorded
 checksum, and its next download fails with `CHECKSUM_MISMATCH` — republish it
 with `publish --force`, or publish a new version.
 
@@ -164,8 +168,11 @@ generation with `UNAVAILABLE` / `STORAGE_UNAVAILABLE`.
 | `audit_log` | Enterprise audit trail, partitioned by month, plus `audit_log_default`. |
 | `goose_db_version` | Applied migrations. |
 
-Migrations are embedded and applied by the service at start, under a PostgreSQL
-session lock. There are no down migrations.
+Migrations are embedded and applied automatically (`goose Up`) by the service at
+start under a PostgreSQL session lock. Both SQL migrations include
+`-- +goose Down` blocks, though the service never runs rollbacks automatically
+(and rolling back `00002_audit_log_partitioning.sql` cannot restore partitions
+already dropped by retention).
 
 If PostgreSQL is unreachable at start, the service retries with exponential
 backoff capped at 5 s. At runtime the readiness endpoint `/` on the health port

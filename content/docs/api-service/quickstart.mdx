@@ -121,30 +121,30 @@ service.
 
 ## 5. Generate code
 
-In a project with `.proto` files under `proto/`:
+In a project with `.proto` files (for example with `roots proto` in
+`protobuf.mod`), create `easyp.gen.yaml`:
 
 ```yaml
-# easyp.yaml
-generate:
-  inputs:
-    - directory:
-        path: .
-        root: proto
-  plugins:
-    - remote: "localhost:23410/protocolbuffers/go:v1.36.10"
-      out: gen/go
-      opts:
-        paths: source_relative
+# easyp.gen.yaml
+version: v1
+plugins:
+  - remote: localhost:23410/protocolbuffers/go
+    version: v1.36.10
+    out: gen/go
+    opts:
+      paths: source_relative
 ```
 
 ```bash
 easyp generate
 ```
 
-The CLI talks plaintext to `localhost` and TLS to any other host. `latest` is
-the highest registered version, but pin the version in `remote:` anyway:
-`latest` moves when a newer version is registered, and generated code changes
-with it. See [Client usage](/docs/api-service/client-usage).
+The CLI talks plaintext to `localhost` and TLS to any other host. EasyP v1
+requires an explicit semver `version:` field in `easyp.gen.yaml` and rejects
+`:version` inside `remote:` or `latest`. On EasyP v0.17, configure the same
+plugin in `easyp.yaml` under `generate.plugins` as
+`remote: "localhost:23410/protocolbuffers/go:v1.36.10"`. See
+[Client usage](/docs/api-service/client-usage).
 
 ## Running from source
 

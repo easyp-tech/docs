@@ -111,7 +111,7 @@ The licence is a PASETO v4.public token signed with Ed25519. Verification is
 offline: the service does not call anything.
 
 1. The token comes from `license.key` (`LICENSE_KEY`) or the file named by
-   `license.file`.
+   `license.file` (`LICENSE_FILE`).
 2. The key id in the token's footer selects a public key from
    `license.public_keys`; an entry under `"*"` verifies any key id. The Helm
    chart ships easyp.tech's current public key (`2026-08`).
@@ -135,8 +135,10 @@ release, not the token.
 - The token is re-validated every `license.cache_ttl` (5 minutes), so the tier
   changes on a running service. Replacing the token itself needs a restart.
 
-Dropping to Community is silent for clients: audit stops, the plugin ceiling
-starts refusing registrations above 10. The alerts
+Dropping to Community is silent for clients: on the running process, audit stops
+and the 10-version plugin ceiling starts refusing new registrations immediately,
+while the `worker_pool.workers` (4) and `worker_pool.max_concurrent_generations`
+(16) ceilings take effect on restart (logged at `Warn`). The alerts
 [EasypLicenceExpiringSoon](/docs/api-service/runbooks#easyplicenceexpiringsoon)
 and [EasypLicenceInGrace](/docs/api-service/runbooks#easyplicenceingrace) exist
 for this.

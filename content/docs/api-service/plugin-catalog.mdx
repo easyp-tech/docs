@@ -9,21 +9,22 @@ This is the catalogue in the service repository at **v1.3.2**: **80 plugins** th
 **1522 distinct versions**. Each entry is a build recipe in `registry/`, not a plugin that
 is running somewhere — a deployment has only the versions its operator built and registered
 (a Community licence allows 10 versions). See [Plugins](/docs/api-service/plugins) for how to build and
-register them, and [Client usage](/docs/api-service/client-usage) for `easyp.yaml`.
+register them, and [Client usage](/docs/api-service/client-usage) for `easyp.gen.yaml`.
 
 What is registered on the public registry right now is on [Plugins on plugins.easyp.tech](/plugins).
 
-Once a version is registered on your service, reference it as:
+Once a version is registered on your service, reference it in `easyp.gen.yaml` as:
 
 ```yaml
-generate:
-  plugins:
-    - remote: "plugins.example.com/protocolbuffers/go:v1.36.10"
-      out: gen/go
+version: v1
+plugins:
+  - remote: plugins.example.com/protocolbuffers/go
+    version: v1.36.10
+    out: gen/go
 ```
 
 <Callout type="warn">
-Pin the version. Without one the service uses `latest`, the highest registered version compared by number (`v1.36.11` over `v1.36.9`), which changes whenever a newer version is published. The versions below are sorted newest first.
+Pin an explicit semver version. EasyP v1 CLI requires a separate `version:` field in `easyp.gen.yaml` and rejects `:version` suffixes or `latest` (on EasyP v0.17 `easyp.yaml`, use `remote: "plugins.example.com/protocolbuffers/go:v1.36.10"`). Direct gRPC/SDK callers or v0.17 configs that omit a version get `latest` — the highest registered version compared by number (`v1.36.11` over `v1.36.9`), which changes whenever a newer version is published. The versions below are sorted newest first.
 </Callout>
 
 <Callout type="warn">

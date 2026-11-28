@@ -23,9 +23,10 @@ files you generate from never leave your network.
 - **Nobody decides which versions are allowed.** Without a central list, a
   plugin version is whatever someone last installed.
 
-With the service, the plugin version is part of the configuration
-(`remote: host/protocolbuffers/go:v1.36.10`), and the binary behind that name is
-the same for every caller.
+With the service, the plugin version is part of `easyp.gen.yaml`
+(`remote: host/protocolbuffers/go` with `version: v1.36.10`; in EasyP v0.17,
+`remote: "host/protocolbuffers/go:v1.36.10"` in `easyp.yaml`), and the binary
+behind that name is the same for every caller.
 
 ## How it works
 

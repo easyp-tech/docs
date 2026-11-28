@@ -145,7 +145,7 @@ Ports the container listens on. The service defaults to 23410-23413 when no conf
 
 ## mcp
 
-The MCP endpoint: a read-only HTTP surface AI tooling uses to read the plugin catalog and the easyp.yaml schema. It exposes nothing the anonymous gRPC reads do not, but it sits outside the gRPC interceptor chain — no TLS, no rate limit, no audit — so serving it is a deployment's explicit decision. Off: the container does not listen on ports.mcp and the Service does not publish it. Turn it on inside a trusted network or behind an ingress that terminates TLS.
+The MCP endpoint: a read-only HTTP surface AI tooling uses to read the plugin catalog (the chart 1.3.2 comment still mentions the `easyp.yaml` schema, which was removed in v0.14.0 — see [MCP Endpoint](/docs/api-service/mcp)). It exposes nothing the anonymous gRPC reads do not, but it sits outside the gRPC interceptor chain — no TLS, no rate limit, no audit — so serving it is a deployment's explicit decision. Off: the container does not listen on ports.mcp and the Service does not publish it. Turn it on inside a trusted network or behind an ingress that terminates TLS.
 
 | Key | Type | Default | Description |
 |---|---|---|---|

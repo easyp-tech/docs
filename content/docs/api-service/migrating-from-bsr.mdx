@@ -12,22 +12,25 @@ Information about Buf is current as of 23 September 2026.
 
 - A running EasyP API Service reachable from developer machines and CI —
   [Installation](/docs/api-service/installation).
-- The easyp CLI configured for your schemas (`easyp.yaml` with `generate.inputs`).
+- The easyp CLI configured for your module (`protobuf.mod` and `easyp.gen.yaml`;
+  for EasyP v0.17, `easyp.yaml` with `generate.inputs`).
 - A list of every `remote:` plugin in your `buf.gen.yaml` files, with versions.
 
 ## 1. Map plugin names
 
 BSR references are `buf.build/<owner>/<plugin>:<version>`
-([remote plugins](https://buf.build/docs/bsr/remote-plugins/)). EasyP names are
-`<group>/<name>:<version>` on your host. The EasyP catalogue follows the same
-owners, so the path after the host is usually identical:
+([remote plugins](https://buf.build/docs/bsr/remote-plugins/)). On the service
+itself, plugins are named `<group>/<name>:<version>`; in EasyP v1
+`easyp.gen.yaml`, the host and path go in `remote:` and the semver tag goes in
+`version:`. The EasyP catalogue follows the same owners, so the path after the
+host is usually identical:
 
-| BSR `remote:` | EasyP `remote:` |
+| BSR `remote:` | EasyP v1 `remote:` + `version:` |
 |---|---|
-| `buf.build/protocolbuffers/go:v1.36.10` | `plugins.example.com/protocolbuffers/go:v1.36.10` |
-| `buf.build/grpc/go:v1.5.1` | `plugins.example.com/grpc/go:v1.5.1` |
-| `buf.build/connectrpc/go:v1.18.1` | `plugins.example.com/connectrpc/go:v1.18.1` |
-| `buf.build/bufbuild/es:v2.2.0` | `plugins.example.com/bufbuild/es:v2.2.0` |
+| `buf.build/protocolbuffers/go:v1.36.10` | `plugins.example.com/protocolbuffers/go` + `v1.36.10` |
+| `buf.build/grpc/go:v1.5.1` | `plugins.example.com/grpc/go` + `v1.5.1` |
+| `buf.build/connectrpc/go:v1.18.1` | `plugins.example.com/connectrpc/go` + `v1.18.1` |
+| `buf.build/bufbuild/es:v2.2.0` | `plugins.example.com/bufbuild/es` + `v2.2.0` |
 
 Check each one:
 
@@ -40,8 +43,10 @@ Check each one:
 A plugin missing from the EasyP catalogue needs a recipe of your own — see
 [Plugins](/docs/api-service/plugins#adding-a-plugin).
 
-Always pin versions. An unpinned EasyP reference resolves to the newest
-registered version, which changes the moment you publish a newer one.
+Always pin versions. EasyP v1 requires an explicit semver `version:` in
+`easyp.gen.yaml`; in direct gRPC/SDK calls or EasyP v0.17 configs, an unpinned
+reference resolves to `latest` (the highest registered version), which changes
+the moment you publish a newer one.
 
 ## 2. Build and publish
 
@@ -76,30 +81,32 @@ plugins:
 ```
 
 ```yaml
-# easyp.yaml
-generate:
-  inputs:
-    - directory:
-        path: .
-        root: proto
-  plugins:
-    - remote: "plugins.example.com/protocolbuffers/go:v1.36.10"
-      out: gen/go
-      opts:
-        paths: source_relative
-    - remote: "plugins.example.com/grpc/go:v1.5.1"
-      out: gen/go
-      opts:
-        paths: source_relative
-        require_unimplemented_servers: false
+# easyp.gen.yaml
+version: v1
+plugins:
+  - remote: plugins.example.com/protocolbuffers/go
+    version: v1.36.10
+    out: gen/go
+    opts:
+      paths: source_relative
+  - remote: plugins.example.com/grpc/go
+    version: v1.5.1
+    out: gen/go
+    opts:
+      paths: source_relative
+      require_unimplemented_servers: false
 ```
 
-| buf.gen.yaml | easyp.yaml |
+On EasyP v0.17 (`easyp.yaml`), place plugins under `generate.plugins` with
+`remote: "plugins.example.com/protocolbuffers/go:v1.36.10"` and declare inputs
+under `generate.inputs`.
+
+| buf.gen.yaml | easyp.gen.yaml |
 |---|---|
-| `plugins[].remote` | `generate.plugins[].remote`, with your host |
-| `plugins[].opt` (string or list) | `generate.plugins[].opts` (map) |
-| `plugins[].out` | `generate.plugins[].out` |
-| `inputs` | `generate.inputs` |
+| `plugins[].remote` (`buf.build/<owner>/<plugin>:<version>`) | `plugins[].remote` (`<host>/<group>/<name>`) + `plugins[].version` (`vX.Y.Z`) |
+| `plugins[].opt` (string or list) | `plugins[].opts` (map or string list) |
+| `plugins[].out` | `plugins[].out` |
+| `inputs` | Module roots in `protobuf.mod`, optionally narrowed with `generate.modules` / `generate.paths` / `generate.packages` |
 | managed mode | `generate.managed` — see [Generator](/docs/cli/generator) |
 
 ## 4. CI
@@ -139,7 +146,7 @@ set of input files.
 
 The reverse is the same table read right to left.
 
-1. For each `remote:` in `easyp.yaml`, check the plugin exists in the BSR
+1. For each `remote:` in `easyp.gen.yaml` (or `easyp.yaml` on v0.17), check the plugin exists in the BSR
    catalogue (https://buf.build/plugins) at the same version. Internal plugins
    you registered on EasyP need to become
    [custom plugins](https://buf.build/docs/bsr/remote-plugins/custom-plugins/)

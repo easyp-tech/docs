@@ -112,7 +112,8 @@ SDK — он поддерживает и то, и другое (`sdk.WithToken`,
 Лицензия — токен PASETO v4.public, подписанный Ed25519. Проверка офлайновая:
 сервис никуда не обращается.
 
-1. Токен берётся из `license.key` (`LICENSE_KEY`) или из файла `license.file`.
+1. Токен берётся из `license.key` (`LICENSE_KEY`) или из файла `license.file`
+   (`LICENSE_FILE`).
 2. Key id из футера токена выбирает публичный ключ из `license.public_keys`;
    запись под `"*"` проверяет любой key id. Helm-чарт поставляется с текущим
    публичным ключом easyp.tech (`2026-08`).
@@ -134,8 +135,11 @@ SDK — он поддерживает и то, и другое (`sdk.WithToken`,
 - Токен перепроверяется каждые `license.cache_ttl` (5 минут), поэтому редакция
   меняется на работающем сервисе. Замена самого токена требует перезапуска.
 
-Для клиентов переход на Community незаметен: аудит прекращается, потолок
-плагинов начинает отклонять регистрации сверх 10. Для этого есть алерты
+Для клиентов переход на Community незаметен: на работающем процессе аудит
+прекращается и потолок в 10 версий плагинов начинает отклонять новые регистрации
+сразу, а потолки `worker_pool.workers` (4) и
+`worker_pool.max_concurrent_generations` (16) вступают в силу при перезапуске
+(в лог пишется `Warn`). Для этого есть алерты
 [EasypLicenceExpiringSoon](/ru/docs/api-service/runbooks#easyplicenceexpiringsoon)
 и [EasypLicenceInGrace](/ru/docs/api-service/runbooks#easyplicenceingrace).
 
