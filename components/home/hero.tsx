@@ -21,7 +21,7 @@ export function Hero({ version = 'vX.X.X' }: { version?: string }) {
   const dropdownRef = useRef<HTMLDivElement>(null)
 
   const installOptions: InstallOption[] = [
-    { id: 'brew', label: 'brew', fullLabel: 'macOS (homebrew)', cmd: 'brew install easyp-tech/tap/easyp' },
+    { id: 'brew', label: 'brew', fullLabel: 'macOS / Linux (homebrew)', cmd: 'brew install easyp-tech/tap/easyp' },
     { id: 'go', label: 'go', fullLabel: 'go Install (any OS)', cmd: 'go install github.com/easyp-tech/easyp/cmd/easyp@latest' },
     { id: 'docker', label: 'docker', fullLabel: 'docker', cmd: 'docker pull ghcr.io/easyp-tech/easyp:latest' },
   ]
@@ -197,7 +197,7 @@ export function Hero({ version = 'vX.X.X' }: { version?: string }) {
           <div className="p-6 font-mono text-sm leading-loose sm:p-10 sm:text-base">
             <div className="flex items-start gap-2">
               <span className="font-bold text-fd-primary">➜</span>
-              <span className="text-fd-foreground">easyp generate -v</span>
+              <span className="text-fd-foreground">easyp generate</span>
             </div>
             <div className="mt-2 border-l-2 border-fd-border pl-4 text-fd-muted-foreground">
               <div className="flex items-center gap-2">
@@ -205,7 +205,7 @@ export function Hero({ version = 'vX.X.X' }: { version?: string }) {
                 <span>
                   Resolving dependencies from{' '}
                   <span className="text-fd-foreground underline decoration-fd-border">
-                    easyp.lock
+                    protobuf.lock
                   </span>
                   ...
                 </span>
@@ -223,14 +223,14 @@ export function Hero({ version = 'vX.X.X' }: { version?: string }) {
                 <span className="text-blue-600 dark:text-blue-400">[INFO]</span> Dispatching
                 plugins:
                 <div className="mt-1 pl-4 text-fd-muted-foreground">
-                  ├─ protoc-gen-go (v1.31){' '}
+                  ├─ protocolbuffers/go (v1.36){' '}
                   <span className="rounded border border-fd-border px-1 text-xs text-fd-muted-foreground">
-                    WASM
+                    REMOTE
                   </span>
                   <br />
-                  └─ custom-java-gen (v2.0){' '}
+                  └─ python{' '}
                   <span className="rounded border border-fd-border px-1 text-xs text-fd-muted-foreground">
-                    DOCKER
+                    WASM
                   </span>
                 </div>
               </div>

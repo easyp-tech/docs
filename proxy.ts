@@ -38,14 +38,19 @@ function isDocsPath(pathname: string): boolean {
 
 /**
  * Markdown negotiation: keep locale for non-default languages.
- * EN:  /docs/foo.md           → /llms.mdx/docs/foo/content.md
- * RU:  /ru/docs/foo.md        → /llms.mdx/docs/ru/foo/content.md
+ * EN:  /docs.md                → /llms.mdx/docs/content.md
+ *      /docs/foo.md            → /llms.mdx/docs/foo/content.md
+ * RU:  /ru/docs.md             → /llms.mdx/docs/ru/content.md
+ *      /ru/docs/foo.md         → /llms.mdx/docs/ru/foo/content.md
  */
 function markdownRewrite(pathname: string): string | null {
-  // /ru/docs/... or /docs/...
+  // /ru/docs.md, /ru/docs/... or /docs/...
   for (const lang of i18n.languages) {
     if (lang === i18n.defaultLanguage) continue
     const prefix = `/${lang}${docsRoute}`
+    if (pathname === `${prefix}.md`) {
+      return `${docsContentRoute}/${lang}/content.md`.replace(/\/+/g, '/')
+    }
     if (pathname === prefix || pathname.startsWith(prefix + '/')) {
       const rest = pathname.slice(prefix.length) // '' or '/foo' or '/foo.md'
       if (rest.endsWith('.md')) {
@@ -73,7 +78,7 @@ function markdownBareRewrite(pathname: string): string | null {
       return `${docsContentRoute}/${lang}${path}/content.md`.replace(/\/+/g, '/')
     }
   }
-const en = rewriteDocsEn(pathname)
+  const en = rewriteDocsEn(pathname)
   return en || null
 }
 

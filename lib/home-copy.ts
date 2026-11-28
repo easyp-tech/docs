@@ -30,26 +30,26 @@ export const en = {
     remoteInfra: "Remote Infrastructure",
     cli: {
       title: "Supercharge your workflow",
-      description: "All tools in a single binary. Linting, formatting, and breaking change detection work instantly.",
+      description: "All tools in a single binary with the built-in easyprotoc pure-Go compiler — zero protoc required. Linting, code generation, and breaking change detection work instantly.",
       packageManager: {
         title: "Package Manager",
-        desc: "Version management via easyp.lock. Like npm, but for Protobuf."
+        desc: "Version management via protobuf.mod & protobuf.lock. Like Go modules, for Protobuf."
       },
       linting: {
         title: "Instant Linting",
-        desc: "100% compatibility with Buf rules"
+        desc: "44 Buf-compatible lint rules powered by the pure-Go easyprotoc compiler"
       },
       apiSafety: {
         title: "API Safety",
-        desc: "Backward compatibility checks in CI"
+        desc: "69 breaking change checks across FILE, PACKAGE, WIRE_JSON, and WIRE profiles"
       }
     },
     server: {
       title: "Your infrastructure, your rules",
       description: "Forget \"works on my machine\" problems. Centralized generation server guarantees identical results for the entire team.",
-      dockerNative: {
-        title: "Docker Native",
-        desc: "Run any plugins (Java, Python, Node) in containers"
+      isolatedRuntime: {
+        title: "Isolated Runtime",
+        desc: "Run versioned plugin bundles (Go, Python, Java, Node) with zero Docker daemon"
       },
       airGap: {
         title: "Air-Gap Ready",
@@ -68,9 +68,9 @@ export const en = {
       title: "Data Sovereignty",
       description: "Unlike SaaS solutions where schemas live in the cloud, EasyP is <strong>Git-Native</strong>. Your data never leaves your secure repositories."
     },
-    hybridRuntime: {
-      title: "Hybrid Runtime",
-      description: "Don't choose between speed and compatibility. EasyP uses <strong>Wasm</strong> for speed and <strong>Docker</strong> for heavy plugins."
+    flexibleExecution: {
+      title: "Flexible Execution",
+      description: "Run <strong>Built-in WASM</strong> plugins for core languages, offload to the <strong>Remote Service</strong>, or invoke local plugins — no Docker daemon required."
     },
     noVendorLock: {
       title: "No Vendor Lock-in",

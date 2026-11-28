@@ -16,8 +16,8 @@ export function ArchitectureComparison() {
     },
     {
       icon: Layers,
-      title: t.hybridRuntime.title,
-      descriptionHtml: t.hybridRuntime.description,
+      title: t.flexibleExecution.title,
+      descriptionHtml: t.flexibleExecution.description,
       iconBg: 'bg-purple-500/10',
       iconColor: 'text-purple-600 dark:text-purple-400',
       hoverBorder: 'hover:border-purple-500/30',
