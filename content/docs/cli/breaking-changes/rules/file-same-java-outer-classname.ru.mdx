@@ -1,0 +1,63 @@
+---
+title: "File Same Java Outer Classname"
+description: "Проверяет, что файлы сохраняют прежнее значение опции java_outer_classname."
+---
+
+- **ID правила:** `FILE_SAME_JAVA_OUTER_CLASSNAME`
+- **Профили:** `FILE`, `PACKAGE`
+
+Это правило проверяет, что файловая опция `java_outer_classname` не изменилась у файла (а также у объявлений, перенесённых в другой файл того же пакета). Изменение `java_outer_classname` меняет имя сгенерированного внешнего класса-обёртки в Java и ломает совместимость сгенерированного кода для Java.
+
+## Примеры
+
+### Неправильно
+
+**До:**
+
+```proto
+syntax = "proto3";
+
+package myapi.v1;
+
+option java_outer_classname = "UserProto";
+
+message User {
+  string id = 1;
+}
+```
+
+**После:**
+
+```proto
+syntax = "proto3";
+
+package myapi.v1;
+
+option java_outer_classname = "UsersProto";
+
+message User {
+  string id = 1;
+}
+```
+
+**Ошибка:**
+
+```text
+user.proto:1:1: File option java_outer_classname changed. (FILE_SAME_JAVA_OUTER_CLASSNAME)
+```
+
+### Правильно
+
+Сохраняйте `option java_outer_classname` неизменной в текущей мажорной версии пакета; меняйте её только в новой мажорной версии (например, `myapi.v2`).
+
+```proto
+syntax = "proto3";
+
+package myapi.v1;
+
+option java_outer_classname = "UserProto";
+
+message User {
+  string id = 1;
+}
+```

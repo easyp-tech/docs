@@ -3,69 +3,151 @@ title: "Breaking Changes Detection"
 description: "Compare protobuf schemas with a Git baseline and revision-local dependencies in EasyP v1."
 ---
 
-<code>easyp breaking</code> compares selected current <code>.proto</code> files with a Git baseline and reports incompatible changes.
+`easyp breaking` compares selected current `.proto` files with a Git baseline and reports incompatible changes.
 
-~~~yaml
+```yaml
 version: v1
 breaking:
   baseline: git:main
   categories: [FILE]
   ignore_unstable: true
   ignore: [experimental]
-~~~
+```
 
-~~~bash
+```bash
 easyp breaking --path proto --against main
 easyp --format json breaking --path proto
-~~~
+easyp breaking --config ./policies/easyp.yaml --path proto --against main
+easyp breaking --frozen --path proto --against main
+```
+
+- `--path` (`-p`) selects a file or directory relative to the scan root (defaults to `.`).
+- `--root` (`-r`) overrides the scan root from the policy directory.
+- `--against` overrides the baseline Git revision (takes precedence over `breaking.baseline`).
+- `--config` selects an explicit policy file instead of discovering `easyp.yaml`.
+- `--frozen` requires existing `protobuf.mod` and verified `protobuf.lock` files without resolving dependencies, writing files, or allowing local `replace` directives.
 
 ## Select a baseline and files
 
-Precedence is explicit <code>--against</code>, then <code>breaking.baseline</code>, then <code>master</code>. Even explicit <code>--against master</code> overrides configuration. An empty or whitespace-only flag is an error; a missing explicit Git baseline never falls back to the configured one.
+Precedence is explicit `--against`, then `breaking.baseline`, then `master`. Even explicit `--against master` overrides configuration. An empty or whitespace-only flag is an error; a missing explicit Git baseline never falls back to the configured one.
 
-The baseline can name a local branch, a lightweight or annotated tag, a full commit SHA, or another locally resolvable Git revision such as <code>HEAD</code>. Required refs and objects must already be present in the checkout. A bare branch name takes precedence over an identically named tag; use <code>refs/tags/v1.2.0</code> to select the tag explicitly. In YAML use <code>git:refs/tags/v1.2.0</code>; for the CLI pass <code>--against refs/tags/v1.2.0</code> without a <code>git:</code> or <code>git-ref=</code> prefix.
+The baseline can name a local branch, a lightweight or annotated tag, a full commit SHA, or another locally resolvable Git revision such as `HEAD`. Required refs and objects must already be present in the checkout. A bare branch name takes precedence over an identically named tag; use `refs/tags/v1.2.0` to select the tag explicitly. In YAML use `git:refs/tags/v1.2.0`; for the CLI pass `--against refs/tags/v1.2.0` without a `git:` or `git-ref=` prefix.
 
-<code>--path</code> selects a file or directory relative to the scan root; <code>--root</code> changes that root from the policy directory. Checked file identities remain repository-relative. <code>breaking.ignore</code> excludes directories; vendored sources are excluded from targets.
+`--path` selects a file or directory relative to the scan root; `--root` changes that root from the policy directory. Checked file identities remain repository-relative. `breaking.ignore` excludes directories; vendored sources are excluded from targets.
 
 Directory and file symlinks select their canonical repository paths, including a deleted suffix beneath an existing directory. Selecting an alias does not skip changes visible through the original path. Targets outside the repository are rejected.
 
-<code>breaking.ignore</code> paths are relative to the file supplying the effective <code>breaking</code> section, not the Git root or <code>--root</code>. For example, <code>ignore: [generated]</code> in <code>api/easyp.yaml</code> excludes <code>api/generated</code>, including when that section is inherited. Entries must be nonempty local relative paths; absolute paths and paths escaping the policy directory or repository are rejected.
+`breaking.ignore` paths are relative to the file supplying the effective `breaking` section, not the Git root or `--root`. For example, `ignore: [generated]` in `api/easyp.yaml` excludes `api/generated`, including when that section is inherited. Entries must be nonempty local relative paths; absolute paths and paths escaping the policy directory or repository are rejected.
 
-Policies come from current configuration. Each nearest defined <code>breaking</code> section applies as a whole; nested policies may select different baselines. Repeated identical findings are emitted once.
+Policies come from current configuration. Each nearest defined `breaking` section applies as a whole; nested policies may select different baselines. Repeated identical findings are emitted once.
 
 ## Revision-local contexts
 
-Each selected module is compared separately. Current and baseline revisions use their own module roots, <code>protobuf.mod</code>, <code>protobuf.lock</code>, and dependencies. Baseline sources, manifests, and locks are read from an isolated Git snapshot. The caller's checkout, manifest, and lock are unchanged; the verified dependency cache may be populated. Temporary snapshots are removed after use.
+Each selected module is compared separately. Current and baseline revisions use their own module roots, `protobuf.mod`, `protobuf.lock`, and dependencies. Baseline sources, manifests, and locks are read from an isolated Git snapshot. The caller's checkout, manifest, and lock are unchanged; the verified dependency cache may be populated. Temporary snapshots are removed after use.
 
 Buf source filters and replacement metadata also belong to their respective revisions. Current files or filters never substitute for missing historical metadata. During consumer checks, reached replacement sources supply imports; they become policy targets only when explicitly selected. Unused replacements cannot exclude consumer targets.
 
-Baseline-only files and deleted modules remain checkable, including through <code>--path</code>. Dependency findings use the policy of the selected files. A policy can also run without a module manifest.
+Baseline-only files and deleted modules remain checkable, including through `--path`. Dependency findings use the policy of the selected files. A policy can also run without a module manifest (unless `--frozen` is passed).
 
 Local replacements inside the repository use the contents of the corresponding revision; absolute paths inside the repository are mapped into the baseline snapshot. External local replacements are rejected because they have no recoverable historical identity. Use a locked dependency for a reproducible baseline.
 
 ## Categories and unstable packages
 
-<code>breaking.categories</code> selects descriptor-based profiles: <code>FILE</code>, <code>PACKAGE</code>, <code>WIRE_JSON</code>, or <code>WIRE</code>. Omitted or empty categories select <code>FILE</code>. Multiple profiles apply their union without duplicate diagnostics.
+`breaking.categories` selects descriptor-based profiles: `FILE` (61 rules), `PACKAGE` (55 rules), `WIRE_JSON` (27 rules), or `WIRE` (20 rules). Omitted or empty categories select `FILE`. Multiple profiles apply their union without duplicate diagnostics.
 
-| Change | FILE | PACKAGE | WIRE_JSON | WIRE |
-|---|---|---|---|---|
+| Change | `FILE` | `PACKAGE` | `WIRE_JSON` | `WIRE` |
+| --- | --- | --- | --- | --- |
 | Move a declaration within its package, preserving options | Reject | Allow | Allow | Allow |
 | Rename a field, even with its old JSON name retained | Reject | Reject | Reject | Allow |
-| Change int32 to int64 | Reject | Reject | Reject | Allow |
-| Change int32 to uint32 | Reject | Reject | Allow | Allow |
-| Change string to bytes | Reject | Reject | Reject | Allow |
-| Change bytes to string or int32 to sint32 | Reject | Reject | Reject | Reject |
+| Change `int32` to `int64` | Reject | Reject | Reject | Allow |
+| Change `int32` to `uint32` | Reject | Reject | Allow | Allow |
+| Change `string` to `bytes` | Reject | Reject | Reject | Allow |
+| Change `bytes` to `string` or `int32` to `sint32` | Reject | Reject | Reject | Reject |
 | Delete a non-required field | Reject | Reject | Reserve number and name | Reserve number |
 | Add/remove a required field or change a real oneof | Reject | Reject | Reject | Reject |
-| Add explicit optional presence | Reject | Reject | Allow | Allow |
-| Convert repeated entry messages to a compatible map | Reject | Reject | Reject | Allow |
+| Add explicit `optional` presence | Reject | Reject | Allow | Allow |
+| Convert repeated entry messages to a compatible `map` | Reject | Reject | Reject | Allow |
 
-A map is encoded as repeated entry messages; repeated scalar values are not compatible merely because their type equals the map value type. Existing reserved names and number ranges cannot be released in any profile. Enum aliases are checked by name/number pairs for source/JSON and by retained numbers for WIRE. RPC/service removal, request/response identity, streaming, idempotency, and actual default-value changes remain checked. Source profiles additionally check supported file/field code-generation options, enum openness, declaration and extension ranges. WIRE_JSON also checks JSON format capability.
+A `map` is encoded as repeated entry messages; repeated scalar values are not compatible merely because their type equals the map value type. Existing reserved names and number ranges cannot be released in any profile. Enum aliases are checked by name/number pairs for source/JSON and by retained numbers for `WIRE`. RPC/service removal, request/response identity, streaming, idempotency, and actual default-value changes remain checked. Source profiles additionally check supported file/field code-generation options, enum openness, declaration and extension ranges. `WIRE_JSON` also checks JSON format capability.
 
-Current and baseline sources are compiled separately using their own imports and pinned revisions. Diagnostics retain source coordinates and repository-relative paths; consumer managed options are not applied. Profiles work with section-scoped extends, ignores, local overlays and frozen verification. No source, manifest, lock or plugin output is written by breaking.
+Current and baseline sources are compiled separately using their own imports and pinned revisions. Diagnostics retain source coordinates and repository-relative paths; consumer managed options are not applied. Profiles work with section-scoped extends, ignores, local overlays, and `--frozen` verification. No source, manifest, lock, or plugin output is written by `easyp breaking`.
 
-The precise implemented rule catalog is <code>internal/config/breaking_profiles.go</code>. This feature does not claim full rule-for-rule Buf equivalence. It checks standard descriptor properties and supported effective Edition features, not arbitrary application-defined option semantics or external generated-code behavior. Unsupported syntax/editions are rejected by the pinned compiler instead of being declared compatible.
+The precise implemented rule catalog is `internal/config/breaking_profiles.go`. This feature does not claim full rule-for-rule Buf equivalence. It checks standard descriptor properties and supported effective Edition features, not arbitrary application-defined option semantics or external generated-code behavior. Unsupported syntax/editions are rejected by the pinned compiler instead of being declared compatible.
 
-<code>breaking.ignore_unstable</code> defaults to false. When true, it excludes packages on both sides whose final component matches <code>vNtest...</code>, <code>vNalpha</code>, <code>vNbeta</code>, <code>vNpMalpha</code>, or <code>vNpMbeta</code>. N and M are positive numbers without leading zeros; alpha/beta may have a similarly positive sequence number, and test may have any suffix. For example, <code>acme.v1beta1</code> is skipped, while <code>acme.v1beta1.service</code> and <code>acme.v0alpha1</code> are not. Stable packages and their references to unstable types remain checked; source reading and import resolution precede filtering.
+`breaking.ignore_unstable` defaults to `false`. When `true`, it excludes packages on both sides whose final component matches `vNtest...`, `vNalpha`, `vNbeta`, `vNpMalpha`, or `vNpMbeta`. `N` and `M` are positive numbers without leading zeros; `alpha`/`beta` may have a similarly positive sequence number, and `test` may have any suffix. For example, `acme.v1beta1` is skipped, while `acme.v1beta1.service` and `acme.v0alpha1` are not. Stable packages and their references to unstable types remain checked; source reading and import resolution precede filtering.
 
-<code>breaking.extends</code> loads a local or locked-module policy. Its baseline and ignore paths apply in the consuming repository; local fields override inherited values. The old <code>breaking_check.against_git_ref</code> key is not accepted by the v1 CLI. See the [policy reference](/docs/reference/easyp-yaml) for all fields.
+`breaking.extends` loads a local or locked-module policy. Its baseline and ignore paths apply in the consuming repository; local fields override inherited values. The old `breaking_check.against_git_ref` key is not accepted by the v1 CLI. See the [policy reference](/docs/reference/easyp-yaml) for all fields.
+
+## Full rule matrix (69 rules)
+
+| Rule | `FILE` (61) | `PACKAGE` (55) | `WIRE_JSON` (27) | `WIRE` (20) |
+| --- | :---: | :---: | :---: | :---: |
+| [`ENUM_MOVED`](/docs/cli/breaking-changes/rules/enum-moved) | Yes | — | — | — |
+| [`ENUM_NO_DELETE`](/docs/cli/breaking-changes/rules/enum-no-delete) | Yes | Yes | — | — |
+| [`ENUM_SAME_JSON_FORMAT`](/docs/cli/breaking-changes/rules/enum-same-json-format) | Yes | Yes | Yes | — |
+| [`ENUM_SAME_TYPE`](/docs/cli/breaking-changes/rules/enum-same-type) | Yes | Yes | — | — |
+| [`ENUM_VALUE_NO_DELETE`](/docs/cli/breaking-changes/rules/enum-value-no-delete) | Yes | Yes | — | — |
+| [`ENUM_VALUE_NO_DELETE_UNLESS_NAME_RESERVED`](/docs/cli/breaking-changes/rules/enum-value-no-delete-unless-name-reserved) | — | — | Yes | — |
+| [`ENUM_VALUE_NO_DELETE_UNLESS_NUMBER_RESERVED`](/docs/cli/breaking-changes/rules/enum-value-no-delete-unless-number-reserved) | — | — | Yes | Yes |
+| [`ENUM_VALUE_SAME_NAME`](/docs/cli/breaking-changes/rules/enum-value-same-name) | Yes | Yes | Yes | — |
+| [`EXTENSION_MESSAGE_NO_DELETE`](/docs/cli/breaking-changes/rules/extension-message-no-delete) | Yes | Yes | — | — |
+| [`EXTENSION_MOVED`](/docs/cli/breaking-changes/rules/extension-moved) | Yes | — | — | — |
+| [`EXTENSION_NO_DELETE`](/docs/cli/breaking-changes/rules/extension-no-delete) | Yes | Yes | — | — |
+| [`EXTENSION_SAME_EXTENDEE`](/docs/cli/breaking-changes/rules/extension-same-extendee) | Yes | Yes | Yes | Yes |
+| [`EXTENSION_SAME_NUMBER`](/docs/cli/breaking-changes/rules/extension-same-number) | Yes | Yes | Yes | Yes |
+| [`FIELD_NO_DELETE`](/docs/cli/breaking-changes/rules/field-no-delete) | Yes | Yes | — | — |
+| [`FIELD_NO_DELETE_UNLESS_NAME_RESERVED`](/docs/cli/breaking-changes/rules/field-no-delete-unless-name-reserved) | — | — | Yes | — |
+| [`FIELD_NO_DELETE_UNLESS_NUMBER_RESERVED`](/docs/cli/breaking-changes/rules/field-no-delete-unless-number-reserved) | — | — | Yes | Yes |
+| [`FIELD_SAME_CARDINALITY`](/docs/cli/breaking-changes/rules/field-same-cardinality) | Yes | Yes | — | — |
+| [`FIELD_SAME_CPP_STRING_TYPE`](/docs/cli/breaking-changes/rules/field-same-cpp-string-type) | Yes | Yes | — | — |
+| [`FIELD_SAME_DEFAULT`](/docs/cli/breaking-changes/rules/field-same-default) | Yes | Yes | Yes | Yes |
+| [`FIELD_SAME_JAVA_UTF8_VALIDATION`](/docs/cli/breaking-changes/rules/field-same-java-utf8-validation) | Yes | Yes | — | — |
+| [`FIELD_SAME_JSON_NAME`](/docs/cli/breaking-changes/rules/field-same-json-name) | Yes | Yes | Yes | — |
+| [`FIELD_SAME_JSTYPE`](/docs/cli/breaking-changes/rules/field-same-jstype) | Yes | Yes | — | — |
+| [`FIELD_SAME_NAME`](/docs/cli/breaking-changes/rules/field-same-name) | Yes | Yes | Yes | — |
+| [`FIELD_SAME_ONEOF`](/docs/cli/breaking-changes/rules/field-same-oneof) | Yes | Yes | Yes | Yes |
+| [`FIELD_SAME_TYPE`](/docs/cli/breaking-changes/rules/field-same-type) | Yes | Yes | — | — |
+| [`FIELD_SAME_UTF8_VALIDATION`](/docs/cli/breaking-changes/rules/field-same-utf8-validation) | Yes | Yes | — | — |
+| [`FIELD_WIRE_COMPATIBLE_CARDINALITY`](/docs/cli/breaking-changes/rules/field-wire-compatible-cardinality) | — | — | — | Yes |
+| [`FIELD_WIRE_COMPATIBLE_TYPE`](/docs/cli/breaking-changes/rules/field-wire-compatible-type) | — | — | — | Yes |
+| [`FIELD_WIRE_JSON_COMPATIBLE_CARDINALITY`](/docs/cli/breaking-changes/rules/field-wire-json-compatible-cardinality) | — | — | Yes | — |
+| [`FIELD_WIRE_JSON_COMPATIBLE_TYPE`](/docs/cli/breaking-changes/rules/field-wire-json-compatible-type) | — | — | Yes | — |
+| [`FILE_NO_DELETE`](/docs/cli/breaking-changes/rules/file-no-delete) | Yes | — | — | — |
+| [`FILE_SAME_CC_ENABLE_ARENAS`](/docs/cli/breaking-changes/rules/file-same-cc-enable-arenas) | Yes | Yes | — | — |
+| [`FILE_SAME_CC_GENERIC_SERVICES`](/docs/cli/breaking-changes/rules/file-same-cc-generic-services) | Yes | Yes | — | — |
+| [`FILE_SAME_CSHARP_NAMESPACE`](/docs/cli/breaking-changes/rules/file-same-csharp-namespace) | Yes | Yes | — | — |
+| [`FILE_SAME_GO_PACKAGE`](/docs/cli/breaking-changes/rules/file-same-go-package) | Yes | Yes | — | — |
+| [`FILE_SAME_JAVA_GENERIC_SERVICES`](/docs/cli/breaking-changes/rules/file-same-java-generic-services) | Yes | Yes | — | — |
+| [`FILE_SAME_JAVA_MULTIPLE_FILES`](/docs/cli/breaking-changes/rules/file-same-java-multiple-files) | Yes | Yes | — | — |
+| [`FILE_SAME_JAVA_OUTER_CLASSNAME`](/docs/cli/breaking-changes/rules/file-same-java-outer-classname) | Yes | Yes | — | — |
+| [`FILE_SAME_JAVA_PACKAGE`](/docs/cli/breaking-changes/rules/file-same-java-package) | Yes | Yes | — | — |
+| [`FILE_SAME_JAVA_STRING_CHECK_UTF8`](/docs/cli/breaking-changes/rules/file-same-java-string-check-utf8) | Yes | Yes | — | — |
+| [`FILE_SAME_OBJC_CLASS_PREFIX`](/docs/cli/breaking-changes/rules/file-same-objc-class-prefix) | Yes | Yes | — | — |
+| [`FILE_SAME_OPTIMIZE_FOR`](/docs/cli/breaking-changes/rules/file-same-optimize-for) | Yes | Yes | — | — |
+| [`FILE_SAME_PACKAGE`](/docs/cli/breaking-changes/rules/file-same-package) | Yes | Yes | Yes | Yes |
+| [`FILE_SAME_PHP_CLASS_PREFIX`](/docs/cli/breaking-changes/rules/file-same-php-class-prefix) | Yes | Yes | — | — |
+| [`FILE_SAME_PHP_METADATA_NAMESPACE`](/docs/cli/breaking-changes/rules/file-same-php-metadata-namespace) | Yes | Yes | — | — |
+| [`FILE_SAME_PHP_NAMESPACE`](/docs/cli/breaking-changes/rules/file-same-php-namespace) | Yes | Yes | — | — |
+| [`FILE_SAME_PY_GENERIC_SERVICES`](/docs/cli/breaking-changes/rules/file-same-py-generic-services) | Yes | Yes | — | — |
+| [`FILE_SAME_RUBY_PACKAGE`](/docs/cli/breaking-changes/rules/file-same-ruby-package) | Yes | Yes | — | — |
+| [`FILE_SAME_SWIFT_PREFIX`](/docs/cli/breaking-changes/rules/file-same-swift-prefix) | Yes | Yes | — | — |
+| [`FILE_SAME_SYNTAX`](/docs/cli/breaking-changes/rules/file-same-syntax) | Yes | Yes | — | — |
+| [`MESSAGE_MOVED`](/docs/cli/breaking-changes/rules/message-moved) | Yes | — | — | — |
+| [`MESSAGE_NO_DELETE`](/docs/cli/breaking-changes/rules/message-no-delete) | Yes | Yes | — | — |
+| [`MESSAGE_NO_REMOVE_STANDARD_DESCRIPTOR_ACCESSOR`](/docs/cli/breaking-changes/rules/message-no-remove-standard-descriptor-accessor) | Yes | Yes | — | — |
+| [`MESSAGE_SAME_JSON_FORMAT`](/docs/cli/breaking-changes/rules/message-same-json-format) | Yes | Yes | Yes | — |
+| [`MESSAGE_SAME_MESSAGE_SET_WIRE_FORMAT`](/docs/cli/breaking-changes/rules/message-same-message-set-wire-format) | Yes | Yes | Yes | Yes |
+| [`MESSAGE_SAME_REQUIRED_FIELDS`](/docs/cli/breaking-changes/rules/message-same-required-fields) | Yes | Yes | Yes | Yes |
+| [`ONEOF_MOVED`](/docs/cli/breaking-changes/rules/oneof-moved) | Yes | — | — | — |
+| [`ONEOF_NO_DELETE`](/docs/cli/breaking-changes/rules/oneof-no-delete) | Yes | Yes | — | — |
+| [`PACKAGE_NO_DELETE`](/docs/cli/breaking-changes/rules/package-no-delete) | Yes | Yes | — | — |
+| [`RESERVED_ENUM_NO_DELETE`](/docs/cli/breaking-changes/rules/reserved-enum-no-delete) | Yes | Yes | Yes | Yes |
+| [`RESERVED_MESSAGE_NO_DELETE`](/docs/cli/breaking-changes/rules/reserved-message-no-delete) | Yes | Yes | Yes | Yes |
+| [`RPC_NO_DELETE`](/docs/cli/breaking-changes/rules/rpc-no-delete) | Yes | Yes | Yes | Yes |
+| [`RPC_SAME_CLIENT_STREAMING`](/docs/cli/breaking-changes/rules/rpc-same-client-streaming) | Yes | Yes | Yes | Yes |
+| [`RPC_SAME_IDEMPOTENCY_LEVEL`](/docs/cli/breaking-changes/rules/rpc-same-idempotency-level) | Yes | Yes | Yes | Yes |
+| [`RPC_SAME_REQUEST_TYPE`](/docs/cli/breaking-changes/rules/rpc-same-request-type) | Yes | Yes | Yes | Yes |
+| [`RPC_SAME_RESPONSE_TYPE`](/docs/cli/breaking-changes/rules/rpc-same-response-type) | Yes | Yes | Yes | Yes |
+| [`RPC_SAME_SERVER_STREAMING`](/docs/cli/breaking-changes/rules/rpc-same-server-streaming) | Yes | Yes | Yes | Yes |
+| [`SERVICE_MOVED`](/docs/cli/breaking-changes/rules/service-moved) | Yes | — | — | — |
+| [`SERVICE_NO_DELETE`](/docs/cli/breaking-changes/rules/service-no-delete) | Yes | Yes | Yes | Yes |

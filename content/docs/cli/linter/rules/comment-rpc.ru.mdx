@@ -1,35 +1,40 @@
 ---
 title: "Comment Rpc"
+description: "Проверяет, что каждый RPC-метод снабжён комментарием."
 ---
 
-Categories:
+- **ID правила:** `COMMENT_RPC`
+- **Группа:** `COMMENTS`
+- **Входит в пресеты (`linters.default`):** `COMMENTS`
 
-- **COMMENT**
+- **ID правила:** `COMMENT_RPC`
+- **Группа:** `COMMENTS`
+- **Входит в пресеты (`linters.default`):** `COMMENTS`
 
-This rule checks that rpc has a comment.
+Это правило проверяет, что у каждого RPC-метода есть документирующий комментарий непосредственно перед объявлением.
 
-## Examples
+## Примеры
 
-### Bad
+### Неправильно
 
 ```proto
 syntax = "proto3";
 
 service Foo {
-    rpc Bar (BarRequest) returns (BarResponse) {}
-    rpc Baz (BazRequest) returns (BazResponse) {}
+  rpc Bar (BarRequest) returns (BarResponse) {}
+  rpc Baz (BazRequest) returns (BazResponse) {}
 }
 ```
 
-### Good
+### Правильно
 
 ```proto
 syntax = "proto3";
 
 service Foo {
-    // Bar rpc for bar logic
-    rpc Bar (BarRequest) returns (BarResponse) {}
-    // Baz rpc for baz logic
-    rpc Baz (BazRequest) returns (BazResponse) {}
+  // Bar выполняет операцию Bar.
+  rpc Bar (BarRequest) returns (BarResponse) {}
+  // Baz выполняет операцию Baz.
+  rpc Baz (BazRequest) returns (BazResponse) {}
 }
 ```

@@ -1,16 +1,17 @@
 ---
 title: "Comment Enum"
+description: "Это правило проверяет, что enum имеет комментарий."
 ---
 
-Категории:
-
-- **COMMENT**
+- **ID правила:** `COMMENT_ENUM`
+- **Группа:** `COMMENTS`
+- **Входит в пресеты (`linters.default`):** `COMMENTS`
 
 Это правило проверяет, что enum имеет комментарий.
 
 ## Примеры
 
-### Bad
+### Неправильно
 
 ```proto
 syntax = "proto3";
@@ -21,7 +22,7 @@ enum Foo {
 }
 ```
 
-### Good
+### Правильно
 
 ```proto
 syntax = "proto3";

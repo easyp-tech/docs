@@ -1,18 +1,17 @@
 ---
 title: "Enum No Allow Alias"
+description: "Это правило проверяет, что опция allow_alias не установлена в значение true внутри enum."
 ---
 
-Категории:
-
-- **MINIMAL**
-- **BASIC**
-- **DEFAULT**
+- **ID правила:** `ENUM_NO_ALLOW_ALIAS`
+- **Группа:** `BASIC`
+- **Входит в пресеты (`linters.default`):** `BASIC`, `STANDARD`, `COMMENTS`
 
 Это правило проверяет, что опция `allow_alias` не установлена в значение `true` внутри enum.
 
 ## Примеры
 
-### Bad
+### Неправильно
 
 ```proto
 syntax = "proto3";
@@ -26,7 +25,7 @@ enum Foo {
 }
 ```
 
-### Good
+### Правильно
 
 ```proto
 syntax = "proto3";

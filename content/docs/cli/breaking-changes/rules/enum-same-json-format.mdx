@@ -1,0 +1,58 @@
+---
+title: "Enum Same Json Format"
+description: "Checks that enums do not downgrade JSON format support from ALLOW to LEGACY_BEST_EFFORT."
+---
+
+- **Rule ID:** `ENUM_SAME_JSON_FORMAT`
+- **Profiles:** `FILE`, `PACKAGE`, `WIRE_JSON`
+
+This rule checks that an enum whose effective `features.json_format` is `ALLOW` (the default in `proto3` and Editions 2023) does not downgrade to `LEGACY_BEST_EFFORT`. Downgrading weakens guaranteed protobuf JSON compliance in `FILE`, `PACKAGE`, and `WIRE_JSON`.
+
+## Examples
+
+### Bad
+
+**Before:**
+
+```proto
+edition = "2023";
+
+package myapi.v1;
+
+enum Status {
+  STATUS_UNSPECIFIED = 0;
+}
+```
+
+**After:**
+
+```proto
+edition = "2023";
+
+package myapi.v1;
+
+enum Status {
+  option features.json_format = LEGACY_BEST_EFFORT;
+  STATUS_UNSPECIFIED = 0;
+}
+```
+
+**Error:**
+
+```text
+status.proto:5:1: Enum "myapi.v1.Status" changed JSON format support. (ENUM_SAME_JSON_FORMAT)
+```
+
+### Good
+
+Keep `features.json_format = ALLOW` (the Editions 2023 default) on enums that already support standard JSON:
+
+```proto
+edition = "2023";
+
+package myapi.v1;
+
+enum Status {
+  STATUS_UNSPECIFIED = 0;
+}
+```

@@ -1,0 +1,48 @@
+---
+title: "Syntax Specified"
+description: "Checks that every .proto file explicitly declares a syntax or edition statement."
+---
+
+- **Rule ID:** `SYNTAX_SPECIFIED`
+- **Group:** `BASIC`
+- **Included in presets (`linters.default`):** `BASIC`, `STANDARD`, `COMMENTS`
+
+- **Rule ID:** `SYNTAX_SPECIFIED`
+- **Group:** `BASIC`
+- **Included in presets (`linters.default`):** `BASIC`, `STANDARD`, `COMMENTS`
+
+This rule checks that every `.proto` file explicitly specifies either a `syntax` declaration (such as `"proto3"` or `"proto2"`) or an `edition` declaration (such as `"2023"`). Omitting it causes compilers to silently default to `proto2`.
+
+## Examples
+
+### Bad
+
+```proto
+package acme.users.v1;
+
+message User {
+  string id = 1;
+}
+```
+
+### Good
+
+```proto
+syntax = "proto3";
+
+package acme.users.v1;
+
+message User {
+  string id = 1;
+}
+```
+
+```proto
+edition = "2023";
+
+package acme.users.v1;
+
+message User {
+  string id = 1;
+}
+```

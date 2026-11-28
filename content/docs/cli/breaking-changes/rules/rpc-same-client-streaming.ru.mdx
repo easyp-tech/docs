@@ -1,0 +1,58 @@
+---
+title: "Rpc Same Client Streaming"
+description: "Проверяет, что RPC-методы не меняют режим клиентского стриминга (client streaming)."
+---
+
+- **ID правила:** `RPC_SAME_CLIENT_STREAMING`
+- **Профили:** `FILE`, `PACKAGE`, `WIRE_JSON`, `WIRE`
+
+Это правило проверяет, что у RPC-метода не добавляется и не убирается `stream` в типе запроса. Переключение между unary и client-streaming меняет и сетевой протокол вызова, и сгенерированные сигнатуры во всех четырёх профилях (`FILE`, `PACKAGE`, `WIRE_JSON`, `WIRE`).
+
+## Примеры
+
+### Неправильно
+
+**До:**
+
+```proto
+syntax = "proto3";
+
+package myapi.v1;
+
+service UploadService {
+  rpc Upload(UploadRequest) returns (UploadResponse);
+}
+```
+
+**После:**
+
+```proto
+syntax = "proto3";
+
+package myapi.v1;
+
+service UploadService {
+  rpc Upload(stream UploadRequest) returns (UploadResponse);
+}
+```
+
+**Ошибка:**
+
+```text
+upload.proto:6:3: RPC "Upload" changed client streaming behavior. (RPC_SAME_CLIENT_STREAMING)
+```
+
+### Правильно
+
+Добавьте новый потоковый RPC-метод вместо изменения режима стриминга у существующего:
+
+```proto
+syntax = "proto3";
+
+package myapi.v1;
+
+service UploadService {
+  rpc Upload(UploadRequest) returns (UploadResponse);
+  rpc UploadStream(stream UploadStreamRequest) returns (UploadStreamResponse);
+}
+```

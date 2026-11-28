@@ -1,0 +1,58 @@
+---
+title: "Field Same Default"
+description: "Checks that fields keep the same explicit or implicit default value."
+---
+
+- **Rule ID:** `FIELD_SAME_DEFAULT`
+- **Profiles:** `FILE`, `PACKAGE`, `WIRE_JSON`, `WIRE`
+
+This rule checks that every field keeps the same effective default value. This applies both to explicit `[default = ...]` options in `proto2` / Editions and to implicit enum defaults (the first declared enum value when a singular enum field has no explicit default). Changing a default alters how older and newer peers interpret omitted fields on the wire.
+
+## Examples
+
+### Bad
+
+**Before:**
+
+```proto
+syntax = "proto2";
+
+package myapi.v1;
+
+message Config {
+  optional int32 timeout_ms = 1 [default = 1000];
+}
+```
+
+**After:**
+
+```proto
+syntax = "proto2";
+
+package myapi.v1;
+
+message Config {
+  optional int32 timeout_ms = 1 [default = 5000];
+}
+```
+
+**Error:**
+
+```text
+config.proto:6:3: Field "timeout_ms" (1) default changed. (FIELD_SAME_DEFAULT)
+```
+
+### Good
+
+Keep the default value unchanged on existing fields; add a new field if a different default is required:
+
+```proto
+syntax = "proto2";
+
+package myapi.v1;
+
+message Config {
+  optional int32 timeout_ms = 1 [default = 1000, deprecated = true];
+  optional int32 request_timeout_ms = 2 [default = 5000];
+}
+```

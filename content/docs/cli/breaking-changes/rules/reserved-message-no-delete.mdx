@@ -1,0 +1,63 @@
+---
+title: "Reserved Message No Delete"
+description: "Checks that existing reserved message field numbers and names are never released."
+---
+
+- **Rule ID:** `RESERVED_MESSAGE_NO_DELETE`
+- **Profiles:** `FILE`, `PACKAGE`, `WIRE_JSON`, `WIRE`
+
+This rule checks that no previously `reserved` field name or number range on a message is removed or narrowed. Releasing a reservation risks reusing retired field tags or names with incompatible types across all four profiles (`FILE`, `PACKAGE`, `WIRE_JSON`, `WIRE`).
+
+## Examples
+
+### Bad
+
+**Before:**
+
+```proto
+syntax = "proto3";
+
+package myapi.v1;
+
+message User {
+  reserved 4, 10 to 20;
+  reserved "legacy_token";
+  string id = 1;
+}
+```
+
+**After:**
+
+```proto
+syntax = "proto3";
+
+package myapi.v1;
+
+message User {
+  reserved 10 to 20;
+  string id = 1;
+}
+```
+
+**Error:**
+
+```text
+user.proto:5:1: Message "myapi.v1.User" released reserved field name "legacy_token". (RESERVED_MESSAGE_NO_DELETE)
+user.proto:5:1: Message "myapi.v1.User" released a reserved field number range. (RESERVED_MESSAGE_NO_DELETE)
+```
+
+### Good
+
+Keep all existing `reserved` ranges and names intact (expanding ranges or adding new reservations is allowed):
+
+```proto
+syntax = "proto3";
+
+package myapi.v1;
+
+message User {
+  reserved 4, 10 to 25;
+  reserved "legacy_token", "old_email";
+  string id = 1;
+}
+```

@@ -1,0 +1,58 @@
+---
+title: "Field Wire Compatible Cardinality"
+description: "Проверяет, что изменения кардинальности поля остаются совместимыми по бинарному формату в профиле WIRE."
+---
+
+- **ID правила:** `FIELD_WIRE_COMPATIBLE_CARDINALITY`
+- **Профили:** `WIRE`
+
+В профиле `WIRE` допускается переключение между неявным и явным `optional` (`string` ↔ `optional string`), а также преобразование между `map<K, V>` и `repeated`-сообщением с бинарно совместимыми entry-полями. Переход между одиночным полем и `repeated`/`map`, а также любые изменения `required`, отклоняются.
+
+## Примеры
+
+### Неправильно
+
+**До:**
+
+```proto
+syntax = "proto3";
+
+package myapi.v1;
+
+message Article {
+  string tag = 1;
+}
+```
+
+**После:**
+
+```proto
+syntax = "proto3";
+
+package myapi.v1;
+
+message Article {
+  repeated string tag = 1;
+}
+```
+
+**Ошибка:**
+
+```text
+article.proto:6:3: Field "tag" (1) on "myapi.v1.Article" changed cardinality from optional_implicit to repeated. (FIELD_WIRE_COMPATIBLE_CARDINALITY)
+```
+
+### Правильно
+
+Используйте wire-совместимые переходы (например, добавление явного `optional` в proto3 допустимо в `WIRE`, а переход от одиночного поля к `repeated` требует нового поля):
+
+```proto
+syntax = "proto3";
+
+package myapi.v1;
+
+message Article {
+  optional string tag = 1;
+  repeated string tags = 2;
+}
+```

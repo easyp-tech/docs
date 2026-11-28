@@ -1,0 +1,48 @@
+---
+title: "Syntax Specified"
+description: "Проверяет, что каждый .proto-файл явно указывает директиву syntax или edition."
+---
+
+- **ID правила:** `SYNTAX_SPECIFIED`
+- **Группа:** `BASIC`
+- **Входит в пресеты (`linters.default`):** `BASIC`, `STANDARD`, `COMMENTS`
+
+- **ID правила:** `SYNTAX_SPECIFIED`
+- **Группа:** `BASIC`
+- **Входит в пресеты (`linters.default`):** `BASIC`, `STANDARD`, `COMMENTS`
+
+Это правило проверяет, что каждый `.proto`-файл явно объявляет `syntax` (например, `"proto3"` или `"proto2"`) или `edition` (например, `"2023"`). Без этой директивы компилятор неявно считает файл `proto2`.
+
+## Примеры
+
+### Неправильно
+
+```proto
+package acme.users.v1;
+
+message User {
+  string id = 1;
+}
+```
+
+### Правильно
+
+```proto
+syntax = "proto3";
+
+package acme.users.v1;
+
+message User {
+  string id = 1;
+}
+```
+
+```proto
+edition = "2023";
+
+package acme.users.v1;
+
+message User {
+  string id = 1;
+}
+```

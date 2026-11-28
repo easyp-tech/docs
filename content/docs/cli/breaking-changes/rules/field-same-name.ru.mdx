@@ -1,0 +1,58 @@
+---
+title: "Field Same Name"
+description: "Проверяет, что поля сохраняют прежнее имя для своего номера."
+---
+
+- **ID правила:** `FIELD_SAME_NAME`
+- **Профили:** `FILE`, `PACKAGE`, `WIRE_JSON`
+
+Это правило проверяет, что поле с тем же номером сохраняет прежнее имя. Переименование поля ломает сгенерированный код (`FILE`, `PACKAGE`) и JSON/текстовый формат (`WIRE_JSON`), даже если сохранить прежний `json_name`. В профиле `WIRE` бинарный формат опирается только на номер поля, поэтому там переименование допустимо.
+
+## Примеры
+
+### Неправильно
+
+**До:**
+
+```proto
+syntax = "proto3";
+
+package myapi.v1;
+
+message User {
+  string first_name = 1;
+}
+```
+
+**После:**
+
+```proto
+syntax = "proto3";
+
+package myapi.v1;
+
+message User {
+  string given_name = 1;
+}
+```
+
+**Ошибка:**
+
+```text
+user.proto:6:3: Field "first_name" (1) on "myapi.v1.User" changed name to "given_name". (FIELD_SAME_NAME)
+```
+
+### Правильно
+
+Сохраните исходное имя поля и добавьте новое поле с нужным именем:
+
+```proto
+syntax = "proto3";
+
+package myapi.v1;
+
+message User {
+  string first_name = 1 [deprecated = true];
+  string given_name = 2;
+}
+```

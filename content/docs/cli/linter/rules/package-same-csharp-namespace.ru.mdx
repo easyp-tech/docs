@@ -1,17 +1,17 @@
 ---
 title: "Package Same Csharp Namespace"
+description: "Это правило проверяет, что все файлы с заданным пакетом используют одно и то же пространство имён C# (csharp_namespace)."
 ---
 
-Категории:
-- **MINIMAL**
-- **BASIC**
-- **DEFAULT**
+- **ID правила:** `PACKAGE_SAME_CSHARP_NAMESPACE`
+- **Группа:** `BASIC`
+- **Входит в пресеты (`linters.default`):** `BASIC`, `STANDARD`, `COMMENTS`
 
 Это правило проверяет, что все файлы с заданным пакетом используют одно и то же пространство имён C# (`csharp_namespace`).
 
 ## Примеры
 
-### Bad
+### Неправильно
 
 ```proto
 // File: pkg/foo.proto
@@ -33,7 +33,7 @@ package pkg;
 option csharp_namespace = "Foo.Baz";
 ```
 
-### Good
+### Правильно
 
 ```proto
 // File: pkg/foo.proto

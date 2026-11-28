@@ -1,0 +1,57 @@
+---
+title: "File Same Package"
+description: "Проверяет, что файл сохраняет прежнее объявление protobuf-пакета."
+---
+
+- **ID правила:** `FILE_SAME_PACKAGE`
+- **Профили:** `FILE`, `PACKAGE`, `WIRE_JSON`, `WIRE`
+
+Это правило проверяет, что `.proto`-файл не меняет объявление `package`. Смена `package` меняет полные имена всех типов, пути gRPC-сервисов и сгенерированные пространства имён во всех четырёх профилях (`FILE`, `PACKAGE`, `WIRE_JSON`, `WIRE`).
+
+## Примеры
+
+### Неправильно
+
+**До:**
+
+```proto
+syntax = "proto3";
+
+package myapi.v1;
+
+message User {
+  string id = 1;
+}
+```
+
+**После:**
+
+```proto
+syntax = "proto3";
+
+package acme.users.v1;
+
+message User {
+  string id = 1;
+}
+```
+
+**Ошибка:**
+
+```text
+user.proto:1:1: File "user.proto" changed package from "myapi.v1" to "acme.users.v1". (FILE_SAME_PACKAGE)
+```
+
+### Правильно
+
+Не меняйте `package` в существующих файлах; при реструктуризации создавайте новые файлы в новом пакете (например, `acme.users.v1` или `myapi.v2`).
+
+```proto
+syntax = "proto3";
+
+package myapi.v1;
+
+message User {
+  string id = 1;
+}
+```

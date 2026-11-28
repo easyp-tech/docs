@@ -1,0 +1,54 @@
+---
+title: "File No Delete"
+description: "Checks that no target .proto files are deleted or renamed."
+---
+
+- **Rule ID:** `FILE_NO_DELETE`
+- **Profiles:** `FILE`
+
+This rule checks that no target `.proto` file present in the baseline is deleted or renamed. Deleting a file breaks downstream `.proto` imports and removes generated file-level artifacts. If you want to move declarations between files in the same package without triggering file-level errors, use the `PACKAGE` profile instead of `FILE`.
+
+## Examples
+
+### Bad
+
+**Before:**
+
+```proto
+// File: myapi/v1/legacy.proto
+syntax = "proto3";
+
+package myapi.v1;
+
+message LegacyItem {
+  string id = 1;
+}
+```
+
+**After:**
+
+```proto
+// File myapi/v1/legacy.proto was deleted
+```
+
+**Error:**
+
+```text
+myapi/v1/legacy.proto:1:1: File "myapi/v1/legacy.proto" was deleted. (FILE_NO_DELETE)
+```
+
+### Good
+
+Keep the file in place and deprecate its declarations until the next major package version:
+
+```proto
+// File: myapi/v1/legacy.proto
+syntax = "proto3";
+
+package myapi.v1;
+
+message LegacyItem {
+  option deprecated = true;
+  string id = 1;
+}
+```

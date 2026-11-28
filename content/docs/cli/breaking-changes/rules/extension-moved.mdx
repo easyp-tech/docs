@@ -1,0 +1,66 @@
+---
+title: "Extension Moved"
+description: "Checks that extensions are not moved to a different .proto file in the FILE profile."
+---
+
+- **Rule ID:** `EXTENSION_MOVED`
+- **Profiles:** `FILE`
+
+In the `FILE` profile, moving an `extend` field declaration to a different `.proto` file breaks generated file-level extension descriptors and language imports. Use the `PACKAGE` profile if moving declarations within the same package is allowed.
+
+## Examples
+
+### Bad
+
+**Before:**
+
+```proto
+// File: myapi/v1/options.proto
+syntax = "proto3";
+
+package myapi.v1;
+
+import "google/protobuf/descriptor.proto";
+
+extend google.protobuf.FieldOptions {
+  bool sensitive = 50001;
+}
+```
+
+**After:**
+
+```proto
+// File: myapi/v1/field_options.proto
+syntax = "proto3";
+
+package myapi.v1;
+
+import "google/protobuf/descriptor.proto";
+
+extend google.protobuf.FieldOptions {
+  bool sensitive = 50001;
+}
+```
+
+**Error:**
+
+```text
+myapi/v1/options.proto:9:3: Extension "myapi.v1.sensitive" was moved between files. (EXTENSION_MOVED)
+```
+
+### Good
+
+Keep the extension in its original `.proto` file when checking with `FILE`:
+
+```proto
+// File: myapi/v1/options.proto
+syntax = "proto3";
+
+package myapi.v1;
+
+import "google/protobuf/descriptor.proto";
+
+extend google.protobuf.FieldOptions {
+  bool sensitive = 50001;
+}
+```

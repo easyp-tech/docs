@@ -1,0 +1,57 @@
+---
+title: "Field Wire Compatible Type"
+description: "Проверяет, что изменения типа поля остаются совместимыми по бинарному формату в профиле WIRE."
+---
+
+- **ID правила:** `FIELD_WIRE_COMPATIBLE_TYPE`
+- **Профили:** `WIRE`
+
+В профиле `WIRE` смена типа допускается только внутри бинарно совместимых семейств: `int32`/`uint32`/`int64`/`uint64`/`bool`, `sint32`/`sint64`, `fixed32`/`sfixed32`, `fixed64`/`sfixed64`, односторонний переход `string` → `bytes`, а также структурно wire-совместимые сообщения и enum. Несовместимые переходы (например, `int32` → `sint32`, `bytes` → `string`, `int32` → `string`) отклоняются.
+
+## Примеры
+
+### Неправильно
+
+**До:**
+
+```proto
+syntax = "proto3";
+
+package myapi.v1;
+
+message Metric {
+  int32 count = 1;
+}
+```
+
+**После:**
+
+```proto
+syntax = "proto3";
+
+package myapi.v1;
+
+message Metric {
+  sint32 count = 1; // ZigZag encoding is not wire-compatible with int32
+}
+```
+
+**Ошибка:**
+
+```text
+metric.proto:6:3: Field "count" (1) on "myapi.v1.Metric" changed incompatibly from int32 to sint32. (FIELD_WIRE_COMPATIBLE_TYPE)
+```
+
+### Правильно
+
+Используйте только бинарно совместимые переходы (например, `int32` → `int64`), а для несовместимых типов добавьте новое поле:
+
+```proto
+syntax = "proto3";
+
+package myapi.v1;
+
+message Metric {
+  int64 count = 1;
+}
+```

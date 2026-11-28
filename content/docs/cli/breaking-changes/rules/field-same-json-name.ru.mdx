@@ -1,0 +1,57 @@
+---
+title: "Field Same Json Name"
+description: "Проверяет, что поля сохраняют прежнее JSON-имя поля."
+---
+
+- **ID правила:** `FIELD_SAME_JSON_NAME`
+- **Профили:** `FILE`, `PACKAGE`, `WIRE_JSON`
+
+Это правило проверяет, что поле с тем же proto-именем сохраняет прежнее эффективное JSON-имя (автоматический lowerCamelCase или явный `[json_name = "..."]`). Изменение JSON-имени ломает JSON-сериализацию и десериализацию Protobuf в профилях `FILE`, `PACKAGE` и `WIRE_JSON`.
+
+## Примеры
+
+### Неправильно
+
+**До:**
+
+```proto
+syntax = "proto3";
+
+package myapi.v1;
+
+message User {
+  string user_id = 1 [json_name = "userId"];
+}
+```
+
+**После:**
+
+```proto
+syntax = "proto3";
+
+package myapi.v1;
+
+message User {
+  string user_id = 1 [json_name = "uid"];
+}
+```
+
+**Ошибка:**
+
+```text
+user.proto:6:3: Field "user_id" (1) changed JSON name from "userId" to "uid". (FIELD_SAME_JSON_NAME)
+```
+
+### Правильно
+
+Сохраняйте эффективное `json_name` неизменным на существующих полях:
+
+```proto
+syntax = "proto3";
+
+package myapi.v1;
+
+message User {
+  string user_id = 1 [json_name = "userId"];
+}
+```

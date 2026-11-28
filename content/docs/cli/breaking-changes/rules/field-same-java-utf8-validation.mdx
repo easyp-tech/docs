@@ -1,0 +1,58 @@
+---
+title: "Field Same Java Utf8 Validation"
+description: "Checks that string fields keep the same effective Java UTF-8 validation behavior."
+---
+
+- **Rule ID:** `FIELD_SAME_JAVA_UTF8_VALIDATION`
+- **Profiles:** `FILE`, `PACKAGE`
+
+This rule checks that `string` fields preserve their effective Java UTF-8 validation mode, computed from `features.(pb.java).utf8_validation`, `features.utf8_validation`, syntax defaults (`proto3`/Editions verify by default), and file option `java_string_check_utf8`. Changing it alters whether generated Java code throws on invalid UTF-8.
+
+## Examples
+
+### Bad
+
+**Before:**
+
+```proto
+edition = "2023";
+
+package myapi.v1;
+
+message Note {
+  string text = 1 [features.utf8_validation = VERIFY];
+}
+```
+
+**After:**
+
+```proto
+edition = "2023";
+
+package myapi.v1;
+
+message Note {
+  string text = 1 [features.utf8_validation = NONE];
+}
+```
+
+**Error:**
+
+```text
+note.proto:6:3: Field "myapi.v1.Note.text" changed Java UTF-8 validation behavior. (FIELD_SAME_JAVA_UTF8_VALIDATION)
+```
+
+### Good
+
+Keep Java UTF-8 validation behavior consistent on existing `string` fields (use `bytes` on a new field if arbitrary byte sequences must be allowed):
+
+```proto
+edition = "2023";
+
+package myapi.v1;
+
+message Note {
+  string text = 1 [features.utf8_validation = VERIFY];
+  bytes raw_text = 2;
+}
+```

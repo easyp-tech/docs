@@ -1,40 +1,64 @@
 ---
 title: "Package Same Directory"
+description: "Проверяет, что все .proto-файлы одного пакета находятся в одном каталоге."
 ---
 
-Категории:
-- **MINIMAL**
-- **BASIC**
-- **DEFAULT**
+- **ID правила:** `PACKAGE_SAME_DIRECTORY`
+- **Группа:** `MINIMAL`
+- **Входит в пресеты (`linters.default`):** `MINIMAL`, `BASIC`, `STANDARD`, `COMMENTS`
 
-Это правило проверяет, что все файлы с данным package находятся в одной директории.
+- **ID правила:** `PACKAGE_SAME_DIRECTORY`
+- **Группа:** `MINIMAL`
+- **Входит в пресеты (`linters.default`):** `MINIMAL`, `BASIC`, `STANDARD`, `COMMENTS`
 
-## Examples
+Это правило уровня модуля проверяет, что все `.proto`-файлы с одинаковым `package` расположены в одном каталоге. Если один пакет разнесён по нескольким каталогам, ошибка выдаётся для каждого файла этого пакета.
 
-### Bad
+## Примеры
+
+### Неправильно
 
 ```proto
-// File: bar/foo.proto
-
+// File: foo/v1/user.proto
 syntax = "proto3";
 
-package foo;
+package foo.v1;
 
-message Foo {
-    string bar = 1;
+message User {
+  string id = 1;
 }
 ```
 
-### Good
-
 ```proto
-// File: bar/foo.proto
-
+// File: bar/v1/order.proto
 syntax = "proto3";
 
-package bar;
+package foo.v1;
 
-message Foo {
-    string bar = 1;
+message Order {
+  string id = 1;
+}
+```
+
+### Правильно
+
+```proto
+// File: foo/v1/user.proto
+syntax = "proto3";
+
+package foo.v1;
+
+message User {
+  string id = 1;
+}
+```
+
+```proto
+// File: foo/v1/order.proto
+syntax = "proto3";
+
+package foo.v1;
+
+message Order {
+  string id = 1;
 }
 ```

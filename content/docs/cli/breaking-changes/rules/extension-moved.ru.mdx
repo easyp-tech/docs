@@ -1,0 +1,66 @@
+---
+title: "Extension Moved"
+description: "Проверяет, что расширения (extend) не переносятся в другой .proto-файл в профиле FILE."
+---
+
+- **ID правила:** `EXTENSION_MOVED`
+- **Профили:** `FILE`
+
+В профиле `FILE` перенос объявления расширения (`extend`) в другой `.proto`-файл ломает сгенерированные файловые дескрипторы расширений и импорты. Если перенос внутри одного пакета допустим, используйте профиль `PACKAGE`.
+
+## Примеры
+
+### Неправильно
+
+**До:**
+
+```proto
+// File: myapi/v1/options.proto
+syntax = "proto3";
+
+package myapi.v1;
+
+import "google/protobuf/descriptor.proto";
+
+extend google.protobuf.FieldOptions {
+  bool sensitive = 50001;
+}
+```
+
+**После:**
+
+```proto
+// File: myapi/v1/field_options.proto
+syntax = "proto3";
+
+package myapi.v1;
+
+import "google/protobuf/descriptor.proto";
+
+extend google.protobuf.FieldOptions {
+  bool sensitive = 50001;
+}
+```
+
+**Ошибка:**
+
+```text
+myapi/v1/options.proto:9:3: Extension "myapi.v1.sensitive" was moved between files. (EXTENSION_MOVED)
+```
+
+### Правильно
+
+Сохраняйте расширение в исходном `.proto`-файле при проверке профилем `FILE`:
+
+```proto
+// File: myapi/v1/options.proto
+syntax = "proto3";
+
+package myapi.v1;
+
+import "google/protobuf/descriptor.proto";
+
+extend google.protobuf.FieldOptions {
+  bool sensitive = 50001;
+}
+```

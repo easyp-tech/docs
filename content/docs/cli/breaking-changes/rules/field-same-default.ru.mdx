@@ -1,0 +1,58 @@
+---
+title: "Field Same Default"
+description: "Проверяет, что поля сохраняют прежнее явное или неявное значение по умолчанию."
+---
+
+- **ID правила:** `FIELD_SAME_DEFAULT`
+- **Профили:** `FILE`, `PACKAGE`, `WIRE_JSON`, `WIRE`
+
+Это правило проверяет, что каждое поле сохраняет прежнее эффективное значение по умолчанию. Это касается как явной опции `[default = ...]` в `proto2` / Editions, так и неявного значения по умолчанию для enum (первого объявленного значения enum у одиночного поля без явного default). Смена значения по умолчанию меняет интерпретацию пропущенных полей по сети.
+
+## Примеры
+
+### Неправильно
+
+**До:**
+
+```proto
+syntax = "proto2";
+
+package myapi.v1;
+
+message Config {
+  optional int32 timeout_ms = 1 [default = 1000];
+}
+```
+
+**После:**
+
+```proto
+syntax = "proto2";
+
+package myapi.v1;
+
+message Config {
+  optional int32 timeout_ms = 1 [default = 5000];
+}
+```
+
+**Ошибка:**
+
+```text
+config.proto:6:3: Field "timeout_ms" (1) default changed. (FIELD_SAME_DEFAULT)
+```
+
+### Правильно
+
+Сохраняйте значение по умолчанию неизменным; при необходимости другого значения добавьте новое поле:
+
+```proto
+syntax = "proto2";
+
+package myapi.v1;
+
+message Config {
+  optional int32 timeout_ms = 1 [default = 1000, deprecated = true];
+  optional int32 request_timeout_ms = 2 [default = 5000];
+}
+```

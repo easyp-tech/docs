@@ -1,18 +1,17 @@
 ---
 title: "File Lower Snake Case"
+description: "Это правило проверяет, что все файлы имеют имя в формате lower_snake_case (только строчные буквы, цифры и символ подчеркивания, без пробелов и заглавных букв)."
 ---
 
-Категории:
-
-- **MINIMAL**
-- **BASIC**
-- **DEFAULT**
+- **ID правила:** `FILE_LOWER_SNAKE_CASE`
+- **Группа:** `DEFAULT`
+- **Входит в пресеты (`linters.default`):** `STANDARD`, `COMMENTS`
 
 Это правило проверяет, что все файлы имеют имя в формате lower_snake_case (только строчные буквы, цифры и символ подчеркивания, без пробелов и заглавных букв).
 
-## Examples
+## Примеры
 
-### Bad
+### Неправильно
 
 ```proto
 // File: bar/FooBaz.proto
@@ -20,7 +19,7 @@ title: "File Lower Snake Case"
 syntax = "proto3";
 ```
 
-### Good
+### Правильно
 
 ```proto
 // File: bar/foo_baz.proto

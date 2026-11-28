@@ -1,13 +1,17 @@
 ---
 title: "Package Same Java Multiple Files"
+description: "Checks that all files in the same package set option java_multiple_files to the same value."
 ---
 
-Categories:
-- **MINIMAL**
-- **BASIC**
-- **DEFAULT**
+- **Rule ID:** `PACKAGE_SAME_JAVA_MULTIPLE_FILES`
+- **Group:** `BASIC`
+- **Included in presets (`linters.default`):** `BASIC`, `STANDARD`, `COMMENTS`
 
-This rule checks that all files with a given package are in the same Java package.
+- **Rule ID:** `PACKAGE_SAME_JAVA_MULTIPLE_FILES`
+- **Group:** `BASIC`
+- **Included in presets (`linters.default`):** `BASIC`, `STANDARD`, `COMMENTS`
+
+This module-level rule checks that all files sharing the same protobuf `package` set `option java_multiple_files` to the same boolean value. A file that omits `option java_multiple_files` is treated as having a distinct value from files that set it explicitly; every file in a disagreeing package is reported.
 
 ## Examples
 
@@ -15,43 +19,38 @@ This rule checks that all files with a given package are in the same Java packag
 
 ```proto
 // File: pkg/foo.proto
-
 syntax = "proto3";
 
 package pkg;
 
-option java_package = "com.example.foo";
+option java_multiple_files = true;
 ```
 
 ```proto
-
 // File: pkg/bar.proto
-
 syntax = "proto3";
 
 package pkg;
 
-option java_package = "com.example.bar";
+option java_multiple_files = false;
 ```
 
 ### Good
 
 ```proto
 // File: pkg/foo.proto
-
 syntax = "proto3";
 
 package pkg;
 
-option java_package = "com.example.foo";
+option java_multiple_files = true;
 ```
 
 ```proto
 // File: pkg/bar.proto
-
 syntax = "proto3";
 
 package pkg;
 
-option java_package = "com.example.foo";
+option java_multiple_files = true;
 ```

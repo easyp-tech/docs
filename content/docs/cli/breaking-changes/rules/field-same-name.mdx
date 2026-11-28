@@ -1,0 +1,58 @@
+---
+title: "Field Same Name"
+description: "Checks that fields keep the same name for a given field number."
+---
+
+- **Rule ID:** `FIELD_SAME_NAME`
+- **Profiles:** `FILE`, `PACKAGE`, `WIRE_JSON`
+
+This rule checks that a field at a given number keeps the same name. Renaming a field breaks generated code (`FILE`, `PACKAGE`) and protobuf JSON / text-format payloads (`WIRE_JSON`), even if you try to preserve `json_name`. In the `WIRE` profile, binary encoding identifies fields by number only, so renaming is allowed there.
+
+## Examples
+
+### Bad
+
+**Before:**
+
+```proto
+syntax = "proto3";
+
+package myapi.v1;
+
+message User {
+  string first_name = 1;
+}
+```
+
+**After:**
+
+```proto
+syntax = "proto3";
+
+package myapi.v1;
+
+message User {
+  string given_name = 1;
+}
+```
+
+**Error:**
+
+```text
+user.proto:6:3: Field "first_name" (1) on "myapi.v1.User" changed name to "given_name". (FIELD_SAME_NAME)
+```
+
+### Good
+
+Keep the original field name and add a new field with the desired name:
+
+```proto
+syntax = "proto3";
+
+package myapi.v1;
+
+message User {
+  string first_name = 1 [deprecated = true];
+  string given_name = 2;
+}
+```

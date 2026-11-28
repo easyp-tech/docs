@@ -1,0 +1,66 @@
+---
+title: "Reserved Enum No Delete"
+description: "Checks that existing reserved enum numbers and names are never released."
+---
+
+- **Rule ID:** `RESERVED_ENUM_NO_DELETE`
+- **Profiles:** `FILE`, `PACKAGE`, `WIRE_JSON`, `WIRE`
+
+This rule checks that no previously `reserved` enum value name or number range is removed or narrowed. Releasing a reservation allows future edits to reuse retired enum numbers or JSON names, causing silent data corruption across all four profiles (`FILE`, `PACKAGE`, `WIRE_JSON`, `WIRE`).
+
+## Examples
+
+### Bad
+
+**Before:**
+
+```proto
+syntax = "proto3";
+
+package myapi.v1;
+
+enum Status {
+  reserved 2, 10 to 15;
+  reserved "STATUS_LEGACY";
+  STATUS_UNSPECIFIED = 0;
+  STATUS_ACTIVE = 1;
+}
+```
+
+**After:**
+
+```proto
+syntax = "proto3";
+
+package myapi.v1;
+
+enum Status {
+  reserved 10 to 15;
+  STATUS_UNSPECIFIED = 0;
+  STATUS_ACTIVE = 1;
+}
+```
+
+**Error:**
+
+```text
+status.proto:5:1: Enum "myapi.v1.Status" released reserved value name "STATUS_LEGACY". (RESERVED_ENUM_NO_DELETE)
+status.proto:5:1: Enum "myapi.v1.Status" released a reserved number range. (RESERVED_ENUM_NO_DELETE)
+```
+
+### Good
+
+Keep all existing `reserved` ranges and names intact (adding more reservations or merging adjacent ranges is allowed):
+
+```proto
+syntax = "proto3";
+
+package myapi.v1;
+
+enum Status {
+  reserved 2, 10 to 20;
+  reserved "STATUS_LEGACY", "STATUS_OLD";
+  STATUS_UNSPECIFIED = 0;
+  STATUS_ACTIVE = 1;
+}
+```

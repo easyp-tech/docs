@@ -1,0 +1,58 @@
+---
+title: "Field Same Cpp String Type"
+description: "Checks that string/bytes fields keep the same C++ string representation option."
+---
+
+- **Rule ID:** `FIELD_SAME_CPP_STRING_TYPE`
+- **Profiles:** `FILE`, `PACKAGE`
+
+This rule checks that fields keep the same effective C++ string representation (`STRING`, `CORD`, or `VIEW`), whether configured via legacy `[ctype = CORD]` / `[ctype = STRING_PIECE]` or via Protobuf Editions `features.(pb.cpp).string_type`. Changing it alters generated C++ getter/setter types.
+
+## Examples
+
+### Bad
+
+**Before:**
+
+```proto
+syntax = "proto3";
+
+package myapi.v1;
+
+message Payload {
+  bytes body = 1;
+}
+```
+
+**After:**
+
+```proto
+syntax = "proto3";
+
+package myapi.v1;
+
+message Payload {
+  bytes body = 1 [ctype = CORD];
+}
+```
+
+**Error:**
+
+```text
+payload.proto:6:3: Field "myapi.v1.Payload.body" changed C++ string type option. (FIELD_SAME_CPP_STRING_TYPE)
+```
+
+### Good
+
+Keep the C++ string type option unchanged on existing fields; introduce a new field if you need a different C++ representation:
+
+```proto
+syntax = "proto3";
+
+package myapi.v1;
+
+message Payload {
+  bytes body = 1;
+  bytes body_cord = 2 [ctype = CORD];
+}
+```

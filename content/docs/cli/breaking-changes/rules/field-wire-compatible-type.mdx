@@ -1,0 +1,57 @@
+---
+title: "Field Wire Compatible Type"
+description: "Checks that field type changes remain binary wire-compatible in the WIRE profile."
+---
+
+- **Rule ID:** `FIELD_WIRE_COMPATIBLE_TYPE`
+- **Profiles:** `WIRE`
+
+In the `WIRE` profile, type changes are allowed only within binary wire-compatible families: `int32`/`uint32`/`int64`/`uint64`/`bool`, `sint32`/`sint64`, `fixed32`/`sfixed32`, `fixed64`/`sfixed64`, one-way `string` → `bytes`, and structurally wire-compatible messages or enums. Incompatible changes (such as `int32` → `sint32`, `bytes` → `string`, or `int32` → `string`) are rejected.
+
+## Examples
+
+### Bad
+
+**Before:**
+
+```proto
+syntax = "proto3";
+
+package myapi.v1;
+
+message Metric {
+  int32 count = 1;
+}
+```
+
+**After:**
+
+```proto
+syntax = "proto3";
+
+package myapi.v1;
+
+message Metric {
+  sint32 count = 1; // ZigZag encoding is not wire-compatible with int32
+}
+```
+
+**Error:**
+
+```text
+metric.proto:6:3: Field "count" (1) on "myapi.v1.Metric" changed incompatibly from int32 to sint32. (FIELD_WIRE_COMPATIBLE_TYPE)
+```
+
+### Good
+
+Use only binary-compatible type transitions (such as `int32` → `int64`), or add a new field for incompatible types:
+
+```proto
+syntax = "proto3";
+
+package myapi.v1;
+
+message Metric {
+  int64 count = 1;
+}
+```

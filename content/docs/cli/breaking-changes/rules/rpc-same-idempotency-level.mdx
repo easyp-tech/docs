@@ -1,0 +1,63 @@
+---
+title: "Rpc Same Idempotency Level"
+description: "Checks that RPC methods keep the same idempotency_level option."
+---
+
+- **Rule ID:** `RPC_SAME_IDEMPOTENCY_LEVEL`
+- **Profiles:** `FILE`, `PACKAGE`, `WIRE_JSON`, `WIRE`
+
+This rule checks that an RPC method preserves its `option idempotency_level` (`IDEMPOTENCY_UNKNOWN`, `NO_SIDE_EFFECTS`, or `IDEMPOTENT`). Proxies, HTTP/GET transcoders, and retry policies rely on idempotency guarantees, so changing it is rejected across all four profiles (`FILE`, `PACKAGE`, `WIRE_JSON`, `WIRE`).
+
+## Examples
+
+### Bad
+
+**Before:**
+
+```proto
+syntax = "proto3";
+
+package myapi.v1;
+
+service UserService {
+  rpc GetUser(GetUserRequest) returns (GetUserResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+}
+```
+
+**After:**
+
+```proto
+syntax = "proto3";
+
+package myapi.v1;
+
+service UserService {
+  rpc GetUser(GetUserRequest) returns (GetUserResponse) {
+    option idempotency_level = IDEMPOTENT;
+  }
+}
+```
+
+**Error:**
+
+```text
+user.proto:6:3: RPC "GetUser" changed idempotency level. (RPC_SAME_IDEMPOTENCY_LEVEL)
+```
+
+### Good
+
+Keep `idempotency_level` unchanged on existing RPC methods (introduce a new RPC if side-effect semantics change):
+
+```proto
+syntax = "proto3";
+
+package myapi.v1;
+
+service UserService {
+  rpc GetUser(GetUserRequest) returns (GetUserResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+}
+```

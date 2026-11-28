@@ -1,33 +1,57 @@
 ---
 title: "Enum Zero Value Suffix"
+description: "Проверяет, что каждое нулевое значение enum заканчивается на заданный суффикс (по умолчанию _NONE)."
 ---
 
-Категории:
+- **ID правила:** `ENUM_ZERO_VALUE_SUFFIX`
+- **Группа:** `DEFAULT`
+- **Входит в пресеты (`linters.default`):** `STANDARD`, `COMMENTS`
 
-- **MINIMAL**
-- **BASIC**
-- **DEFAULT**
+- **ID правила:** `ENUM_ZERO_VALUE_SUFFIX`
+- **Группа:** `DEFAULT`
+- **Входит в пресеты (`linters.default`):** `STANDARD`, `COMMENTS`
 
-Это правило проверяет, что все нулевые значения enum имеют суффикс `_NONE` или ваш кастомный (пользовательский) суффикс.
+Это правило проверяет, что каждое значение enum с номером `0` оканчивается на `_NONE` либо на пользовательский суффикс из `linters-settings.ENUM_ZERO_VALUE_SUFFIX.suffix` (можно указывать с ведущим подчёркиванием или без него).
+
+## Конфигурация
+
+```yaml
+version: v1
+linters-settings:
+  ENUM_ZERO_VALUE_SUFFIX:
+    suffix: UNSPECIFIED
+```
 
 ## Примеры
 
-### Bad
+### Неправильно
 
 ```proto
 syntax = "proto3";
 
 enum Foo {
-    BAR = 0;
+  FOO_BAR = 0;
 }
 ```
 
-### Good
+### Правильно
+
+С суффиксом по умолчанию (`NONE`):
 
 ```proto
 syntax = "proto3";
 
 enum Foo {
-    FOO_BAR_NONE = 0;
+  FOO_NONE = 0;
+}
+```
+
+С настройкой `suffix: UNSPECIFIED`:
+
+```proto
+syntax = "proto3";
+
+enum Foo {
+  FOO_UNSPECIFIED = 0;
 }
 ```

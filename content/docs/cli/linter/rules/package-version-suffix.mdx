@@ -1,14 +1,24 @@
 ---
 title: "Package Version Suffix"
+description: "Checks that the last dot-separated package component is a valid version suffix such as v1 or v1beta1."
 ---
 
-Categories:
+- **Rule ID:** `PACKAGE_VERSION_SUFFIX`
+- **Group:** `DEFAULT`
+- **Included in presets (`linters.default`):** `STANDARD`, `COMMENTS`
 
-- **MINIMAL**
-- **BASIC**
-- **DEFAULT**
+- **Rule ID:** `PACKAGE_VERSION_SUFFIX`
+- **Group:** `DEFAULT`
+- **Included in presets (`linters.default`):** `STANDARD`, `COMMENTS`
 
-This rule checks that the package version suffix is `_vX` where `X` is a number of version.
+This rule checks that the package name has at least two dot-separated components and that its last component is a valid version suffix:
+
+- `vN` (for example, `foo.v1`, `acme.users.v2`)
+- `vNalpha`, `vNalphaM`, `vNbeta`, `vNbetaM` (for example, `foo.v1alpha1`, `foo.v1beta2`)
+- `vNpMalpha`, `vNpMalphaK`, `vNpMbeta`, `vNpMbetaK` (for example, `foo.v1p1alpha1`, `foo.v1p1beta1`)
+- `vNtest...` (for example, `foo.v1test`, `foo.v1testfoo`)
+
+All version numbers (`N`, `M`, `K`) must be integers `>= 1`. Underscore-delimited suffixes like `_v1` or single-component packages like `v1` are rejected.
 
 ## Examples
 
@@ -17,7 +27,25 @@ This rule checks that the package version suffix is `_vX` where `X` is a number 
 ```proto
 syntax = "proto3";
 
-package foo;   
+package foo;
+```
+
+```proto
+syntax = "proto3";
+
+package foo_v1;
+```
+
+```proto
+syntax = "proto3";
+
+package v1;
+```
+
+```proto
+syntax = "proto3";
+
+package foo.v0;
 ```
 
 ### Good
@@ -26,4 +54,22 @@ package foo;
 syntax = "proto3";
 
 package foo.v1;
+```
+
+```proto
+syntax = "proto3";
+
+package foo.v1beta1;
+```
+
+```proto
+syntax = "proto3";
+
+package foo.v1p1alpha1;
+```
+
+```proto
+syntax = "proto3";
+
+package foo.v1test;
 ```

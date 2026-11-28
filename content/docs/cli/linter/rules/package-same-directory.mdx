@@ -1,42 +1,64 @@
 ---
 title: "Package Same Directory"
+description: "Checks that all .proto files sharing a package are located in the same directory."
 ---
 
-Categories:
-- **MINIMAL**
-- **BASIC**
-- **DEFAULT**
+- **Rule ID:** `PACKAGE_SAME_DIRECTORY`
+- **Group:** `MINIMAL`
+- **Included in presets (`linters.default`):** `MINIMAL`, `BASIC`, `STANDARD`, `COMMENTS`
 
-This rule checks that all files with a given package are in the same directory.
+- **Rule ID:** `PACKAGE_SAME_DIRECTORY`
+- **Group:** `MINIMAL`
+- **Included in presets (`linters.default`):** `MINIMAL`, `BASIC`, `STANDARD`, `COMMENTS`
+
+This module-level rule checks that all `.proto` files declaring the same `package` live in the same directory. If a package is split across multiple directories, every file in that package is reported.
 
 ## Examples
 
 ### Bad
 
 ```proto
-// File: bar/foo.proto
-
+// File: foo/v1/user.proto
 syntax = "proto3";
 
-package foo;
+package foo.v1;
 
-message Foo {
-    string bar = 1;
+message User {
+  string id = 1;
 }
+```
 
+```proto
+// File: bar/v1/order.proto
+syntax = "proto3";
+
+package foo.v1;
+
+message Order {
+  string id = 1;
+}
 ```
 
 ### Good
 
 ```proto
-// File: bar/foo.proto
-
+// File: foo/v1/user.proto
 syntax = "proto3";
 
-package bar;
+package foo.v1;
 
-message Foo {
-    string bar = 1;
+message User {
+  string id = 1;
 }
+```
 
+```proto
+// File: foo/v1/order.proto
+syntax = "proto3";
+
+package foo.v1;
+
+message Order {
+  string id = 1;
+}
 ```

@@ -1,0 +1,63 @@
+---
+title: "File Same Optimize For"
+description: "Checks that files keep the same optimize_for option value."
+---
+
+- **Rule ID:** `FILE_SAME_OPTIMIZE_FOR`
+- **Profiles:** `FILE`, `PACKAGE`
+
+This rule checks that the file-level `optimize_for` option does not change for a file or for any declaration moved to another file in the same package. Changing `optimize_for` alters generated reflection and runtime base classes (for example, `SPEED` vs `LITE_RUNTIME`), breaking source compatibility for Protobuf runtime consumers.
+
+## Examples
+
+### Bad
+
+**Before:**
+
+```proto
+syntax = "proto3";
+
+package myapi.v1;
+
+option optimize_for = SPEED;
+
+message User {
+  string id = 1;
+}
+```
+
+**After:**
+
+```proto
+syntax = "proto3";
+
+package myapi.v1;
+
+option optimize_for = LITE_RUNTIME;
+
+message User {
+  string id = 1;
+}
+```
+
+**Error:**
+
+```text
+user.proto:1:1: File option optimize_for changed. (FILE_SAME_OPTIMIZE_FOR)
+```
+
+### Good
+
+Keep `option optimize_for` unchanged in the existing package version; change it only in a new major package version (for example, `myapi.v2`).
+
+```proto
+syntax = "proto3";
+
+package myapi.v1;
+
+option optimize_for = SPEED;
+
+message User {
+  string id = 1;
+}
+```

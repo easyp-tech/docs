@@ -1,0 +1,53 @@
+---
+title: "Field Not Required"
+description: "Проверяет, что поля сообщений не используют модификатор required из proto2."
+---
+
+- **ID правила:** `FIELD_NOT_REQUIRED`
+- **Группа:** `BASIC`
+- **Входит в пресеты (`linters.default`):** `BASIC`, `STANDARD`, `COMMENTS`
+
+- **ID правила:** `FIELD_NOT_REQUIRED`
+- **Группа:** `BASIC`
+- **Входит в пресеты (`linters.default`):** `BASIC`, `STANDARD`, `COMMENTS`
+
+Это правило проверяет, что в объявлениях полей не используется модификатор `required`. Поля `required` в proto2 невозможно безопасно удалить или сделать необязательными в будущем без нарушения wire-совместимости; обязательность данных лучше проверять на уровне прикладной валидации.
+
+## Примеры
+
+### Неправильно
+
+```proto
+syntax = "proto2";
+
+package acme.users.v1;
+
+message User {
+  required string id = 1;
+  optional string email = 2;
+}
+```
+
+### Правильно
+
+```proto
+syntax = "proto2";
+
+package acme.users.v1;
+
+message User {
+  optional string id = 1;
+  optional string email = 2;
+}
+```
+
+```proto
+syntax = "proto3";
+
+package acme.users.v1;
+
+message User {
+  string id = 1;
+  string email = 2;
+}
+```

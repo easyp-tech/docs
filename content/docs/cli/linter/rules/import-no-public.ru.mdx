@@ -1,17 +1,17 @@
 ---
 title: "Import No Public"
+description: "Это правило проверяет, что в proto-файле не используются public импорты (оператор import public \"...\")."
 ---
 
-Категории:
-- **MINIMAL**
-- **BASIC**
-- **DEFAULT**
+- **ID правила:** `IMPORT_NO_PUBLIC`
+- **Группа:** `BASIC`
+- **Входит в пресеты (`linters.default`):** `BASIC`, `STANDARD`, `COMMENTS`
 
 Это правило проверяет, что в proto-файле не используются `public` импорты (оператор `import public "..."`).
 
 ## Примеры
 
-### Bad
+### Неправильно
 
 ```proto
 syntax = "proto3";
@@ -21,7 +21,7 @@ package foo;
 import public "bar.proto";
 ```
 
-### Good
+### Правильно
 
 ```proto
 syntax = "proto3";

@@ -1,14 +1,17 @@
 ---
 title: "Rpc Response Standard Name"
+description: "Checks that RPC response messages are named <Method>Response or <Service><Method>Response."
 ---
 
-Categories:
+- **Rule ID:** `RPC_RESPONSE_STANDARD_NAME`
+- **Group:** `DEFAULT`
+- **Included in presets (`linters.default`):** `STANDARD`, `COMMENTS`
 
-- **MINIMAL**
-- **BASIC**
-- **DEFAULT**
+- **Rule ID:** `RPC_RESPONSE_STANDARD_NAME`
+- **Group:** `DEFAULT`
+- **Included in presets (`linters.default`):** `STANDARD`, `COMMENTS`
 
-This rule checks that all RPC response messages are named `MethodResponse`.
+This rule checks that every RPC response message name follows either `<Method>Response` or `<Service><Method>Response` (using PascalCase for both the service and RPC names).
 
 ## Examples
 
@@ -17,8 +20,8 @@ This rule checks that all RPC response messages are named `MethodResponse`.
 ```proto
 syntax = "proto3";
 
-service Foo {
-    rpc GetFoo (GetFooRequest) returns (Foo) {}
+service FooService {
+  rpc GetFoo(GetFooRequest) returns (Foo) {}
 }
 ```
 
@@ -27,7 +30,8 @@ service Foo {
 ```proto
 syntax = "proto3";
 
-service Foo {
-    rpc GetFoo (GetFooRequest) returns (GetFooResponse) {}
+service FooService {
+  rpc GetFoo(GetFooRequest) returns (GetFooResponse) {}
+  rpc ListFoos(FooServiceListFoosRequest) returns (FooServiceListFoosResponse) {}
 }
 ```

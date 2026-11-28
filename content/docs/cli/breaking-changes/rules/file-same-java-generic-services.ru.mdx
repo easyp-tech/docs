@@ -1,0 +1,63 @@
+---
+title: "File Same Java Generic Services"
+description: "Проверяет, что файлы сохраняют прежнее значение опции java_generic_services."
+---
+
+- **ID правила:** `FILE_SAME_JAVA_GENERIC_SERVICES`
+- **Профили:** `FILE`, `PACKAGE`
+
+Это правило проверяет, что файловая опция `java_generic_services` не изменилась у файла (а также у объявлений, перенесённых в другой файл того же пакета). Изменение `java_generic_services` меняет генерацию абстрактных generic-классов сервисов в Java и ломает совместимость сгенерированного кода для Java.
+
+## Примеры
+
+### Неправильно
+
+**До:**
+
+```proto
+syntax = "proto3";
+
+package myapi.v1;
+
+option java_generic_services = true;
+
+message User {
+  string id = 1;
+}
+```
+
+**После:**
+
+```proto
+syntax = "proto3";
+
+package myapi.v1;
+
+option java_generic_services = false;
+
+message User {
+  string id = 1;
+}
+```
+
+**Ошибка:**
+
+```text
+user.proto:1:1: File option java_generic_services changed. (FILE_SAME_JAVA_GENERIC_SERVICES)
+```
+
+### Правильно
+
+Сохраняйте `option java_generic_services` неизменной в текущей мажорной версии пакета; меняйте её только в новой мажорной версии (например, `myapi.v2`).
+
+```proto
+syntax = "proto3";
+
+package myapi.v1;
+
+option java_generic_services = true;
+
+message User {
+  string id = 1;
+}
+```

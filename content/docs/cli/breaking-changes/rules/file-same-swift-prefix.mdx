@@ -1,0 +1,63 @@
+---
+title: "File Same Swift Prefix"
+description: "Checks that files keep the same swift_prefix option value."
+---
+
+- **Rule ID:** `FILE_SAME_SWIFT_PREFIX`
+- **Profiles:** `FILE`, `PACKAGE`
+
+This rule checks that the file-level `swift_prefix` option does not change for a file or for any declaration moved to another file in the same package. Changing `swift_prefix` alters the prefix prepended to generated Swift type names, breaking source compatibility for Swift consumers.
+
+## Examples
+
+### Bad
+
+**Before:**
+
+```proto
+syntax = "proto3";
+
+package myapi.v1;
+
+option swift_prefix = "Acme";
+
+message User {
+  string id = 1;
+}
+```
+
+**After:**
+
+```proto
+syntax = "proto3";
+
+package myapi.v1;
+
+option swift_prefix = "Users";
+
+message User {
+  string id = 1;
+}
+```
+
+**Error:**
+
+```text
+user.proto:1:1: File option swift_prefix changed. (FILE_SAME_SWIFT_PREFIX)
+```
+
+### Good
+
+Keep `option swift_prefix` unchanged in the existing package version; change it only in a new major package version (for example, `myapi.v2`).
+
+```proto
+syntax = "proto3";
+
+package myapi.v1;
+
+option swift_prefix = "Acme";
+
+message User {
+  string id = 1;
+}
+```

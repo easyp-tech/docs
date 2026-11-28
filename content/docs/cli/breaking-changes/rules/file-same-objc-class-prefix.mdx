@@ -1,0 +1,63 @@
+---
+title: "File Same Objc Class Prefix"
+description: "Checks that files keep the same objc_class_prefix option value."
+---
+
+- **Rule ID:** `FILE_SAME_OBJC_CLASS_PREFIX`
+- **Profiles:** `FILE`, `PACKAGE`
+
+This rule checks that the file-level `objc_class_prefix` option does not change for a file or for any declaration moved to another file in the same package. Changing `objc_class_prefix` alters the prefix prepended to every generated Objective-C class and enum, breaking source compatibility for Objective-C consumers.
+
+## Examples
+
+### Bad
+
+**Before:**
+
+```proto
+syntax = "proto3";
+
+package myapi.v1;
+
+option objc_class_prefix = "ACME";
+
+message User {
+  string id = 1;
+}
+```
+
+**After:**
+
+```proto
+syntax = "proto3";
+
+package myapi.v1;
+
+option objc_class_prefix = "USR";
+
+message User {
+  string id = 1;
+}
+```
+
+**Error:**
+
+```text
+user.proto:1:1: File option objc_class_prefix changed. (FILE_SAME_OBJC_CLASS_PREFIX)
+```
+
+### Good
+
+Keep `option objc_class_prefix` unchanged in the existing package version; change it only in a new major package version (for example, `myapi.v2`).
+
+```proto
+syntax = "proto3";
+
+package myapi.v1;
+
+option objc_class_prefix = "ACME";
+
+message User {
+  string id = 1;
+}
+```

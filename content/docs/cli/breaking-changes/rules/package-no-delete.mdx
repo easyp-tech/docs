@@ -1,0 +1,54 @@
+---
+title: "Package No Delete"
+description: "Checks that no protobuf package present in the baseline is completely deleted."
+---
+
+- **Rule ID:** `PACKAGE_NO_DELETE`
+- **Profiles:** `FILE`, `PACKAGE`
+
+This rule checks that every protobuf `package` present in the baseline still has at least one file in the current revision. Deleting an entire package breaks all imports and generated package modules for downstream consumers.
+
+## Examples
+
+### Bad
+
+**Before:**
+
+```proto
+// File: myapi/v1/user.proto
+syntax = "proto3";
+
+package myapi.v1;
+
+message User {
+  string id = 1;
+}
+```
+
+**After:**
+
+```proto
+// All files in package myapi.v1 were deleted or moved to myapi.v2
+```
+
+**Error:**
+
+```text
+myapi/v1/user.proto:1:1: Package "myapi.v1" was deleted. (PACKAGE_NO_DELETE)
+```
+
+### Good
+
+Keep existing major-version packages intact while introducing new versions (such as `myapi.v2`) alongside them:
+
+```proto
+// File: myapi/v1/user.proto (kept)
+syntax = "proto3";
+
+package myapi.v1;
+
+message User {
+  option deprecated = true;
+  string id = 1;
+}
+```

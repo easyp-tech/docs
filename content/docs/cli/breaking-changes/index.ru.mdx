@@ -3,69 +3,151 @@ title: "Проверка несовместимых изменений"
 description: "Сравнение protobuf-схем с Git-базой и зависимостями каждой ревизии в EasyP v1."
 ---
 
-<code>easyp breaking</code> сравнивает выбранные текущие <code>.proto</code> с Git-базой и выводит несовместимые изменения.
+`easyp breaking` сравнивает выбранные текущие `.proto`-файлы с Git-базой и выводит несовместимые изменения.
 
-~~~yaml
+```yaml
 version: v1
 breaking:
   baseline: git:main
   categories: [FILE]
   ignore_unstable: true
   ignore: [experimental]
-~~~
+```
 
-~~~bash
+```bash
 easyp breaking --path proto --against main
 easyp --format json breaking --path proto
-~~~
+easyp breaking --config ./policies/easyp.yaml --path proto --against main
+easyp breaking --frozen --path proto --against main
+```
+
+- `--path` (`-p`) выбирает файл или каталог относительно корня проверки (по умолчанию `.`).
+- `--root` (`-r`) переопределяет корень проверки вместо каталога политики.
+- `--against` переопределяет базовую Git-ревизию (приоритетнее `breaking.baseline`).
+- `--config` указывает явный файл политики вместо автоматического поиска `easyp.yaml`.
+- `--frozen` требует наличия `protobuf.mod` и проверенного `protobuf.lock` без разрешения зависимостей, изменения файлов и локальных директив `replace`.
 
 ## Выбор базы и файлов
 
-Приоритет: явный <code>--against</code>, затем <code>breaking.baseline</code>, затем <code>master</code>. Даже явный <code>--against master</code> перекрывает конфигурацию. Пустое или пробельное значение флага — ошибка; отсутствующая явная Git-база не заменяется конфигурационной.
+Приоритет: явный `--against`, затем `breaking.baseline`, затем `master`. Даже явный `--against master` перекрывает конфигурацию. Пустое или пробельное значение флага — ошибка; отсутствующая явная Git-база не заменяется конфигурационной.
 
-База может указывать на локальную ветку, лёгкий или аннотированный тег, полный SHA коммита или другую разрешимую локально Git-ревизию, например <code>HEAD</code>. Нужные ссылки и объекты должны уже присутствовать в checkout. Короткое имя ветки приоритетнее одноимённого тега; для явного выбора тега используйте <code>refs/tags/v1.2.0</code>. В YAML задавайте <code>git:refs/tags/v1.2.0</code>, а в CLI — <code>--against refs/tags/v1.2.0</code> без префикса <code>git:</code> или <code>git-ref=</code>.
+База может указывать на локальную ветку, лёгкий или аннотированный тег, полный SHA коммита или другую разрешимую локально Git-ревизию, например `HEAD`. Нужные ссылки и объекты должны уже присутствовать в checkout. Короткое имя ветки приоритетнее одноимённого тега; для явного выбора тега используйте `refs/tags/v1.2.0`. В YAML задавайте `git:refs/tags/v1.2.0`, а в CLI — `--against refs/tags/v1.2.0` без префикса `git:` или `git-ref=`.
 
-<code>--path</code> выбирает файл или каталог относительно корня проверки; <code>--root</code> меняет этот корень с каталога политики. Идентичность проверяемых файлов остаётся относительно Git-репозитория. <code>breaking.ignore</code> исключает каталоги; вендорные исходники не становятся целями проверки.
+`--path` выбирает файл или каталог относительно корня проверки; `--root` меняет этот корень с каталога политики. Идентичность проверяемых файлов остаётся относительно Git-репозитория. `breaking.ignore` исключает каталоги; вендорные исходники не становятся целями проверки.
 
 Symlink на каталог или файл выбирает канонический путь внутри репозитория, в том числе удалённый суффикс под существующим каталогом. Выбор ссылки не пропускает изменения, видимые по исходному пути. Цели за пределами репозитория отклоняются.
 
-Пути <code>breaking.ignore</code> отсчитываются от файла, задающего эффективную секцию <code>breaking</code>, а не от корня Git или <code>--root</code>. Например, <code>ignore: [generated]</code> в <code>api/easyp.yaml</code> исключает <code>api/generated</code>, в том числе при наследовании этой секции. Допустимы непустые локальные относительные пути; абсолютные пути и выход за каталог политики или репозиторий отклоняются.
+Пути `breaking.ignore` отсчитываются от файла, задающего эффективную секцию `breaking`, а не от корня Git или `--root`. Например, `ignore: [generated]` в `api/easyp.yaml` исключает `api/generated`, в том числе при наследовании этой секции. Допустимы непустые локальные относительные пути; абсолютные пути и выход за каталог политики или репозиторий отклоняются.
 
-Политики берутся из текущей конфигурации. Ближайшая определённая секция <code>breaking</code> применяется целиком; вложенные политики могут выбирать разные базы. Повторяющиеся одинаковые замечания выводятся один раз.
+Политики берутся из текущей конфигурации. Ближайшая определённая секция `breaking` применяется целиком; вложенные политики могут выбирать разные базы. Повторяющиеся одинаковые замечания выводятся один раз.
 
 ## Контекст каждой ревизии
 
-Каждый выбранный модуль сравнивается отдельно. Текущая ревизия и база используют собственные корни модулей, <code>protobuf.mod</code>, <code>protobuf.lock</code> и зависимости. Исходники, манифесты и lock базы читаются из изолированного Git-снимка. Рабочее дерево, манифест и lock пользователя не меняются; проверенный кеш зависимостей может пополняться. Временные снимки удаляются после проверки.
+Каждый выбранный модуль сравнивается отдельно. Текущая ревизия и база используют собственные корни модулей, `protobuf.mod`, `protobuf.lock` и зависимости. Исходники, манифесты и lock базы читаются из изолированного Git-снимка. Рабочее дерево, манифест и lock пользователя не меняются; проверенный кеш зависимостей может пополняться. Временные снимки удаляются после проверки.
 
 Фильтры Buf и метаданные замен также берутся из соответствующей ревизии. Текущие файлы и фильтры не подставляются вместо отсутствующих исторических метаданных. При проверке потребителя достижимые исходники замен предоставляют импорты; собственная политика проверяется при явном выборе замены. Неиспользуемые замены не исключают цели потребителя.
 
-Файлы, существующие только в базе, и удалённые модули остаются доступными для проверки, в том числе через <code>--path</code>. Политика выбранных файлов определяет и политику замечаний о зависимостях. Проверка возможна и без манифеста модуля.
+Файлы, существующие только в базе, и удалённые модули остаются доступными для проверки, в том числе через `--path`. Политика выбранных файлов определяет и политику замечаний о зависимостях. Проверка возможна и без манифеста модуля (если не передан `--frozen`).
 
 Локальная замена внутри репозитория использует содержимое соответствующей ревизии; абсолютный путь внутри репозитория отображается в снимок базы. Внешняя локальная замена отклоняется: у неё нет восстановимой исторической идентичности. Для воспроизводимой базы используйте зафиксированную зависимость.
 
 ## Категории и нестабильные пакеты
 
-<code>breaking.categories</code> выбирает профили сравнения скомпилированных дескрипторов: <code>FILE</code>, <code>PACKAGE</code>, <code>WIRE_JSON</code> или <code>WIRE</code>. Отсутствующий или пустой список выбирает <code>FILE</code>. Несколько профилей применяются совместно без повторения одинаковых диагностик.
+`breaking.categories` выбирает профили сравнения скомпилированных дескрипторов: `FILE` (61 правило), `PACKAGE` (55 правил), `WIRE_JSON` (27 правил) или `WIRE` (20 правил). Отсутствующий или пустой список выбирает `FILE`. Несколько профилей применяются совместно без повторения одинаковых диагностик.
 
-| Изменение | FILE | PACKAGE | WIRE_JSON | WIRE |
-|---|---|---|---|---|
+| Изменение | `FILE` | `PACKAGE` | `WIRE_JSON` | `WIRE` |
+| --- | --- | --- | --- | --- |
 | Перенос объявления внутри пакета с сохранением options | Ошибка | Допустимо | Допустимо | Допустимо |
 | Переименование поля, даже при сохранённом JSON-имени | Ошибка | Ошибка | Ошибка | Допустимо |
-| int32 → int64 | Ошибка | Ошибка | Ошибка | Допустимо |
-| int32 → uint32 | Ошибка | Ошибка | Допустимо | Допустимо |
-| string → bytes | Ошибка | Ошибка | Ошибка | Допустимо |
-| bytes → string или int32 → sint32 | Ошибка | Ошибка | Ошибка | Ошибка |
+| `int32` → `int64` | Ошибка | Ошибка | Ошибка | Допустимо |
+| `int32` → `uint32` | Ошибка | Ошибка | Допустимо | Допустимо |
+| `string` → `bytes` | Ошибка | Ошибка | Ошибка | Допустимо |
+| `bytes` → `string` или `int32` → `sint32` | Ошибка | Ошибка | Ошибка | Ошибка |
 | Удаление необязательного поля | Ошибка | Ошибка | Зарезервировать номер и имя | Зарезервировать номер |
-| Добавление/удаление required или изменение настоящего oneof | Ошибка | Ошибка | Ошибка | Ошибка |
-| Добавление явной optional-presence | Ошибка | Ошибка | Допустимо | Допустимо |
-| Повторяемые entry-сообщения → совместимый map | Ошибка | Ошибка | Ошибка | Допустимо |
+| Добавление/удаление `required` или изменение настоящего `oneof` | Ошибка | Ошибка | Ошибка | Ошибка |
+| Добавление явной `optional`-presence | Ошибка | Ошибка | Допустимо | Допустимо |
+| Повторяемые entry-сообщения → совместимый `map` | Ошибка | Ошибка | Ошибка | Допустимо |
 
-Map кодируется повторяемыми entry-сообщениями: повторяемый scalar не становится совместимым с map только из-за совпадения типа значения. Существующие резервные имена и диапазоны номеров нельзя освобождать ни в одном профиле. Alias-значения enum проверяются по парам имя/номер для source/JSON и сохранённым номерам для WIRE. Проверяются удаления RPC/сервисов, типы запросов/ответов, streaming, idempotency и фактические значения по умолчанию. Source-профили дополнительно проверяют поддержанные file/field options генераторов, открытость enum, объявления и диапазоны extension. WIRE_JSON также проверяет возможность JSON-представления.
+`map` кодируется повторяемыми entry-сообщениями: повторяемый scalar не становится совместимым с `map` только из-за совпадения типа значения. Существующие резервные имена и диапазоны номеров нельзя освобождать ни в одном профиле. Alias-значения enum проверяются по парам имя/номер для source/JSON и сохранённым номерам для `WIRE`. Проверяются удаления RPC/сервисов, типы запросов/ответов, streaming, idempotency и фактические значения по умолчанию. Source-профили дополнительно проверяют поддержанные file/field options генераторов, открытость enum, объявления и диапазоны extension. `WIRE_JSON` также проверяет возможность JSON-представления.
 
-Текущие исходники и baseline компилируются отдельно, со своими импортами и закреплёнными ревизиями. Диагностика сохраняет координаты исходника и путь относительно репозитория; consumer managed-options не применяются. Профили работают с extends, исключениями, локальными заменами и frozen-проверкой. Команда breaking не записывает исходники, manifest, lock или результат плагинов.
+Текущие исходники и baseline компилируются отдельно, со своими импортами и закреплёнными ревизиями. Диагностика сохраняет координаты исходника и путь относительно репозитория; consumer managed-options не применяются. Профили работают с `extends`, исключениями, локальными заменами и проверкой `--frozen`. Команда `easyp breaking` не записывает исходники, manifest, lock или результат плагинов.
 
-Точный реализованный каталог правил находится в <code>internal/config/breaking_profiles.go</code>. Полная эквивалентность всем правилам Buf не заявляется. Проверяются стандартные свойства дескрипторов и поддержанные эффективные Edition features, а не произвольный смысл пользовательских options или поведение внешнего сгенерированного кода. Неподдерживаемый синтаксис/Edition отклоняется закреплённым компилятором, а не признаётся совместимым.
+Точный реализованный каталог правил находится в `internal/config/breaking_profiles.go`. Полная эквивалентность всем правилам Buf не заявляется. Проверяются стандартные свойства дескрипторов и поддержанные эффективные Edition features, а не произвольный смысл пользовательских options или поведение внешнего сгенерированного кода. Неподдерживаемый синтаксис/Edition отклоняется закреплённым компилятором, а не признаётся совместимым.
 
-<code>breaking.ignore_unstable</code> по умолчанию равен false. При true на обеих сторонах сравнения исключаются пакеты, последний компонент имени которых соответствует <code>vNtest...</code>, <code>vNalpha</code>, <code>vNbeta</code>, <code>vNpMalpha</code> или <code>vNpMbeta</code>. N и M — положительные числа без ведущего нуля; после alpha/beta допустим такой же положительный номер, после test — любой суффикс. Например, <code>acme.v1beta1</code> пропускается, а <code>acme.v1beta1.service</code> и <code>acme.v0alpha1</code> — нет. Стабильные пакеты и их ссылки на нестабильные типы всё ещё проверяются; чтение исходников и разрешение импортов происходят до фильтрации.
+`breaking.ignore_unstable` по умолчанию равен `false`. При `true` на обеих сторонах сравнения исключаются пакеты, последний компонент имени которых соответствует `vNtest...`, `vNalpha`, `vNbeta`, `vNpMalpha` или `vNpMbeta`. `N` и `M` — положительные числа без ведущего нуля; после `alpha`/`beta` допустим такой же положительный номер, после `test` — любой суффикс. Например, `acme.v1beta1` пропускается, а `acme.v1beta1.service` и `acme.v0alpha1` — нет. Стабильные пакеты и их ссылки на нестабильные типы всё ещё проверяются; чтение исходников и разрешение импортов происходят до фильтрации.
 
-<code>breaking.extends</code> загружает локальную политику или базу из закреплённого модуля. Baseline и ignore применяются в репозитории потребителя; локальные поля приоритетнее базы. Старый ключ <code>breaking_check.against_git_ref</code> CLI v1 не принимает. Все поля описаны в [справочнике политики](/ru/docs/reference/easyp-yaml).
+`breaking.extends` загружает локальную политику или базу из закреплённого модуля. Baseline и ignore применяются в репозитории потребителя; локальные поля приоритетнее базы. Старый ключ `breaking_check.against_git_ref` CLI v1 не принимает. Все поля описаны в [справочнике политики](/ru/docs/reference/easyp-yaml).
+
+## Полная матрица правил (69 правил)
+
+| Правило | `FILE` (61) | `PACKAGE` (55) | `WIRE_JSON` (27) | `WIRE` (20) |
+| --- | :---: | :---: | :---: | :---: |
+| [`ENUM_MOVED`](/ru/docs/cli/breaking-changes/rules/enum-moved) | Да | — | — | — |
+| [`ENUM_NO_DELETE`](/ru/docs/cli/breaking-changes/rules/enum-no-delete) | Да | Да | — | — |
+| [`ENUM_SAME_JSON_FORMAT`](/ru/docs/cli/breaking-changes/rules/enum-same-json-format) | Да | Да | Да | — |
+| [`ENUM_SAME_TYPE`](/ru/docs/cli/breaking-changes/rules/enum-same-type) | Да | Да | — | — |
+| [`ENUM_VALUE_NO_DELETE`](/ru/docs/cli/breaking-changes/rules/enum-value-no-delete) | Да | Да | — | — |
+| [`ENUM_VALUE_NO_DELETE_UNLESS_NAME_RESERVED`](/ru/docs/cli/breaking-changes/rules/enum-value-no-delete-unless-name-reserved) | — | — | Да | — |
+| [`ENUM_VALUE_NO_DELETE_UNLESS_NUMBER_RESERVED`](/ru/docs/cli/breaking-changes/rules/enum-value-no-delete-unless-number-reserved) | — | — | Да | Да |
+| [`ENUM_VALUE_SAME_NAME`](/ru/docs/cli/breaking-changes/rules/enum-value-same-name) | Да | Да | Да | — |
+| [`EXTENSION_MESSAGE_NO_DELETE`](/ru/docs/cli/breaking-changes/rules/extension-message-no-delete) | Да | Да | — | — |
+| [`EXTENSION_MOVED`](/ru/docs/cli/breaking-changes/rules/extension-moved) | Да | — | — | — |
+| [`EXTENSION_NO_DELETE`](/ru/docs/cli/breaking-changes/rules/extension-no-delete) | Да | Да | — | — |
+| [`EXTENSION_SAME_EXTENDEE`](/ru/docs/cli/breaking-changes/rules/extension-same-extendee) | Да | Да | Да | Да |
+| [`EXTENSION_SAME_NUMBER`](/ru/docs/cli/breaking-changes/rules/extension-same-number) | Да | Да | Да | Да |
+| [`FIELD_NO_DELETE`](/ru/docs/cli/breaking-changes/rules/field-no-delete) | Да | Да | — | — |
+| [`FIELD_NO_DELETE_UNLESS_NAME_RESERVED`](/ru/docs/cli/breaking-changes/rules/field-no-delete-unless-name-reserved) | — | — | Да | — |
+| [`FIELD_NO_DELETE_UNLESS_NUMBER_RESERVED`](/ru/docs/cli/breaking-changes/rules/field-no-delete-unless-number-reserved) | — | — | Да | Да |
+| [`FIELD_SAME_CARDINALITY`](/ru/docs/cli/breaking-changes/rules/field-same-cardinality) | Да | Да | — | — |
+| [`FIELD_SAME_CPP_STRING_TYPE`](/ru/docs/cli/breaking-changes/rules/field-same-cpp-string-type) | Да | Да | — | — |
+| [`FIELD_SAME_DEFAULT`](/ru/docs/cli/breaking-changes/rules/field-same-default) | Да | Да | Да | Да |
+| [`FIELD_SAME_JAVA_UTF8_VALIDATION`](/ru/docs/cli/breaking-changes/rules/field-same-java-utf8-validation) | Да | Да | — | — |
+| [`FIELD_SAME_JSON_NAME`](/ru/docs/cli/breaking-changes/rules/field-same-json-name) | Да | Да | Да | — |
+| [`FIELD_SAME_JSTYPE`](/ru/docs/cli/breaking-changes/rules/field-same-jstype) | Да | Да | — | — |
+| [`FIELD_SAME_NAME`](/ru/docs/cli/breaking-changes/rules/field-same-name) | Да | Да | Да | — |
+| [`FIELD_SAME_ONEOF`](/ru/docs/cli/breaking-changes/rules/field-same-oneof) | Да | Да | Да | Да |
+| [`FIELD_SAME_TYPE`](/ru/docs/cli/breaking-changes/rules/field-same-type) | Да | Да | — | — |
+| [`FIELD_SAME_UTF8_VALIDATION`](/ru/docs/cli/breaking-changes/rules/field-same-utf8-validation) | Да | Да | — | — |
+| [`FIELD_WIRE_COMPATIBLE_CARDINALITY`](/ru/docs/cli/breaking-changes/rules/field-wire-compatible-cardinality) | — | — | — | Да |
+| [`FIELD_WIRE_COMPATIBLE_TYPE`](/ru/docs/cli/breaking-changes/rules/field-wire-compatible-type) | — | — | — | Да |
+| [`FIELD_WIRE_JSON_COMPATIBLE_CARDINALITY`](/ru/docs/cli/breaking-changes/rules/field-wire-json-compatible-cardinality) | — | — | Да | — |
+| [`FIELD_WIRE_JSON_COMPATIBLE_TYPE`](/ru/docs/cli/breaking-changes/rules/field-wire-json-compatible-type) | — | — | Да | — |
+| [`FILE_NO_DELETE`](/ru/docs/cli/breaking-changes/rules/file-no-delete) | Да | — | — | — |
+| [`FILE_SAME_CC_ENABLE_ARENAS`](/ru/docs/cli/breaking-changes/rules/file-same-cc-enable-arenas) | Да | Да | — | — |
+| [`FILE_SAME_CC_GENERIC_SERVICES`](/ru/docs/cli/breaking-changes/rules/file-same-cc-generic-services) | Да | Да | — | — |
+| [`FILE_SAME_CSHARP_NAMESPACE`](/ru/docs/cli/breaking-changes/rules/file-same-csharp-namespace) | Да | Да | — | — |
+| [`FILE_SAME_GO_PACKAGE`](/ru/docs/cli/breaking-changes/rules/file-same-go-package) | Да | Да | — | — |
+| [`FILE_SAME_JAVA_GENERIC_SERVICES`](/ru/docs/cli/breaking-changes/rules/file-same-java-generic-services) | Да | Да | — | — |
+| [`FILE_SAME_JAVA_MULTIPLE_FILES`](/ru/docs/cli/breaking-changes/rules/file-same-java-multiple-files) | Да | Да | — | — |
+| [`FILE_SAME_JAVA_OUTER_CLASSNAME`](/ru/docs/cli/breaking-changes/rules/file-same-java-outer-classname) | Да | Да | — | — |
+| [`FILE_SAME_JAVA_PACKAGE`](/ru/docs/cli/breaking-changes/rules/file-same-java-package) | Да | Да | — | — |
+| [`FILE_SAME_JAVA_STRING_CHECK_UTF8`](/ru/docs/cli/breaking-changes/rules/file-same-java-string-check-utf8) | Да | Да | — | — |
+| [`FILE_SAME_OBJC_CLASS_PREFIX`](/ru/docs/cli/breaking-changes/rules/file-same-objc-class-prefix) | Да | Да | — | — |
+| [`FILE_SAME_OPTIMIZE_FOR`](/ru/docs/cli/breaking-changes/rules/file-same-optimize-for) | Да | Да | — | — |
+| [`FILE_SAME_PACKAGE`](/ru/docs/cli/breaking-changes/rules/file-same-package) | Да | Да | Да | Да |
+| [`FILE_SAME_PHP_CLASS_PREFIX`](/ru/docs/cli/breaking-changes/rules/file-same-php-class-prefix) | Да | Да | — | — |
+| [`FILE_SAME_PHP_METADATA_NAMESPACE`](/ru/docs/cli/breaking-changes/rules/file-same-php-metadata-namespace) | Да | Да | — | — |
+| [`FILE_SAME_PHP_NAMESPACE`](/ru/docs/cli/breaking-changes/rules/file-same-php-namespace) | Да | Да | — | — |
+| [`FILE_SAME_PY_GENERIC_SERVICES`](/ru/docs/cli/breaking-changes/rules/file-same-py-generic-services) | Да | Да | — | — |
+| [`FILE_SAME_RUBY_PACKAGE`](/ru/docs/cli/breaking-changes/rules/file-same-ruby-package) | Да | Да | — | — |
+| [`FILE_SAME_SWIFT_PREFIX`](/ru/docs/cli/breaking-changes/rules/file-same-swift-prefix) | Да | Да | — | — |
+| [`FILE_SAME_SYNTAX`](/ru/docs/cli/breaking-changes/rules/file-same-syntax) | Да | Да | — | — |
+| [`MESSAGE_MOVED`](/ru/docs/cli/breaking-changes/rules/message-moved) | Да | — | — | — |
+| [`MESSAGE_NO_DELETE`](/ru/docs/cli/breaking-changes/rules/message-no-delete) | Да | Да | — | — |
+| [`MESSAGE_NO_REMOVE_STANDARD_DESCRIPTOR_ACCESSOR`](/ru/docs/cli/breaking-changes/rules/message-no-remove-standard-descriptor-accessor) | Да | Да | — | — |
+| [`MESSAGE_SAME_JSON_FORMAT`](/ru/docs/cli/breaking-changes/rules/message-same-json-format) | Да | Да | Да | — |
+| [`MESSAGE_SAME_MESSAGE_SET_WIRE_FORMAT`](/ru/docs/cli/breaking-changes/rules/message-same-message-set-wire-format) | Да | Да | Да | Да |
+| [`MESSAGE_SAME_REQUIRED_FIELDS`](/ru/docs/cli/breaking-changes/rules/message-same-required-fields) | Да | Да | Да | Да |
+| [`ONEOF_MOVED`](/ru/docs/cli/breaking-changes/rules/oneof-moved) | Да | — | — | — |
+| [`ONEOF_NO_DELETE`](/ru/docs/cli/breaking-changes/rules/oneof-no-delete) | Да | Да | — | — |
+| [`PACKAGE_NO_DELETE`](/ru/docs/cli/breaking-changes/rules/package-no-delete) | Да | Да | — | — |
+| [`RESERVED_ENUM_NO_DELETE`](/ru/docs/cli/breaking-changes/rules/reserved-enum-no-delete) | Да | Да | Да | Да |
+| [`RESERVED_MESSAGE_NO_DELETE`](/ru/docs/cli/breaking-changes/rules/reserved-message-no-delete) | Да | Да | Да | Да |
+| [`RPC_NO_DELETE`](/ru/docs/cli/breaking-changes/rules/rpc-no-delete) | Да | Да | Да | Да |
+| [`RPC_SAME_CLIENT_STREAMING`](/ru/docs/cli/breaking-changes/rules/rpc-same-client-streaming) | Да | Да | Да | Да |
+| [`RPC_SAME_IDEMPOTENCY_LEVEL`](/ru/docs/cli/breaking-changes/rules/rpc-same-idempotency-level) | Да | Да | Да | Да |
+| [`RPC_SAME_REQUEST_TYPE`](/ru/docs/cli/breaking-changes/rules/rpc-same-request-type) | Да | Да | Да | Да |
+| [`RPC_SAME_RESPONSE_TYPE`](/ru/docs/cli/breaking-changes/rules/rpc-same-response-type) | Да | Да | Да | Да |
+| [`RPC_SAME_SERVER_STREAMING`](/ru/docs/cli/breaking-changes/rules/rpc-same-server-streaming) | Да | Да | Да | Да |
+| [`SERVICE_MOVED`](/ru/docs/cli/breaking-changes/rules/service-moved) | Да | — | — | — |
+| [`SERVICE_NO_DELETE`](/ru/docs/cli/breaking-changes/rules/service-no-delete) | Да | Да | Да | Да |

@@ -1,0 +1,63 @@
+---
+title: "File Same Objc Class Prefix"
+description: "Проверяет, что файлы сохраняют прежнее значение опции objc_class_prefix."
+---
+
+- **ID правила:** `FILE_SAME_OBJC_CLASS_PREFIX`
+- **Профили:** `FILE`, `PACKAGE`
+
+Это правило проверяет, что файловая опция `objc_class_prefix` не изменилась у файла (а также у объявлений, перенесённых в другой файл того же пакета). Изменение `objc_class_prefix` меняет префикс всех сгенерированных классов и enum в Objective-C и ломает совместимость сгенерированного кода для Objective-C.
+
+## Примеры
+
+### Неправильно
+
+**До:**
+
+```proto
+syntax = "proto3";
+
+package myapi.v1;
+
+option objc_class_prefix = "ACME";
+
+message User {
+  string id = 1;
+}
+```
+
+**После:**
+
+```proto
+syntax = "proto3";
+
+package myapi.v1;
+
+option objc_class_prefix = "USR";
+
+message User {
+  string id = 1;
+}
+```
+
+**Ошибка:**
+
+```text
+user.proto:1:1: File option objc_class_prefix changed. (FILE_SAME_OBJC_CLASS_PREFIX)
+```
+
+### Правильно
+
+Сохраняйте `option objc_class_prefix` неизменной в текущей мажорной версии пакета; меняйте её только в новой мажорной версии (например, `myapi.v2`).
+
+```proto
+syntax = "proto3";
+
+package myapi.v1;
+
+option objc_class_prefix = "ACME";
+
+message User {
+  string id = 1;
+}
+```

@@ -1,0 +1,58 @@
+---
+title: "Field Wire Json Compatible Type"
+description: "Проверяет, что изменения типа поля остаются совместимыми по бинарному формату и JSON в профиле WIRE_JSON."
+---
+
+- **ID правила:** `FIELD_WIRE_JSON_COMPATIBLE_TYPE`
+- **Профили:** `WIRE_JSON`
+
+В профиле `WIRE_JSON` смена скалярного типа допускается только внутри пар, совместимых и в бинарном формате, и в JSON: `int32`/`uint32`, `int64`/`uint64`, `fixed32`/`sfixed32` и `fixed64`/`sfixed64` (а также JSON-совместимые сообщения и enum). Переходы вроде `int32` → `int64` (число против строки в JSON) или `string` → `bytes` (строка против base64) отклоняются.
+
+## Примеры
+
+### Неправильно
+
+**До:**
+
+```proto
+syntax = "proto3";
+
+package myapi.v1;
+
+message Item {
+  int32 count = 1;
+}
+```
+
+**После:**
+
+```proto
+syntax = "proto3";
+
+package myapi.v1;
+
+message Item {
+  int64 count = 1; // Serialized as string in Protobuf JSON
+}
+```
+
+**Ошибка:**
+
+```text
+item.proto:6:3: Field "count" (1) on "myapi.v1.Item" changed incompatibly from int32 to int64. (FIELD_WIRE_JSON_COMPATIBLE_TYPE)
+```
+
+### Правильно
+
+При требовании JSON-совместимости добавьте новое 64-битное поле (либо меняйте тип только внутри JSON-совместимых пар вроде `int32` ↔ `uint32`):
+
+```proto
+syntax = "proto3";
+
+package myapi.v1;
+
+message Item {
+  int32 count = 1 [deprecated = true];
+  int64 count_v2 = 2;
+}
+```

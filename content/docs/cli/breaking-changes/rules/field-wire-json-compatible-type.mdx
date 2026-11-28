@@ -1,0 +1,58 @@
+---
+title: "Field Wire Json Compatible Type"
+description: "Checks that field type changes remain both binary and JSON compatible in WIRE_JSON."
+---
+
+- **Rule ID:** `FIELD_WIRE_JSON_COMPATIBLE_TYPE`
+- **Profiles:** `WIRE_JSON`
+
+In the `WIRE_JSON` profile, scalar type changes are allowed only within JSON- and wire-compatible pairs: `int32`/`uint32`, `int64`/`uint64`, `fixed32`/`sfixed32`, and `fixed64`/`sfixed64` (plus JSON-compatible messages and enums). Transitions like `int32` → `int64` (JSON number vs JSON string) or `string` → `bytes` (UTF-8 string vs base64 string) are rejected.
+
+## Examples
+
+### Bad
+
+**Before:**
+
+```proto
+syntax = "proto3";
+
+package myapi.v1;
+
+message Item {
+  int32 count = 1;
+}
+```
+
+**After:**
+
+```proto
+syntax = "proto3";
+
+package myapi.v1;
+
+message Item {
+  int64 count = 1; // Serialized as string in Protobuf JSON
+}
+```
+
+**Error:**
+
+```text
+item.proto:6:3: Field "count" (1) on "myapi.v1.Item" changed incompatibly from int32 to int64. (FIELD_WIRE_JSON_COMPATIBLE_TYPE)
+```
+
+### Good
+
+Add a new 64-bit field when JSON compatibility is required (or switch only between JSON-compatible pairs like `int32` ↔ `uint32`):
+
+```proto
+syntax = "proto3";
+
+package myapi.v1;
+
+message Item {
+  int32 count = 1 [deprecated = true];
+  int64 count_v2 = 2;
+}
+```

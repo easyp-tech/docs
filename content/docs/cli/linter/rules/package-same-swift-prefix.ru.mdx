@@ -1,18 +1,17 @@
 ---
 title: "Package Same Swift Prefix"
+description: "Это правило проверяет, что все файлы с одним и тем же package используют один и тот же swift_prefix."
 ---
 
-Категории:
-
-- **MINIMAL**
-- **BASIC**
-- **DEFAULT**
+- **ID правила:** `PACKAGE_SAME_SWIFT_PREFIX`
+- **Группа:** `BASIC`
+- **Входит в пресеты (`linters.default`):** `BASIC`, `STANDARD`, `COMMENTS`
 
 Это правило проверяет, что все файлы с одним и тем же package используют один и тот же `swift_prefix`.
 
-## Examples
+## Примеры
 
-### Bad
+### Неправильно
 
 ```proto
 // File: pkg/foo.proto
@@ -34,7 +33,7 @@ package pkg;
 option swift_prefix = "Bar";
 ```
 
-### Good
+### Правильно
 
 ```proto
 // File: pkg/foo.proto

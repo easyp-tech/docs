@@ -1,40 +1,64 @@
 ---
 title: "Directory Same Package"
+description: "Checks that all .proto files in the same directory declare the same package."
 ---
 
-Categories:
-- **MINIMAL**
-- **BASIC**
-- **DEFAULT**
+- **Rule ID:** `DIRECTORY_SAME_PACKAGE`
+- **Group:** `MINIMAL`
+- **Included in presets (`linters.default`):** `MINIMAL`, `BASIC`, `STANDARD`, `COMMENTS`
 
-This rule checks that all files in a given directory are in the same package.
+- **Rule ID:** `DIRECTORY_SAME_PACKAGE`
+- **Group:** `MINIMAL`
+- **Included in presets (`linters.default`):** `MINIMAL`, `BASIC`, `STANDARD`, `COMMENTS`
+
+This module-level rule checks that every `.proto` file located in the same directory declares the same `package`. If a directory contains files with different package declarations (or a mix of packaged and unpackaged files), every file in that directory is reported.
 
 ## Examples
 
 ### Bad
 
 ```proto
-// File: dir/foo.proto
-
+// File: foo/v1/user.proto
 syntax = "proto3";
-   
-package foo;
 
-message Foo {
-    string bar = 1;
+package foo.v1;
+
+message User {
+  string id = 1;
+}
+```
+
+```proto
+// File: foo/v1/order.proto
+syntax = "proto3";
+
+package bar.v1;
+
+message Order {
+  string id = 1;
 }
 ```
 
 ### Good
 
 ```proto
-// File: dir/foo/foo.proto
-
+// File: foo/v1/user.proto
 syntax = "proto3";
 
-package dir.foo;
+package foo.v1;
 
-message Foo {
-    string bar = 1;
+message User {
+  string id = 1;
+}
+```
+
+```proto
+// File: foo/v1/order.proto
+syntax = "proto3";
+
+package foo.v1;
+
+message Order {
+  string id = 1;
 }
 ```

@@ -1,0 +1,58 @@
+---
+title: "Enum Same Json Format"
+description: "Проверяет, что enum не понижает поддержку формата JSON с ALLOW до LEGACY_BEST_EFFORT."
+---
+
+- **ID правила:** `ENUM_SAME_JSON_FORMAT`
+- **Профили:** `FILE`, `PACKAGE`, `WIRE_JSON`
+
+Это правило проверяет, что enum с эффективной опцией `features.json_format = ALLOW` (по умолчанию в `proto3` и Editions 2023) не понижает её до `LEGACY_BEST_EFFORT`. Такое понижение нарушает гарантии JSON-формата в профилях `FILE`, `PACKAGE` и `WIRE_JSON`.
+
+## Примеры
+
+### Неправильно
+
+**До:**
+
+```proto
+edition = "2023";
+
+package myapi.v1;
+
+enum Status {
+  STATUS_UNSPECIFIED = 0;
+}
+```
+
+**После:**
+
+```proto
+edition = "2023";
+
+package myapi.v1;
+
+enum Status {
+  option features.json_format = LEGACY_BEST_EFFORT;
+  STATUS_UNSPECIFIED = 0;
+}
+```
+
+**Ошибка:**
+
+```text
+status.proto:5:1: Enum "myapi.v1.Status" changed JSON format support. (ENUM_SAME_JSON_FORMAT)
+```
+
+### Правильно
+
+Сохраняйте `features.json_format = ALLOW` (значение по умолчанию в Editions 2023) для enum, уже поддерживающих стандартный JSON:
+
+```proto
+edition = "2023";
+
+package myapi.v1;
+
+enum Status {
+  STATUS_UNSPECIFIED = 0;
+}
+```

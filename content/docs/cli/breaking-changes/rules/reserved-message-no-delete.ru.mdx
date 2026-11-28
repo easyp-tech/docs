@@ -1,0 +1,63 @@
+---
+title: "Reserved Message No Delete"
+description: "Проверяет, что существующие зарезервированные номера и имена полей сообщения никогда не освобождаются."
+---
+
+- **ID правила:** `RESERVED_MESSAGE_NO_DELETE`
+- **Профили:** `FILE`, `PACKAGE`, `WIRE_JSON`, `WIRE`
+
+Это правило проверяет, что ни одно ранее зарезервированное имя или диапазон номеров полей сообщения не были удалены или сужены. Снятие резервирования создаёт риск повторного использования старых тегов или имён с несовместимыми типами во всех четырёх профилях (`FILE`, `PACKAGE`, `WIRE_JSON`, `WIRE`).
+
+## Примеры
+
+### Неправильно
+
+**До:**
+
+```proto
+syntax = "proto3";
+
+package myapi.v1;
+
+message User {
+  reserved 4, 10 to 20;
+  reserved "legacy_token";
+  string id = 1;
+}
+```
+
+**После:**
+
+```proto
+syntax = "proto3";
+
+package myapi.v1;
+
+message User {
+  reserved 10 to 20;
+  string id = 1;
+}
+```
+
+**Ошибка:**
+
+```text
+user.proto:5:1: Message "myapi.v1.User" released reserved field name "legacy_token". (RESERVED_MESSAGE_NO_DELETE)
+user.proto:5:1: Message "myapi.v1.User" released a reserved field number range. (RESERVED_MESSAGE_NO_DELETE)
+```
+
+### Правильно
+
+Сохраняйте все существующие директивы `reserved` (расширять диапазоны и добавлять новые резервы безопасно):
+
+```proto
+syntax = "proto3";
+
+package myapi.v1;
+
+message User {
+  reserved 4, 10 to 25;
+  reserved "legacy_token", "old_email";
+  string id = 1;
+}
+```

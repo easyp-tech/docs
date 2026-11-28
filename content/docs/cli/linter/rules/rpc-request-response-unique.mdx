@@ -1,14 +1,20 @@
 ---
 title: "Rpc Request Response Unique"
+description: "Checks that every RPC request and response type is unique across all linted RPCs and not reused for both request and response."
 ---
 
-Categories:
+- **Rule ID:** `RPC_REQUEST_RESPONSE_UNIQUE`
+- **Group:** `DEFAULT`
+- **Included in presets (`linters.default`):** `STANDARD`, `COMMENTS`
 
-- **MINIMAL**
-- **BASIC**
-- **DEFAULT**
+- **Rule ID:** `RPC_REQUEST_RESPONSE_UNIQUE`
+- **Group:** `DEFAULT`
+- **Included in presets (`linters.default`):** `STANDARD`, `COMMENTS`
 
-This rule checks that all RPC request and response messages are unique.
+This module-level rule checks two constraints across all linted files:
+
+- No request or response message type may be reused by more than one RPC (even across different services or files).
+- No single RPC may use the same message type for both its request and its response.
 
 ## Examples
 
@@ -17,9 +23,13 @@ This rule checks that all RPC request and response messages are unique.
 ```proto
 syntax = "proto3";
 
-service Foo {
-    rpc GetFoo (FooRequest) returns (FooResponse) {}
-    rpc GetBar (FooRequest) returns (FooResponse) {}
+service FooService {
+  // Reused request/response types across RPCs:
+  rpc GetFoo(FooRequest) returns (FooResponse) {}
+  rpc GetBar(FooRequest) returns (BarResponse) {}
+
+  // Same type used for both request and response:
+  rpc Ping(PingPayload) returns (PingPayload) {}
 }
 ```
 
@@ -28,8 +38,9 @@ service Foo {
 ```proto
 syntax = "proto3";
 
-service Foo {
-    rpc GetFoo (FooRequest) returns (FooResponse) {}
-    rpc GetBar (BarRequest) returns (BarResponse) {}
+service FooService {
+  rpc GetFoo(GetFooRequest) returns (GetFooResponse) {}
+  rpc GetBar(GetBarRequest) returns (GetBarResponse) {}
+  rpc Ping(PingRequest) returns (PingResponse) {}
 }
 ```

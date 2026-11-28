@@ -1,14 +1,26 @@
 ---
 title: "Service Suffix"
+description: "Checks that all service names end with the configured suffix (default Service)."
 ---
 
-Categories:
+- **Rule ID:** `SERVICE_SUFFIX`
+- **Group:** `DEFAULT`
+- **Included in presets (`linters.default`):** `STANDARD`, `COMMENTS`
 
-- **MINIMAL**
-- **BASIC**
-- **DEFAULT**
+- **Rule ID:** `SERVICE_SUFFIX`
+- **Group:** `DEFAULT`
+- **Included in presets (`linters.default`):** `STANDARD`, `COMMENTS`
 
-This rule checks that all services are suffixed with `Service` or your custom suffix.
+This rule checks that all `service` names end with `Service` or a custom suffix configured via `linters-settings.SERVICE_SUFFIX.suffix`.
+
+## Configuration
+
+```yaml
+version: v1
+linters-settings:
+  SERVICE_SUFFIX:
+    suffix: API
+```
 
 ## Examples
 
@@ -18,16 +30,28 @@ This rule checks that all services are suffixed with `Service` or your custom su
 syntax = "proto3";
 
 service Foo {
-    rpc Bar(BarRequest) returns (BarResponse);
+  rpc Bar(BarRequest) returns (BarResponse);
 }
 ```
 
 ### Good
 
+With the default suffix (`Service`):
+
 ```proto
 syntax = "proto3";
 
 service FooService {
-    rpc Bar(BarRequest) returns (BarResponse); 
+  rpc Bar(BarRequest) returns (BarResponse);
+}
+```
+
+With `suffix: API`:
+
+```proto
+syntax = "proto3";
+
+service FooAPI {
+  rpc Bar(BarRequest) returns (BarResponse);
 }
 ```

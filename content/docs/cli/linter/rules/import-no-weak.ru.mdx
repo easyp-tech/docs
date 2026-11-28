@@ -1,11 +1,11 @@
 ---
 title: "Import No Weak"
+description: "Это правило проверяет, что в proto‑файле не используются weak‑импорты (import weak \"...\")."
 ---
 
-Категории:
-- **MINIMAL**
-- **BASIC**
-- **DEFAULT**
+- **ID правила:** `IMPORT_NO_WEAK`
+- **Группа:** `BASIC`
+- **Входит в пресеты (`linters.default`):** `BASIC`, `STANDARD`, `COMMENTS`
 
 Это правило проверяет, что в proto‑файле не используются weak‑импорты (`import weak "..."`).
 
@@ -13,7 +13,7 @@ Weak import (синтаксис `import weak`) допустим в proto2, но 
 
 ## Примеры
 
-### Bad
+### Неправильно
 
 ```proto
 syntax = "proto2";
@@ -23,7 +23,7 @@ package foo;
 import weak "bar.proto";
 ```
 
-### Good
+### Правильно
 
 ```proto
 syntax = "proto2";

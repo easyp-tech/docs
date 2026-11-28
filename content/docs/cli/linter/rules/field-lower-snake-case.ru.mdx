@@ -1,18 +1,17 @@
 ---
 title: "Field Lower Snake Case"
+description: "Это правило проверяет, что имена полей сообщений записаны в стиле lower_snake_case."
 ---
 
-Категории:
-
-- **MINIMAL**
-- **BASIC**
-- **DEFAULT**
+- **ID правила:** `FIELD_LOWER_SNAKE_CASE`
+- **Группа:** `BASIC`
+- **Входит в пресеты (`linters.default`):** `BASIC`, `STANDARD`, `COMMENTS`
 
 Это правило проверяет, что имена полей сообщений записаны в стиле lower_snake_case.
 
 ## Примеры
 
-### Bad
+### Неправильно
 
 ```proto
 syntax = "proto3";
@@ -24,7 +23,7 @@ message Foo {
 }
 ```
 
-### Good
+### Правильно
 
 ```proto
 syntax = "proto3";

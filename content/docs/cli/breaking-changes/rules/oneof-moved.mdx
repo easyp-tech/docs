@@ -1,0 +1,69 @@
+---
+title: "Oneof Moved"
+description: "Checks that oneofs are not moved to a different .proto file in the FILE profile."
+---
+
+- **Rule ID:** `ONEOF_MOVED`
+- **Profiles:** `FILE`
+
+In the `FILE` profile, moving a message containing a real `oneof` to another `.proto` file reports `ONEOF_MOVED` in addition to `MESSAGE_MOVED`, because generated file-level wrapper types move to a different file. Use the `PACKAGE` profile if moving declarations within the same package is permitted.
+
+## Examples
+
+### Bad
+
+**Before:**
+
+```proto
+// File: myapi/v1/auth.proto
+syntax = "proto3";
+
+package myapi.v1;
+
+message LoginRequest {
+  oneof credentials {
+    string password = 1;
+    string token = 2;
+  }
+}
+```
+
+**After:**
+
+```proto
+// File: myapi/v1/login.proto
+syntax = "proto3";
+
+package myapi.v1;
+
+message LoginRequest {
+  oneof credentials {
+    string password = 1;
+    string token = 2;
+  }
+}
+```
+
+**Error:**
+
+```text
+myapi/v1/auth.proto:7:3: Oneof "credentials" on "myapi.v1.LoginRequest" was moved from "myapi/v1/auth.proto" to "myapi/v1/login.proto". (ONEOF_MOVED)
+```
+
+### Good
+
+Keep the declaring message and its `oneof` in the original `.proto` file when using the `FILE` profile:
+
+```proto
+// File: myapi/v1/auth.proto
+syntax = "proto3";
+
+package myapi.v1;
+
+message LoginRequest {
+  oneof credentials {
+    string password = 1;
+    string token = 2;
+  }
+}
+```

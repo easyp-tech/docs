@@ -1,0 +1,63 @@
+---
+title: "File Same Csharp Namespace"
+description: "Проверяет, что файлы сохраняют прежнее значение опции csharp_namespace."
+---
+
+- **ID правила:** `FILE_SAME_CSHARP_NAMESPACE`
+- **Профили:** `FILE`, `PACKAGE`
+
+Это правило проверяет, что файловая опция `csharp_namespace` не изменилась у файла (а также у объявлений, перенесённых в другой файл того же пакета). Изменение `csharp_namespace` меняет сгенерированное пространство имён C# для всех типов файла и ломает совместимость сгенерированного кода для C#.
+
+## Примеры
+
+### Неправильно
+
+**До:**
+
+```proto
+syntax = "proto3";
+
+package myapi.v1;
+
+option csharp_namespace = "MyApi.V1";
+
+message User {
+  string id = 1;
+}
+```
+
+**После:**
+
+```proto
+syntax = "proto3";
+
+package myapi.v1;
+
+option csharp_namespace = "Acme.MyApi.V1";
+
+message User {
+  string id = 1;
+}
+```
+
+**Ошибка:**
+
+```text
+user.proto:1:1: File option csharp_namespace changed. (FILE_SAME_CSHARP_NAMESPACE)
+```
+
+### Правильно
+
+Сохраняйте `option csharp_namespace` неизменной в текущей мажорной версии пакета; меняйте её только в новой мажорной версии (например, `myapi.v2`).
+
+```proto
+syntax = "proto3";
+
+package myapi.v1;
+
+option csharp_namespace = "MyApi.V1";
+
+message User {
+  string id = 1;
+}
+```

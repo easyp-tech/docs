@@ -1,0 +1,61 @@
+---
+title: "Field No Delete Unless Name Reserved"
+description: "Проверяет, что при удалении поля в профиле WIRE_JSON его имя зарезервировано."
+---
+
+- **ID правила:** `FIELD_NO_DELETE_UNLESS_NAME_RESERVED`
+- **Профили:** `WIRE_JSON`
+
+В профиле `WIRE_JSON` удаление необязательного поля допускается только при одновременном резервировании его номера (правило `FIELD_NO_DELETE_UNLESS_NUMBER_RESERVED`) **и** его имени через `reserved "name";`. Резервирование имени не даёт будущим полям переиспользовать его и ломать совместимость со старыми JSON-сообщениями.
+
+## Примеры
+
+### Неправильно
+
+**До:**
+
+```proto
+syntax = "proto3";
+
+package myapi.v1;
+
+message User {
+  string name = 1;
+  string phone = 2;
+}
+```
+
+**После:**
+
+```proto
+syntax = "proto3";
+
+package myapi.v1;
+
+message User {
+  reserved 2;
+  string name = 1;
+}
+```
+
+**Ошибка:**
+
+```text
+user.proto:7:3: Deleted field "phone" on "myapi.v1.User" must have its name reserved for JSON compatibility. (FIELD_NO_DELETE_UNLESS_NAME_RESERVED)
+```
+
+### Правильно
+
+Зарезервируйте и номер, и имя удалённого поля:
+
+```proto
+syntax = "proto3";
+
+package myapi.v1;
+
+message User {
+  reserved 2;
+  reserved "phone";
+  string name = 1;
+}
+```

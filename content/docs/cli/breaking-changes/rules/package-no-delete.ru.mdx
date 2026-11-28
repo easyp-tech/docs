@@ -1,0 +1,54 @@
+---
+title: "Package No Delete"
+description: "Проверяет, что ни один protobuf-пакет из базовой ревизии не был полностью удалён."
+---
+
+- **ID правила:** `PACKAGE_NO_DELETE`
+- **Профили:** `FILE`, `PACKAGE`
+
+Это правило проверяет, что каждый protobuf-пакет (`package`) из базовой ревизии по-прежнему представлен хотя бы одним файлом в текущей ревизии. Полное удаление пакета ломает все импорты и сгенерированные модули у потребителей.
+
+## Примеры
+
+### Неправильно
+
+**До:**
+
+```proto
+// File: myapi/v1/user.proto
+syntax = "proto3";
+
+package myapi.v1;
+
+message User {
+  string id = 1;
+}
+```
+
+**После:**
+
+```proto
+// All files in package myapi.v1 were deleted or moved to myapi.v2
+```
+
+**Ошибка:**
+
+```text
+myapi/v1/user.proto:1:1: Package "myapi.v1" was deleted. (PACKAGE_NO_DELETE)
+```
+
+### Правильно
+
+Сохраняйте существующие мажорные пакеты и добавляйте новые версии (например, `myapi.v2`) параллельно:
+
+```proto
+// File: myapi/v1/user.proto (kept)
+syntax = "proto3";
+
+package myapi.v1;
+
+message User {
+  option deprecated = true;
+  string id = 1;
+}
+```

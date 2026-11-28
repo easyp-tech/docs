@@ -1,16 +1,17 @@
 ---
 title: "Comment Service"
+description: "Это правило проверяет, что сервис имеет комментарий."
 ---
 
-Категории:
-
-- **COMMENT**
+- **ID правила:** `COMMENT_SERVICE`
+- **Группа:** `COMMENTS`
+- **Входит в пресеты (`linters.default`):** `COMMENTS`
 
 Это правило проверяет, что сервис имеет комментарий.
 
 ## Примеры
 
-### Bad
+### Неправильно
 
 ```proto
 syntax = "proto3";
@@ -20,7 +21,7 @@ service Foo {
 }
 ```
 
-### Good
+### Правильно
 
 ```proto
 syntax = "proto3";

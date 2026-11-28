@@ -1,0 +1,64 @@
+---
+title: "Enum Value No Delete Unless Name Reserved"
+description: "Проверяет, что при удалении значения enum в профиле WIRE_JSON его имя зарезервировано."
+---
+
+- **ID правила:** `ENUM_VALUE_NO_DELETE_UNLESS_NAME_RESERVED`
+- **Профили:** `WIRE_JSON`
+
+В профиле `WIRE_JSON` удаление значения enum допускается только при одновременном резервировании его номера (правило `ENUM_VALUE_NO_DELETE_UNLESS_NUMBER_RESERVED`) **и** его имени через `reserved "NAME";`. Это предотвращает повторное использование того же имени для другого числа в JSON.
+
+## Примеры
+
+### Неправильно
+
+**До:**
+
+```proto
+syntax = "proto3";
+
+package myapi.v1;
+
+enum Color {
+  COLOR_UNSPECIFIED = 0;
+  COLOR_RED = 1;
+  COLOR_BLUE = 2;
+}
+```
+
+**После:**
+
+```proto
+syntax = "proto3";
+
+package myapi.v1;
+
+enum Color {
+  reserved 2;
+  COLOR_UNSPECIFIED = 0;
+  COLOR_RED = 1;
+}
+```
+
+**Ошибка:**
+
+```text
+color.proto:5:1: Deleted enum name "COLOR_BLUE" in "myapi.v1.Color" must be reserved for JSON compatibility. (ENUM_VALUE_NO_DELETE_UNLESS_NAME_RESERVED)
+```
+
+### Правильно
+
+Зарезервируйте и номер, и имя удалённого значения enum:
+
+```proto
+syntax = "proto3";
+
+package myapi.v1;
+
+enum Color {
+  reserved 2;
+  reserved "COLOR_BLUE";
+  COLOR_UNSPECIFIED = 0;
+  COLOR_RED = 1;
+}
+```

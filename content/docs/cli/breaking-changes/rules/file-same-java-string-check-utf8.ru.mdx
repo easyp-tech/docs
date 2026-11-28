@@ -1,0 +1,63 @@
+---
+title: "File Same Java String Check Utf8"
+description: "Проверяет, что файлы сохраняют прежнее значение опции java_string_check_utf8."
+---
+
+- **ID правила:** `FILE_SAME_JAVA_STRING_CHECK_UTF8`
+- **Профили:** `FILE`, `PACKAGE`
+
+Это правило проверяет, что файловая опция `java_string_check_utf8` не изменилась у файла (а также у объявлений, перенесённых в другой файл того же пакета). Изменение `java_string_check_utf8` меняет проверки валидности UTF-8 в сгенерированных Java-аксессорах строк и ломает совместимость сгенерированного кода для Java.
+
+## Примеры
+
+### Неправильно
+
+**До:**
+
+```proto
+syntax = "proto3";
+
+package myapi.v1;
+
+option java_string_check_utf8 = true;
+
+message User {
+  string id = 1;
+}
+```
+
+**После:**
+
+```proto
+syntax = "proto3";
+
+package myapi.v1;
+
+option java_string_check_utf8 = false;
+
+message User {
+  string id = 1;
+}
+```
+
+**Ошибка:**
+
+```text
+user.proto:1:1: File option java_string_check_utf8 changed. (FILE_SAME_JAVA_STRING_CHECK_UTF8)
+```
+
+### Правильно
+
+Сохраняйте `option java_string_check_utf8` неизменной в текущей мажорной версии пакета; меняйте её только в новой мажорной версии (например, `myapi.v2`).
+
+```proto
+syntax = "proto3";
+
+package myapi.v1;
+
+option java_string_check_utf8 = true;
+
+message User {
+  string id = 1;
+}
+```

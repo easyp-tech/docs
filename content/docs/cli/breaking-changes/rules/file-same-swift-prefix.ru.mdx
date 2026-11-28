@@ -1,0 +1,63 @@
+---
+title: "File Same Swift Prefix"
+description: "Проверяет, что файлы сохраняют прежнее значение опции swift_prefix."
+---
+
+- **ID правила:** `FILE_SAME_SWIFT_PREFIX`
+- **Профили:** `FILE`, `PACKAGE`
+
+Это правило проверяет, что файловая опция `swift_prefix` не изменилась у файла (а также у объявлений, перенесённых в другой файл того же пакета). Изменение `swift_prefix` меняет префикс сгенерированных имён типов в Swift и ломает совместимость сгенерированного кода для Swift.
+
+## Примеры
+
+### Неправильно
+
+**До:**
+
+```proto
+syntax = "proto3";
+
+package myapi.v1;
+
+option swift_prefix = "Acme";
+
+message User {
+  string id = 1;
+}
+```
+
+**После:**
+
+```proto
+syntax = "proto3";
+
+package myapi.v1;
+
+option swift_prefix = "Users";
+
+message User {
+  string id = 1;
+}
+```
+
+**Ошибка:**
+
+```text
+user.proto:1:1: File option swift_prefix changed. (FILE_SAME_SWIFT_PREFIX)
+```
+
+### Правильно
+
+Сохраняйте `option swift_prefix` неизменной в текущей мажорной версии пакета; меняйте её только в новой мажорной версии (например, `myapi.v2`).
+
+```proto
+syntax = "proto3";
+
+package myapi.v1;
+
+option swift_prefix = "Acme";
+
+message User {
+  string id = 1;
+}
+```

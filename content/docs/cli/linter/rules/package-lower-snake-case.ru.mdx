@@ -1,18 +1,17 @@
 ---
 title: "Package Lower Snake Case"
+description: "Это правило проверяет, что имена package записаны в формате lower_snake_case (строчные буквы, при необходимости цифры и символ подчеркивания, без пробелов и заглавных букв)."
 ---
 
-Категории:
-
-- **MINIMAL**
-- **BASIC**
-- **DEFAULT**
+- **ID правила:** `PACKAGE_LOWER_SNAKE_CASE`
+- **Группа:** `BASIC`
+- **Входит в пресеты (`linters.default`):** `BASIC`, `STANDARD`, `COMMENTS`
 
 Это правило проверяет, что имена package записаны в формате lower_snake_case (строчные буквы, при необходимости цифры и символ подчеркивания, без пробелов и заглавных букв).
 
 ## Примеры
 
-### Bad
+### Неправильно
 
 ```proto
 // File: bar/foo.proto
@@ -21,7 +20,7 @@ syntax = "proto3";
 package FooBar;
 ```
 
-### Good
+### Правильно
 
 ```proto
 // File: bar/foo.proto

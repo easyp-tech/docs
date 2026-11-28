@@ -1,0 +1,67 @@
+---
+title: "Field Same Oneof"
+description: "Проверяет, что поля не перемещаются в настоящий блок oneof, из него или между разными oneof."
+---
+
+- **ID правила:** `FIELD_SAME_ONEOF`
+- **Профили:** `FILE`, `PACKAGE`, `WIRE_JSON`, `WIRE`
+
+Это правило проверяет, что принадлежность поля к настоящему блоку `oneof` не меняется (синтетические oneof для `optional`-полей proto3 игнорируются). Перенос поля в `oneof`, вынос из `oneof` или перенос в другой `oneof` ломает семантику взаимной исключаемости и сгенерированные типы во всех четырёх профилях (`FILE`, `PACKAGE`, `WIRE_JSON`, `WIRE`).
+
+## Примеры
+
+### Неправильно
+
+**До:**
+
+```proto
+syntax = "proto3";
+
+package myapi.v1;
+
+message Contact {
+  oneof destination {
+    string email = 1;
+    string phone = 2;
+  }
+}
+```
+
+**После:**
+
+```proto
+syntax = "proto3";
+
+package myapi.v1;
+
+message Contact {
+  oneof destination {
+    string email = 1;
+  }
+  string phone = 2;
+}
+```
+
+**Ошибка:**
+
+```text
+contact.proto:8:5: Field "phone" (2) changed real oneof membership. (FIELD_SAME_ONEOF)
+```
+
+### Правильно
+
+Сохраните существующие поля в их исходном `oneof`, а новые добавьте отдельно или в новый `oneof`:
+
+```proto
+syntax = "proto3";
+
+package myapi.v1;
+
+message Contact {
+  oneof destination {
+    string email = 1;
+    string phone = 2 [deprecated = true];
+  }
+  string secondary_phone = 3;
+}
+```

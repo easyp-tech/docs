@@ -1,0 +1,58 @@
+---
+title: "Message No Remove Standard Descriptor Accessor"
+description: "Проверяет, что на сообщениях не включается no_standard_descriptor_accessor после того, как стандартные аксессоры дескриптора уже генерировались."
+---
+
+- **ID правила:** `MESSAGE_NO_REMOVE_STANDARD_DESCRIPTOR_ACCESSOR`
+- **Профили:** `FILE`, `PACKAGE`
+
+Это правило проверяет, что на сообщении опция `option no_standard_descriptor_accessor` не меняется с `false` (по умолчанию) на `true`. Включение этой опции удаляет сгенерированные методы `descriptor()` / `GetDescriptor()` и ломает код, использующий рефлексию.
+
+## Примеры
+
+### Неправильно
+
+**До:**
+
+```proto
+syntax = "proto3";
+
+package myapi.v1;
+
+message Event {
+  string id = 1;
+}
+```
+
+**После:**
+
+```proto
+syntax = "proto3";
+
+package myapi.v1;
+
+message Event {
+  option no_standard_descriptor_accessor = true;
+  string id = 1;
+}
+```
+
+**Ошибка:**
+
+```text
+event.proto:5:1: Message "myapi.v1.Event" disabled standard descriptor accessors. (MESSAGE_NO_REMOVE_STANDARD_DESCRIPTOR_ACCESSOR)
+```
+
+### Правильно
+
+Не включайте `no_standard_descriptor_accessor = true` на существующих сообщениях:
+
+```proto
+syntax = "proto3";
+
+package myapi.v1;
+
+message Event {
+  string id = 1;
+}
+```

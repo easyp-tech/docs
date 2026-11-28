@@ -1,0 +1,58 @@
+---
+title: "Rpc Same Server Streaming"
+description: "Проверяет, что RPC-методы не меняют режим серверного стриминга (server streaming)."
+---
+
+- **ID правила:** `RPC_SAME_SERVER_STREAMING`
+- **Профили:** `FILE`, `PACKAGE`, `WIRE_JSON`, `WIRE`
+
+Это правило проверяет, что у RPC-метода не добавляется и не убирается `stream` в типе ответа. Переключение между unary и server-streaming ломает сетевой протокол и сгенерированные интерфейсы во всех четырёх профилях (`FILE`, `PACKAGE`, `WIRE_JSON`, `WIRE`).
+
+## Примеры
+
+### Неправильно
+
+**До:**
+
+```proto
+syntax = "proto3";
+
+package myapi.v1;
+
+service EventService {
+  rpc WatchEvents(WatchEventsRequest) returns (WatchEventsResponse);
+}
+```
+
+**После:**
+
+```proto
+syntax = "proto3";
+
+package myapi.v1;
+
+service EventService {
+  rpc WatchEvents(WatchEventsRequest) returns (stream WatchEventsResponse);
+}
+```
+
+**Ошибка:**
+
+```text
+event.proto:6:3: RPC "WatchEvents" changed server streaming behavior. (RPC_SAME_SERVER_STREAMING)
+```
+
+### Правильно
+
+Добавьте новый RPC с серверным стримингом вместо изменения существующего unary-метода:
+
+```proto
+syntax = "proto3";
+
+package myapi.v1;
+
+service EventService {
+  rpc WatchEvents(WatchEventsRequest) returns (WatchEventsResponse);
+  rpc StreamEvents(StreamEventsRequest) returns (stream StreamEventsResponse);
+}
+```

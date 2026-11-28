@@ -1,0 +1,60 @@
+---
+title: "Enum Moved"
+description: "Checks that enums are not moved to a different .proto file in the FILE profile."
+---
+
+- **Rule ID:** `ENUM_MOVED`
+- **Profiles:** `FILE`
+
+In the `FILE` profile, moving an `enum` from one `.proto` file to another (even within the same protobuf package) is flagged because generated file-level headers and imports (for example, C++ `#include` or Python module imports) depend on the declaring file path. Use the `PACKAGE` profile if you allow moving declarations between files in the same package.
+
+## Examples
+
+### Bad
+
+**Before:**
+
+```proto
+// File: myapi/v1/order.proto
+syntax = "proto3";
+
+package myapi.v1;
+
+enum OrderStatus {
+  ORDER_STATUS_UNSPECIFIED = 0;
+}
+```
+
+**After:**
+
+```proto
+// File: myapi/v1/status.proto
+syntax = "proto3";
+
+package myapi.v1;
+
+enum OrderStatus {
+  ORDER_STATUS_UNSPECIFIED = 0;
+}
+```
+
+**Error:**
+
+```text
+myapi/v1/order.proto:6:1: Enum "myapi.v1.OrderStatus" was moved from "myapi/v1/order.proto" to "myapi/v1/status.proto". (ENUM_MOVED)
+```
+
+### Good
+
+Keep the enum in its original `.proto` file when using the `FILE` profile:
+
+```proto
+// File: myapi/v1/order.proto
+syntax = "proto3";
+
+package myapi.v1;
+
+enum OrderStatus {
+  ORDER_STATUS_UNSPECIFIED = 0;
+}
+```

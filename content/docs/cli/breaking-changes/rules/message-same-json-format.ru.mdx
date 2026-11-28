@@ -1,0 +1,58 @@
+---
+title: "Message Same Json Format"
+description: "Проверяет, что сообщения не понижают поддержку формата JSON с ALLOW до LEGACY_BEST_EFFORT."
+---
+
+- **ID правила:** `MESSAGE_SAME_JSON_FORMAT`
+- **Профили:** `FILE`, `PACKAGE`, `WIRE_JSON`
+
+Это правило проверяет, что сообщение с эффективной опцией `features.json_format = ALLOW` (по умолчанию в `proto3` и Editions 2023) не понижает её до `LEGACY_BEST_EFFORT`. Такое понижение нарушает гарантии JSON-сериализации в профилях `FILE`, `PACKAGE` и `WIRE_JSON`.
+
+## Примеры
+
+### Неправильно
+
+**До:**
+
+```proto
+edition = "2023";
+
+package myapi.v1;
+
+message User {
+  string id = 1;
+}
+```
+
+**После:**
+
+```proto
+edition = "2023";
+
+package myapi.v1;
+
+message User {
+  option features.json_format = LEGACY_BEST_EFFORT;
+  string id = 1;
+}
+```
+
+**Ошибка:**
+
+```text
+user.proto:5:1: Message "myapi.v1.User" changed JSON format support. (MESSAGE_SAME_JSON_FORMAT)
+```
+
+### Правильно
+
+Сохраняйте `features.json_format = ALLOW` для сообщений, уже поддерживающих стандартный JSON:
+
+```proto
+edition = "2023";
+
+package myapi.v1;
+
+message User {
+  string id = 1;
+}
+```

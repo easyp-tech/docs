@@ -1,14 +1,26 @@
 ---
 title: "Enum Zero Value Suffix"
+description: "Checks that every enum value numbered 0 ends with the configured suffix (default _NONE)."
 ---
 
-Categories:
+- **Rule ID:** `ENUM_ZERO_VALUE_SUFFIX`
+- **Group:** `DEFAULT`
+- **Included in presets (`linters.default`):** `STANDARD`, `COMMENTS`
 
-- **MINIMAL**
-- **BASIC**
-- **DEFAULT**
+- **Rule ID:** `ENUM_ZERO_VALUE_SUFFIX`
+- **Group:** `DEFAULT`
+- **Included in presets (`linters.default`):** `STANDARD`, `COMMENTS`
 
-This rule checks that all enum zero values are suffixed with `_NONE` or your custom suffix.
+This rule checks that every enum value with number `0` ends with `_NONE` or a custom suffix configured via `linters-settings.ENUM_ZERO_VALUE_SUFFIX.suffix` (with or without a leading underscore).
+
+## Configuration
+
+```yaml
+version: v1
+linters-settings:
+  ENUM_ZERO_VALUE_SUFFIX:
+    suffix: UNSPECIFIED
+```
 
 ## Examples
 
@@ -18,16 +30,28 @@ This rule checks that all enum zero values are suffixed with `_NONE` or your cus
 syntax = "proto3";
 
 enum Foo {
-    BAR = 0;
+  FOO_BAR = 0;
 }
 ```
 
 ### Good
 
+With the default suffix (`NONE`):
+
 ```proto
 syntax = "proto3";
 
 enum Foo {
-    FOO_BAR_NONE = 0;
+  FOO_NONE = 0;
+}
+```
+
+With `suffix: UNSPECIFIED`:
+
+```proto
+syntax = "proto3";
+
+enum Foo {
+  FOO_UNSPECIFIED = 0;
 }
 ```
