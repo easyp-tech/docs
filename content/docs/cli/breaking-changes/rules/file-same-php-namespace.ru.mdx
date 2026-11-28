@@ -1,0 +1,63 @@
+---
+title: "File Same Php Namespace"
+description: "Проверяет, что файлы сохраняют прежнее значение опции php_namespace."
+---
+
+- **ID правила:** `FILE_SAME_PHP_NAMESPACE`
+- **Профили:** `FILE`, `PACKAGE`
+
+Это правило проверяет, что файловая опция `php_namespace` не изменилась у файла (а также у объявлений, перенесённых в другой файл того же пакета). Изменение `php_namespace` меняет сгенерированное пространство имён PHP для типов файла и ломает совместимость сгенерированного кода для PHP.
+
+## Примеры
+
+### Неправильно
+
+**До:**
+
+```proto
+syntax = "proto3";
+
+package myapi.v1;
+
+option php_namespace = "Acme\\MyApi\\V1";
+
+message User {
+  string id = 1;
+}
+```
+
+**После:**
+
+```proto
+syntax = "proto3";
+
+package myapi.v1;
+
+option php_namespace = "Acme\\Users\\V1";
+
+message User {
+  string id = 1;
+}
+```
+
+**Ошибка:**
+
+```text
+user.proto:1:1: File option php_namespace changed. (FILE_SAME_PHP_NAMESPACE)
+```
+
+### Правильно
+
+Сохраняйте `option php_namespace` неизменной в текущей мажорной версии пакета; меняйте её только в новой мажорной версии (например, `myapi.v2`).
+
+```proto
+syntax = "proto3";
+
+package myapi.v1;
+
+option php_namespace = "Acme\\MyApi\\V1";
+
+message User {
+  string id = 1;
+}
+```

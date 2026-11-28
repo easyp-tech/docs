@@ -1,0 +1,63 @@
+---
+title: "File Same Go Package"
+description: "Проверяет, что файлы сохраняют прежнее значение опции go_package."
+---
+
+- **ID правила:** `FILE_SAME_GO_PACKAGE`
+- **Профили:** `FILE`, `PACKAGE`
+
+Это правило проверяет, что файловая опция `go_package` не изменилась у файла (а также у объявлений, перенесённых в другой файл того же пакета). Изменение `go_package` меняет путь импорта и имя сгенерированного пакета Go и ломает совместимость сгенерированного кода для Go.
+
+## Примеры
+
+### Неправильно
+
+**До:**
+
+```proto
+syntax = "proto3";
+
+package myapi.v1;
+
+option go_package = "github.com/acme/myapi/gen/v1;myapiv1";
+
+message User {
+  string id = 1;
+}
+```
+
+**После:**
+
+```proto
+syntax = "proto3";
+
+package myapi.v1;
+
+option go_package = "github.com/acme/myapi/gen/users/v1;usersv1";
+
+message User {
+  string id = 1;
+}
+```
+
+**Ошибка:**
+
+```text
+user.proto:1:1: File option go_package changed. (FILE_SAME_GO_PACKAGE)
+```
+
+### Правильно
+
+Сохраняйте `option go_package` неизменной в текущей мажорной версии пакета; меняйте её только в новой мажорной версии (например, `myapi.v2`).
+
+```proto
+syntax = "proto3";
+
+package myapi.v1;
+
+option go_package = "github.com/acme/myapi/gen/v1;myapiv1";
+
+message User {
+  string id = 1;
+}
+```

@@ -1,0 +1,63 @@
+---
+title: "Enum Value No Delete Unless Number Reserved"
+description: "Checks that any enum value deleted in WIRE or WIRE_JSON has its number reserved."
+---
+
+- **Rule ID:** `ENUM_VALUE_NO_DELETE_UNLESS_NUMBER_RESERVED`
+- **Profiles:** `WIRE_JSON`, `WIRE`
+
+In `WIRE` and `WIRE_JSON` profiles, deleting an enum value (when no remaining alias keeps that number) requires permanently reserving its number with `reserved <number>;` so future values cannot reuse the same wire number with a different meaning.
+
+## Examples
+
+### Bad
+
+**Before:**
+
+```proto
+syntax = "proto3";
+
+package myapi.v1;
+
+enum Color {
+  COLOR_UNSPECIFIED = 0;
+  COLOR_RED = 1;
+  COLOR_BLUE = 2;
+}
+```
+
+**After:**
+
+```proto
+syntax = "proto3";
+
+package myapi.v1;
+
+enum Color {
+  COLOR_UNSPECIFIED = 0;
+  COLOR_RED = 1;
+}
+```
+
+**Error:**
+
+```text
+color.proto:5:1: Deleted enum number 2 in "myapi.v1.Color" must be reserved. (ENUM_VALUE_NO_DELETE_UNLESS_NUMBER_RESERVED)
+```
+
+### Good
+
+Reserve the deleted enum value number (and its name if using `WIRE_JSON`):
+
+```proto
+syntax = "proto3";
+
+package myapi.v1;
+
+enum Color {
+  reserved 2;
+  reserved "COLOR_BLUE";
+  COLOR_UNSPECIFIED = 0;
+  COLOR_RED = 1;
+}
+```

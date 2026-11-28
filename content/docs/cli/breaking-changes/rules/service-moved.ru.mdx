@@ -1,0 +1,60 @@
+---
+title: "Service Moved"
+description: "Проверяет, что сервисы не переносятся в другой .proto-файл в профиле FILE."
+---
+
+- **ID правила:** `SERVICE_MOVED`
+- **Профили:** `FILE`
+
+В профиле `FILE` перенос `service` в другой `.proto`-файл (даже внутри того же пакета) ломает сгенерированные файловые стабы сервисов и импорты. Если перенос объявлений внутри одного пакета допустим, используйте профиль `PACKAGE`.
+
+## Примеры
+
+### Неправильно
+
+**До:**
+
+```proto
+// File: myapi/v1/user.proto
+syntax = "proto3";
+
+package myapi.v1;
+
+service UserService {
+  rpc GetUser(GetUserRequest) returns (GetUserResponse);
+}
+```
+
+**После:**
+
+```proto
+// File: myapi/v1/user_service.proto
+syntax = "proto3";
+
+package myapi.v1;
+
+service UserService {
+  rpc GetUser(GetUserRequest) returns (GetUserResponse);
+}
+```
+
+**Ошибка:**
+
+```text
+myapi/v1/user.proto:6:1: Service "myapi.v1.UserService" was moved from "myapi/v1/user.proto" to "myapi/v1/user_service.proto". (SERVICE_MOVED)
+```
+
+### Правильно
+
+Оставьте сервис в исходном `.proto`-файле при проверке профилем `FILE`:
+
+```proto
+// File: myapi/v1/user.proto
+syntax = "proto3";
+
+package myapi.v1;
+
+service UserService {
+  rpc GetUser(GetUserRequest) returns (GetUserResponse);
+}
+```

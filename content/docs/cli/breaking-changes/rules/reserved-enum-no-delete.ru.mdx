@@ -1,0 +1,66 @@
+---
+title: "Reserved Enum No Delete"
+description: "Проверяет, что существующие зарезервированные номера и имена в enum никогда не освобождаются."
+---
+
+- **ID правила:** `RESERVED_ENUM_NO_DELETE`
+- **Профили:** `FILE`, `PACKAGE`, `WIRE_JSON`, `WIRE`
+
+Это правило проверяет, что ни одно ранее зарезервированное имя или диапазон номеров в `enum` не были удалены или сужены. Снятие резервирования позволяет повторно занять выведенные из эксплуатации номера или JSON-имена, что ведёт к порче данных во всех четырёх профилях (`FILE`, `PACKAGE`, `WIRE_JSON`, `WIRE`).
+
+## Примеры
+
+### Неправильно
+
+**До:**
+
+```proto
+syntax = "proto3";
+
+package myapi.v1;
+
+enum Status {
+  reserved 2, 10 to 15;
+  reserved "STATUS_LEGACY";
+  STATUS_UNSPECIFIED = 0;
+  STATUS_ACTIVE = 1;
+}
+```
+
+**После:**
+
+```proto
+syntax = "proto3";
+
+package myapi.v1;
+
+enum Status {
+  reserved 10 to 15;
+  STATUS_UNSPECIFIED = 0;
+  STATUS_ACTIVE = 1;
+}
+```
+
+**Ошибка:**
+
+```text
+status.proto:5:1: Enum "myapi.v1.Status" released reserved value name "STATUS_LEGACY". (RESERVED_ENUM_NO_DELETE)
+status.proto:5:1: Enum "myapi.v1.Status" released a reserved number range. (RESERVED_ENUM_NO_DELETE)
+```
+
+### Правильно
+
+Сохраняйте все существующие директивы `reserved` (добавлять новые резервы или объединять смежные диапазоны безопасно):
+
+```proto
+syntax = "proto3";
+
+package myapi.v1;
+
+enum Status {
+  reserved 2, 10 to 20;
+  reserved "STATUS_LEGACY", "STATUS_OLD";
+  STATUS_UNSPECIFIED = 0;
+  STATUS_ACTIVE = 1;
+}
+```

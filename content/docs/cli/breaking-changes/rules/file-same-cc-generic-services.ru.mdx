@@ -1,0 +1,63 @@
+---
+title: "File Same Cc Generic Services"
+description: "Проверяет, что файлы сохраняют прежнее значение опции cc_generic_services."
+---
+
+- **ID правила:** `FILE_SAME_CC_GENERIC_SERVICES`
+- **Профили:** `FILE`, `PACKAGE`
+
+Это правило проверяет, что файловая опция `cc_generic_services` не изменилась у файла (а также у объявлений, перенесённых в другой файл того же пакета). Изменение `cc_generic_services` меняет генерацию абстрактных generic-стабов сервисов в C++ и ломает совместимость сгенерированного кода для C++.
+
+## Примеры
+
+### Неправильно
+
+**До:**
+
+```proto
+syntax = "proto3";
+
+package myapi.v1;
+
+option cc_generic_services = true;
+
+message User {
+  string id = 1;
+}
+```
+
+**После:**
+
+```proto
+syntax = "proto3";
+
+package myapi.v1;
+
+option cc_generic_services = false;
+
+message User {
+  string id = 1;
+}
+```
+
+**Ошибка:**
+
+```text
+user.proto:1:1: File option cc_generic_services changed. (FILE_SAME_CC_GENERIC_SERVICES)
+```
+
+### Правильно
+
+Сохраняйте `option cc_generic_services` неизменной в текущей мажорной версии пакета; меняйте её только в новой мажорной версии (например, `myapi.v2`).
+
+```proto
+syntax = "proto3";
+
+package myapi.v1;
+
+option cc_generic_services = true;
+
+message User {
+  string id = 1;
+}
+```

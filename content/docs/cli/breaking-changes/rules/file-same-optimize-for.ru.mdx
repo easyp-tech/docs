@@ -1,0 +1,63 @@
+---
+title: "File Same Optimize For"
+description: "Проверяет, что файлы сохраняют прежнее значение опции optimize_for."
+---
+
+- **ID правила:** `FILE_SAME_OPTIMIZE_FOR`
+- **Профили:** `FILE`, `PACKAGE`
+
+Это правило проверяет, что файловая опция `optimize_for` не изменилась у файла (а также у объявлений, перенесённых в другой файл того же пакета). Изменение `optimize_for` меняет поддержку рефлексии и базовые классы рантайма (например, `SPEED` против `LITE_RUNTIME`) и ломает совместимость сгенерированного кода для рантаймов Protobuf.
+
+## Примеры
+
+### Неправильно
+
+**До:**
+
+```proto
+syntax = "proto3";
+
+package myapi.v1;
+
+option optimize_for = SPEED;
+
+message User {
+  string id = 1;
+}
+```
+
+**После:**
+
+```proto
+syntax = "proto3";
+
+package myapi.v1;
+
+option optimize_for = LITE_RUNTIME;
+
+message User {
+  string id = 1;
+}
+```
+
+**Ошибка:**
+
+```text
+user.proto:1:1: File option optimize_for changed. (FILE_SAME_OPTIMIZE_FOR)
+```
+
+### Правильно
+
+Сохраняйте `option optimize_for` неизменной в текущей мажорной версии пакета; меняйте её только в новой мажорной версии (например, `myapi.v2`).
+
+```proto
+syntax = "proto3";
+
+package myapi.v1;
+
+option optimize_for = SPEED;
+
+message User {
+  string id = 1;
+}
+```

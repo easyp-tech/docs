@@ -1,0 +1,57 @@
+---
+title: "Field Same Jstype"
+description: "Проверяет, что поля сохраняют прежнюю опцию кодогенерации jstype."
+---
+
+- **ID правила:** `FIELD_SAME_JSTYPE`
+- **Профили:** `FILE`, `PACKAGE`
+
+Это правило проверяет, что поля сохраняют значение опции `[jstype = ...]` (`JS_NORMAL`, `JS_STRING` или `JS_NUMBER`). Изменение `jstype` меняет типы 64-битных целых полей в сгенерированном JavaScript/TypeScript-коде.
+
+## Примеры
+
+### Неправильно
+
+**До:**
+
+```proto
+syntax = "proto3";
+
+package myapi.v1;
+
+message Account {
+  int64 balance_cents = 1 [jstype = JS_STRING];
+}
+```
+
+**После:**
+
+```proto
+syntax = "proto3";
+
+package myapi.v1;
+
+message Account {
+  int64 balance_cents = 1 [jstype = JS_NUMBER];
+}
+```
+
+**Ошибка:**
+
+```text
+account.proto:6:3: Field "myapi.v1.Account.balance_cents" changed jstype option. (FIELD_SAME_JSTYPE)
+```
+
+### Правильно
+
+Сохраняйте опцию `[jstype = ...]` неизменной на существующих полях:
+
+```proto
+syntax = "proto3";
+
+package myapi.v1;
+
+message Account {
+  int64 balance_cents = 1 [jstype = JS_STRING];
+}
+```

@@ -1,0 +1,58 @@
+---
+title: "Field Wire Compatible Cardinality"
+description: "Checks that field cardinality changes remain binary wire-compatible in the WIRE profile."
+---
+
+- **Rule ID:** `FIELD_WIRE_COMPATIBLE_CARDINALITY`
+- **Profiles:** `WIRE`
+
+In the `WIRE` profile, a field may change between implicit and explicit `optional` presence (`string` ↔ `optional string`), and between a `map<K, V>` and a `repeated` message whose entry fields are wire-compatible. Switching between singular and `repeated`/`map`, or adding/removing `required`, is rejected.
+
+## Examples
+
+### Bad
+
+**Before:**
+
+```proto
+syntax = "proto3";
+
+package myapi.v1;
+
+message Article {
+  string tag = 1;
+}
+```
+
+**After:**
+
+```proto
+syntax = "proto3";
+
+package myapi.v1;
+
+message Article {
+  repeated string tag = 1;
+}
+```
+
+**Error:**
+
+```text
+article.proto:6:3: Field "tag" (1) on "myapi.v1.Article" changed cardinality from optional_implicit to repeated. (FIELD_WIRE_COMPATIBLE_CARDINALITY)
+```
+
+### Good
+
+Keep wire-compatible cardinality (for example, adding explicit `optional` in proto3 is allowed in `WIRE`, whereas changing singular to `repeated` requires a new field):
+
+```proto
+syntax = "proto3";
+
+package myapi.v1;
+
+message Article {
+  optional string tag = 1;
+  repeated string tags = 2;
+}
+```

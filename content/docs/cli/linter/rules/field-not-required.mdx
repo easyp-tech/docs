@@ -1,0 +1,53 @@
+---
+title: "Field Not Required"
+description: "Checks that message fields do not use the proto2 required label."
+---
+
+- **Rule ID:** `FIELD_NOT_REQUIRED`
+- **Group:** `BASIC`
+- **Included in presets (`linters.default`):** `BASIC`, `STANDARD`, `COMMENTS`
+
+- **Rule ID:** `FIELD_NOT_REQUIRED`
+- **Group:** `BASIC`
+- **Included in presets (`linters.default`):** `BASIC`, `STANDARD`, `COMMENTS`
+
+This rule checks that message fields do not use the `required` label. Proto2 `required` fields cannot be safely removed or changed later without breaking wire compatibility across producers and consumers; enforce presence requirements in application validation instead.
+
+## Examples
+
+### Bad
+
+```proto
+syntax = "proto2";
+
+package acme.users.v1;
+
+message User {
+  required string id = 1;
+  optional string email = 2;
+}
+```
+
+### Good
+
+```proto
+syntax = "proto2";
+
+package acme.users.v1;
+
+message User {
+  optional string id = 1;
+  optional string email = 2;
+}
+```
+
+```proto
+syntax = "proto3";
+
+package acme.users.v1;
+
+message User {
+  string id = 1;
+  string email = 2;
+}
+```

@@ -1,0 +1,60 @@
+---
+title: "Message Moved"
+description: "Checks that messages are not moved to a different .proto file in the FILE profile."
+---
+
+- **Rule ID:** `MESSAGE_MOVED`
+- **Profiles:** `FILE`
+
+In the `FILE` profile, moving a `message` to a different `.proto` file (even within the same protobuf package) is rejected because generated file-oriented imports (such as C++ headers, Python modules, or Java outer classes) depend on the declaring file path. Use the `PACKAGE` profile to allow moving messages between files within the same package.
+
+## Examples
+
+### Bad
+
+**Before:**
+
+```proto
+// File: myapi/v1/user.proto
+syntax = "proto3";
+
+package myapi.v1;
+
+message Address {
+  string city = 1;
+}
+```
+
+**After:**
+
+```proto
+// File: myapi/v1/address.proto
+syntax = "proto3";
+
+package myapi.v1;
+
+message Address {
+  string city = 1;
+}
+```
+
+**Error:**
+
+```text
+myapi/v1/user.proto:6:1: Message "myapi.v1.Address" was moved from "myapi/v1/user.proto" to "myapi/v1/address.proto". (MESSAGE_MOVED)
+```
+
+### Good
+
+Keep the message in its original `.proto` file when using the `FILE` profile:
+
+```proto
+// File: myapi/v1/user.proto
+syntax = "proto3";
+
+package myapi.v1;
+
+message Address {
+  string city = 1;
+}
+```

@@ -1,0 +1,58 @@
+---
+title: "Message Same Message Set Wire Format"
+description: "Проверяет, что сообщения сохраняют прежнее значение опции message_set_wire_format."
+---
+
+- **ID правила:** `MESSAGE_SAME_MESSAGE_SET_WIRE_FORMAT`
+- **Профили:** `FILE`, `PACKAGE`, `WIRE_JSON`, `WIRE`
+
+Это правило проверяет, что на сообщении не переключается `option message_set_wire_format`. Включение или выключение формата MessageSet полностью меняет бинарное кодирование расширений сообщения и ломает совместимость во всех четырёх профилях (`FILE`, `PACKAGE`, `WIRE_JSON`, `WIRE`).
+
+## Примеры
+
+### Неправильно
+
+**До:**
+
+```proto
+syntax = "proto2";
+
+package myapi.v1;
+
+message Envelope {
+  extensions 100 to max;
+}
+```
+
+**После:**
+
+```proto
+syntax = "proto2";
+
+package myapi.v1;
+
+message Envelope {
+  option message_set_wire_format = true;
+  extensions 4 to max;
+}
+```
+
+**Ошибка:**
+
+```text
+envelope.proto:5:1: Message "myapi.v1.Envelope" changed message-set encoding. (MESSAGE_SAME_MESSAGE_SET_WIRE_FORMAT)
+```
+
+### Правильно
+
+Не изменяйте `message_set_wire_format` на существующих сообщениях:
+
+```proto
+syntax = "proto2";
+
+package myapi.v1;
+
+message Envelope {
+  extensions 100 to max;
+}
+```

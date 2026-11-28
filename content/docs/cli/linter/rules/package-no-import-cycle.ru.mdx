@@ -1,0 +1,87 @@
+---
+title: "Package No Import Cycle"
+description: "Проверяет отсутствие прямых и транзитивных циклических импортов между пакетами."
+---
+
+- **ID правила:** `PACKAGE_NO_IMPORT_CYCLE`
+- **Группа:** `MINIMAL`
+- **Входит в пресеты (`linters.default`):** `MINIMAL`, `BASIC`, `STANDARD`, `COMMENTS`
+
+- **ID правила:** `PACKAGE_NO_IMPORT_CYCLE`
+- **Группа:** `MINIMAL`
+- **Входит в пресеты (`linters.default`):** `MINIMAL`, `BASIC`, `STANDARD`, `COMMENTS`
+
+Это правило уровня модуля проверяет, что protobuf-пакеты не образуют циклических зависимостей импорта (прямых или транзитивных). Импорты между файлами внутри одного пакета допустимы. Граф строится по проверяемым файлам и пакетам их прямых импортов; сообщение об ошибке выдаётся для каждого импорта, ведущего в цикл.
+
+## Примеры
+
+### Неправильно
+
+```proto
+// File: foo/v1/foo.proto
+syntax = "proto3";
+
+package foo.v1;
+
+import "bar/v1/bar.proto";
+
+message Foo {
+  bar.v1.Bar bar = 1;
+}
+```
+
+```proto
+// File: bar/v1/bar.proto
+syntax = "proto3";
+
+package bar.v1;
+
+import "foo/v1/foo.proto";
+
+message Bar {
+  foo.v1.Foo foo = 1;
+}
+```
+
+### Правильно
+
+Вынесите общие типы в отдельный пакет, чтобы зависимости оставались однонаправленными:
+
+```proto
+// File: common/v1/types.proto
+syntax = "proto3";
+
+package common.v1;
+
+message SharedId {
+  string value = 1;
+}
+```
+
+```proto
+// File: foo/v1/foo.proto
+syntax = "proto3";
+
+package foo.v1;
+
+import "common/v1/types.proto";
+
+message Foo {
+  common.v1.SharedId id = 1;
+}
+```
+
+```proto
+// File: bar/v1/bar.proto
+syntax = "proto3";
+
+package bar.v1;
+
+import "common/v1/types.proto";
+import "foo/v1/foo.proto";
+
+message Bar {
+  common.v1.SharedId id = 1;
+  foo.v1.Foo foo = 2;
+}
+```

@@ -1,0 +1,63 @@
+---
+title: "File Same Php Class Prefix"
+description: "Checks that files keep the same php_class_prefix option value."
+---
+
+- **Rule ID:** `FILE_SAME_PHP_CLASS_PREFIX`
+- **Profiles:** `FILE`, `PACKAGE`
+
+This rule checks that the file-level `php_class_prefix` option does not change for a file or for any declaration moved to another file in the same package. Changing `php_class_prefix` alters the prefix applied to generated PHP classes, breaking source compatibility for PHP consumers.
+
+## Examples
+
+### Bad
+
+**Before:**
+
+```proto
+syntax = "proto3";
+
+package myapi.v1;
+
+option php_class_prefix = "Acme";
+
+message User {
+  string id = 1;
+}
+```
+
+**After:**
+
+```proto
+syntax = "proto3";
+
+package myapi.v1;
+
+option php_class_prefix = "Users";
+
+message User {
+  string id = 1;
+}
+```
+
+**Error:**
+
+```text
+user.proto:1:1: File option php_class_prefix changed. (FILE_SAME_PHP_CLASS_PREFIX)
+```
+
+### Good
+
+Keep `option php_class_prefix` unchanged in the existing package version; change it only in a new major package version (for example, `myapi.v2`).
+
+```proto
+syntax = "proto3";
+
+package myapi.v1;
+
+option php_class_prefix = "Acme";
+
+message User {
+  string id = 1;
+}
+```

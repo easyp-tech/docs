@@ -16,6 +16,7 @@
     "enum-value-upper-snake-case",
     "enum-zero-value-suffix",
     "field-lower-snake-case",
+    "field-not-required",
     "file-lower-snake-case",
     "import-no-public",
     "import-no-weak",
@@ -25,6 +26,7 @@
     "package-defined",
     "package-directory-match",
     "package-lower-snake-case",
+    "package-no-import-cycle",
     "package-same-csharp-namespace",
     "package-same-directory",
     "package-same-go-package",
@@ -41,6 +43,7 @@
     "rpc-request-standard-name",
     "rpc-response-standard-name",
     "service-pascal-case",
-    "service-suffix"
+    "service-suffix",
+    "syntax-specified"
   ]
 }

@@ -1,0 +1,87 @@
+---
+title: "Package No Import Cycle"
+description: "Checks that protobuf packages do not form direct or transitive import cycles."
+---
+
+- **Rule ID:** `PACKAGE_NO_IMPORT_CYCLE`
+- **Group:** `MINIMAL`
+- **Included in presets (`linters.default`):** `MINIMAL`, `BASIC`, `STANDARD`, `COMMENTS`
+
+- **Rule ID:** `PACKAGE_NO_IMPORT_CYCLE`
+- **Group:** `MINIMAL`
+- **Included in presets (`linters.default`):** `MINIMAL`, `BASIC`, `STANDARD`, `COMMENTS`
+
+This module-level rule checks that protobuf packages do not import each other in a cycle (directly or transitively). Imports between files within the same package are allowed. The package graph covers linted files and the packages of their direct imports, and every import leading into a cycle is reported.
+
+## Examples
+
+### Bad
+
+```proto
+// File: foo/v1/foo.proto
+syntax = "proto3";
+
+package foo.v1;
+
+import "bar/v1/bar.proto";
+
+message Foo {
+  bar.v1.Bar bar = 1;
+}
+```
+
+```proto
+// File: bar/v1/bar.proto
+syntax = "proto3";
+
+package bar.v1;
+
+import "foo/v1/foo.proto";
+
+message Bar {
+  foo.v1.Foo foo = 1;
+}
+```
+
+### Good
+
+Extract shared types into a common package so dependencies flow in one direction:
+
+```proto
+// File: common/v1/types.proto
+syntax = "proto3";
+
+package common.v1;
+
+message SharedId {
+  string value = 1;
+}
+```
+
+```proto
+// File: foo/v1/foo.proto
+syntax = "proto3";
+
+package foo.v1;
+
+import "common/v1/types.proto";
+
+message Foo {
+  common.v1.SharedId id = 1;
+}
+```
+
+```proto
+// File: bar/v1/bar.proto
+syntax = "proto3";
+
+package bar.v1;
+
+import "common/v1/types.proto";
+import "foo/v1/foo.proto";
+
+message Bar {
+  common.v1.SharedId id = 1;
+  foo.v1.Foo foo = 2;
+}
+```

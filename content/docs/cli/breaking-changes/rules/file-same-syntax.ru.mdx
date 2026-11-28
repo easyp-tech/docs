@@ -1,0 +1,57 @@
+---
+title: "File Same Syntax"
+description: "Проверяет, что файл сохраняет прежний синтаксис (syntax) или версию Protobuf Edition."
+---
+
+- **ID правила:** `FILE_SAME_SYNTAX`
+- **Профили:** `FILE`, `PACKAGE`
+
+Это правило проверяет, что `.proto`-файл сохраняет прежнюю директиву `syntax` (`proto2` / `proto3`) и `edition` (например, `"2023"`). Смена синтаксиса или Edition меняет правила присутствия полей, открытость enum и сгенерированный API.
+
+## Примеры
+
+### Неправильно
+
+**До:**
+
+```proto
+syntax = "proto3";
+
+package myapi.v1;
+
+message User {
+  string id = 1;
+}
+```
+
+**После:**
+
+```proto
+edition = "2023";
+
+package myapi.v1;
+
+message User {
+  string id = 1;
+}
+```
+
+**Ошибка:**
+
+```text
+user.proto:1:1: File "user.proto" changed syntax from proto3 to editions. (FILE_SAME_SYNTAX)
+```
+
+### Правильно
+
+Сохраняйте `syntax` или `edition` файла в рамках текущей мажорной версии; переходите на новый синтаксис или Edition в новой мажорной версии пакета (например, `myapi.v2`).
+
+```proto
+syntax = "proto3";
+
+package myapi.v1;
+
+message User {
+  string id = 1;
+}
+```

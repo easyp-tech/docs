@@ -1,18 +1,19 @@
 ---
 title: "Rpc No Delete"
+description: "Проверяет, что ни один RPC-метод не был удалён из сервиса."
 ---
 
-Категории:
+- **ID правила:** `RPC_NO_DELETE`
+- **Профили:** `FILE`, `PACKAGE`, `WIRE_JSON`, `WIRE`
 
-- **WIRE+**
-
-Правило проверяет, что ни один RPC‑метод не был удалён из service. Удаление RPC ломает сгенерированный код и клиентские приложения, которые этот метод вызывают.
+Это правило проверяет, что из `service` не удалён ни один RPC-метод. Удаление RPC ломает как сгенерированный клиентский и серверный код, так и живые сетевые вызовы.
 
 ## Примеры
 
-### Плохой (Breaking)
+### Неправильно
 
 **До:**
+
 ```proto
 syntax = "proto3";
 
@@ -20,12 +21,12 @@ package myapi.v1;
 
 service UserService {
   rpc GetUser(GetUserRequest) returns (GetUserResponse);
-  rpc CreateUser(CreateUserRequest) returns (CreateUserResponse);
   rpc DeleteUser(DeleteUserRequest) returns (DeleteUserResponse);
 }
 ```
 
 **После:**
+
 ```proto
 syntax = "proto3";
 
@@ -33,19 +34,20 @@ package myapi.v1;
 
 service UserService {
   rpc GetUser(GetUserRequest) returns (GetUserResponse);
-  rpc CreateUser(CreateUserRequest) returns (CreateUserResponse);
-  // DeleteUser RPC удалён — BREAKING CHANGE!
+  // RPC DeleteUser удалён
 }
 ```
 
 **Ошибка:**
-```
-services.proto:7:1: Previously present RPC "DeleteUser" on service "UserService" was deleted. (BREAKING_CHECK)
+
+```text
+services.proto:7:3: RPC "DeleteUser" on service "myapi.v1.UserService" was deleted. (RPC_NO_DELETE)
 ```
 
-### Хороший (Безопасный)
+### Правильно
 
-**Вместо удаления — пометить RPC deprecated:**
+Вместо удаления пометьте RPC-метод как устаревший:
+
 ```proto
 syntax = "proto3";
 
@@ -53,28 +55,14 @@ package myapi.v1;
 
 service UserService {
   rpc GetUser(GetUserRequest) returns (GetUserResponse);
-  rpc CreateUser(CreateUserRequest) returns (CreateUserResponse);
   rpc DeleteUser(DeleteUserRequest) returns (DeleteUserResponse) {
     option deprecated = true;
   }
 }
 ```
 
-## Влияние
-
-- **Generated Code:** Stub/метод исчезает — клиенты не компилируются
-- **Client Applications:** Существующие вызовы метода падают при сборке
-- **Runtime:** gRPC клиенты теряют определение метода
-
 ## Стратегия миграции
 
-1. **Сначала деприкация:**
-   ```proto
-   rpc OldMethod(OldRequest) returns (OldResponse) {
-     option deprecated = true;
-   }
-   ```
-
-2. **Имплементация может возвращать ошибку**, указывая что метод устарел (например, INTERNAL / UNIMPLEMENTED)
-
-3. **Удалить в следующей major‑версии** после миграции всех клиентов
+1. Пометьте RPC опцией `option deprecated = true;` и предупредите потребителей API.
+2. Сохраняйте обработчик на сервере до завершения миграции клиентов.
+3. Удалите RPC только в новой мажорной версии пакета (например, `myapi.v2`).

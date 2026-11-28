@@ -1,0 +1,60 @@
+---
+title: "Field No Delete Unless Number Reserved"
+description: "Проверяет, что при удалении поля в профилях WIRE или WIRE_JSON его номер зарезервирован."
+---
+
+- **ID правила:** `FIELD_NO_DELETE_UNLESS_NUMBER_RESERVED`
+- **Профили:** `WIRE_JSON`, `WIRE`
+
+В профилях `WIRE` и `WIRE_JSON` удаление необязательного поля допускается только при постоянном резервировании его номера с помощью `reserved <number>;`. Без этого будущие изменения могут повторно занять тот же тег другим типом и повредить сериализованные данные.
+
+## Примеры
+
+### Неправильно
+
+**До:**
+
+```proto
+syntax = "proto3";
+
+package myapi.v1;
+
+message User {
+  string name = 1;
+  string phone = 2;
+}
+```
+
+**После:**
+
+```proto
+syntax = "proto3";
+
+package myapi.v1;
+
+message User {
+  string name = 1;
+}
+```
+
+**Ошибка:**
+
+```text
+user.proto:7:3: Deleted field "phone" number 2 on "myapi.v1.User" must be reserved. (FIELD_NO_DELETE_UNLESS_NUMBER_RESERVED)
+```
+
+### Правильно
+
+Зарезервируйте номер удалённого поля (и его имя, если используется `WIRE_JSON`):
+
+```proto
+syntax = "proto3";
+
+package myapi.v1;
+
+message User {
+  reserved 2;
+  reserved "phone";
+  string name = 1;
+}
+```

@@ -1,0 +1,61 @@
+---
+title: "Field No Delete Unless Name Reserved"
+description: "Checks that any field deleted in WIRE_JSON has its field name reserved."
+---
+
+- **Rule ID:** `FIELD_NO_DELETE_UNLESS_NAME_RESERVED`
+- **Profiles:** `WIRE_JSON`
+
+In the `WIRE_JSON` profile, deleting a non-required field is allowed only if its field number is reserved (checked by `FIELD_NO_DELETE_UNLESS_NUMBER_RESERVED`) **and** its field name is reserved with `reserved "name";`. Reserving the name prevents future fields from reusing it and conflicting with historical protobuf JSON payloads.
+
+## Examples
+
+### Bad
+
+**Before:**
+
+```proto
+syntax = "proto3";
+
+package myapi.v1;
+
+message User {
+  string name = 1;
+  string phone = 2;
+}
+```
+
+**After:**
+
+```proto
+syntax = "proto3";
+
+package myapi.v1;
+
+message User {
+  reserved 2;
+  string name = 1;
+}
+```
+
+**Error:**
+
+```text
+user.proto:7:3: Deleted field "phone" on "myapi.v1.User" must have its name reserved for JSON compatibility. (FIELD_NO_DELETE_UNLESS_NAME_RESERVED)
+```
+
+### Good
+
+Reserve both the deleted field number and the deleted field name:
+
+```proto
+syntax = "proto3";
+
+package myapi.v1;
+
+message User {
+  reserved 2;
+  reserved "phone";
+  string name = 1;
+}
+```

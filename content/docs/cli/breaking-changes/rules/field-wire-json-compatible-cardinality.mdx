@@ -1,0 +1,68 @@
+---
+title: "Field Wire Json Compatible Cardinality"
+description: "Checks that field cardinality changes remain both binary and JSON wire-compatible in WIRE_JSON."
+---
+
+- **Rule ID:** `FIELD_WIRE_JSON_COMPATIBLE_CARDINALITY`
+- **Profiles:** `WIRE_JSON`
+
+In the `WIRE_JSON` profile, toggling between implicit and explicit `optional` presence (`string` ↔ `optional string`) is allowed. Converting between `repeated` entry messages and `map` is rejected because protobuf JSON encodes `repeated` as a JSON array and `map` as a JSON object.
+
+## Examples
+
+### Bad
+
+**Before:**
+
+```proto
+syntax = "proto3";
+
+package myapi.v1;
+
+message LabelEntry {
+  string key = 1;
+  string value = 2;
+}
+
+message Resource {
+  repeated LabelEntry labels = 1;
+}
+```
+
+**After:**
+
+```proto
+syntax = "proto3";
+
+package myapi.v1;
+
+message Resource {
+  map<string, string> labels = 1;
+}
+```
+
+**Error:**
+
+```text
+resource.proto:11:3: Field "labels" (1) on "myapi.v1.Resource" changed cardinality from repeated to map. (FIELD_WIRE_JSON_COMPATIBLE_CARDINALITY)
+```
+
+### Good
+
+Add a new `map` field instead of converting an existing `repeated` field in place:
+
+```proto
+syntax = "proto3";
+
+package myapi.v1;
+
+message LabelEntry {
+  string key = 1;
+  string value = 2;
+}
+
+message Resource {
+  repeated LabelEntry labels = 1 [deprecated = true];
+  map<string, string> label_map = 2;
+}
+```

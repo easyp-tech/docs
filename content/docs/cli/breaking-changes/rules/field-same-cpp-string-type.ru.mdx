@@ -1,0 +1,58 @@
+---
+title: "Field Same Cpp String Type"
+description: "Проверяет, что поля string/bytes сохраняют прежний тип строки для C++."
+---
+
+- **ID правила:** `FIELD_SAME_CPP_STRING_TYPE`
+- **Профили:** `FILE`, `PACKAGE`
+
+Это правило проверяет, что поля сохраняют прежнее эффективное представление строк в C++ (`STRING`, `CORD` или `VIEW`), заданное через `[ctype = CORD]` / `[ctype = STRING_PIECE]` или через `features.(pb.cpp).string_type` в Protobuf Editions. Изменение ломает сигнатуры сгенерированного C++-кода.
+
+## Примеры
+
+### Неправильно
+
+**До:**
+
+```proto
+syntax = "proto3";
+
+package myapi.v1;
+
+message Payload {
+  bytes body = 1;
+}
+```
+
+**После:**
+
+```proto
+syntax = "proto3";
+
+package myapi.v1;
+
+message Payload {
+  bytes body = 1 [ctype = CORD];
+}
+```
+
+**Ошибка:**
+
+```text
+payload.proto:6:3: Field "myapi.v1.Payload.body" changed C++ string type option. (FIELD_SAME_CPP_STRING_TYPE)
+```
+
+### Правильно
+
+Не меняйте опцию типа C++-строки на существующем поле; при необходимости добавьте новое поле:
+
+```proto
+syntax = "proto3";
+
+package myapi.v1;
+
+message Payload {
+  bytes body = 1;
+  bytes body_cord = 2 [ctype = CORD];
+}
+```

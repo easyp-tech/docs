@@ -1,0 +1,63 @@
+---
+title: "File Same Java Multiple Files"
+description: "Проверяет, что файлы сохраняют прежнее значение опции java_multiple_files."
+---
+
+- **ID правила:** `FILE_SAME_JAVA_MULTIPLE_FILES`
+- **Профили:** `FILE`, `PACKAGE`
+
+Это правило проверяет, что файловая опция `java_multiple_files` не изменилась у файла (а также у объявлений, перенесённых в другой файл того же пакета). Изменение `java_multiple_files` меняет размещение верхнеуровневых сообщений и enum (отдельные классы или вложенные во внешний класс) и ломает совместимость сгенерированного кода для Java.
+
+## Примеры
+
+### Неправильно
+
+**До:**
+
+```proto
+syntax = "proto3";
+
+package myapi.v1;
+
+option java_multiple_files = true;
+
+message User {
+  string id = 1;
+}
+```
+
+**После:**
+
+```proto
+syntax = "proto3";
+
+package myapi.v1;
+
+option java_multiple_files = false;
+
+message User {
+  string id = 1;
+}
+```
+
+**Ошибка:**
+
+```text
+user.proto:1:1: File option java_multiple_files changed. (FILE_SAME_JAVA_MULTIPLE_FILES)
+```
+
+### Правильно
+
+Сохраняйте `option java_multiple_files` неизменной в текущей мажорной версии пакета; меняйте её только в новой мажорной версии (например, `myapi.v2`).
+
+```proto
+syntax = "proto3";
+
+package myapi.v1;
+
+option java_multiple_files = true;
+
+message User {
+  string id = 1;
+}
+```

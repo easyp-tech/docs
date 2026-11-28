@@ -1,16 +1,17 @@
 ---
 title: "Rpc No Client Streaming"
+description: "Это правило проверяет, что RPC не использует клиентский стриминг (запрос не является stream ...)."
 ---
 
-Категории:
-
-- **UNARY_RPC**
+- **ID правила:** `RPC_NO_CLIENT_STREAMING`
+- **Группа:** `UNARY_RPC`
+- **Входит в пресеты (`linters.default`):** Нет (подключается через `linters.enable`)
 
 Это правило проверяет, что RPC не использует клиентский стриминг (запрос не является `stream ...`).
 
 ## Примеры
 
-### Bad
+### Неправильно
 
 ```proto
 syntax = "proto3";
@@ -20,7 +21,7 @@ service Foo {
 }
 ```
 
-### Good
+### Правильно
 
 ```proto
 syntax = "proto3";

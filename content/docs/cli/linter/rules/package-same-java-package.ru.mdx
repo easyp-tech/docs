@@ -1,18 +1,17 @@
 ---
 title: "Package Same Java Package"
+description: "Это правило проверяет, что все файлы с одним и тем же package используют одно и то же значение опции java_package."
 ---
 
-Категории:
-
-- **MINIMAL**
-- **BASIC**
-- **DEFAULT**
+- **ID правила:** `PACKAGE_SAME_JAVA_PACKAGE`
+- **Группа:** `BASIC`
+- **Входит в пресеты (`linters.default`):** `BASIC`, `STANDARD`, `COMMENTS`
 
 Это правило проверяет, что все файлы с одним и тем же `package` используют одно и то же значение опции `java_package`.
 
-## Examples
+## Примеры
 
-### Bad
+### Неправильно
 
 ```proto
 // File: pkg/foo.proto
@@ -34,7 +33,7 @@ package pkg;
 option java_package = "com.example.bar";
 ```
 
-### Good
+### Правильно
 
 ```proto
 // File: pkg/foo.proto

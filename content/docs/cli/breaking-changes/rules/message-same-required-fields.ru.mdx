@@ -1,0 +1,62 @@
+---
+title: "Message Same Required Fields"
+description: "Проверяет, что в сообщениях не добавляются и не удаляются обязательные (required) поля."
+---
+
+- **ID правила:** `MESSAGE_SAME_REQUIRED_FIELDS`
+- **Профили:** `FILE`, `PACKAGE`, `WIRE_JSON`, `WIRE`
+
+Это правило проверяет, что набор номеров обязательных полей сообщения (`required` в proto2 или `LEGACY_REQUIRED` в Editions) остаётся неизменным. Добавление нового `required`-поля делает старые сообщения невалидными, а удаление — ломает старых получателей. Применяется во всех четырёх профилях (`FILE`, `PACKAGE`, `WIRE_JSON`, `WIRE`).
+
+## Примеры
+
+### Неправильно
+
+**До:**
+
+```proto
+syntax = "proto2";
+
+package myapi.v1;
+
+message Record {
+  required string id = 1;
+  optional string label = 2;
+}
+```
+
+**После:**
+
+```proto
+syntax = "proto2";
+
+package myapi.v1;
+
+message Record {
+  required string id = 1;
+  optional string label = 2;
+  required int64 created_at = 3;
+}
+```
+
+**Ошибка:**
+
+```text
+record.proto:8:3: Message "myapi.v1.Record" added required field number 3. (MESSAGE_SAME_REQUIRED_FIELDS)
+```
+
+### Правильно
+
+Добавляйте новые поля как `optional` (а не `required`) и не удаляйте существующие `required`-поля в текущей мажорной версии:
+
+```proto
+syntax = "proto2";
+
+package myapi.v1;
+
+message Record {
+  required string id = 1;
+  optional string label = 2;
+  optional int64 created_at = 3;
+}
+```

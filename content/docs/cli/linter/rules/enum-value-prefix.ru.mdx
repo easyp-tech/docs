@@ -1,18 +1,17 @@
 ---
 title: "Enum Value Prefix"
+description: "Это правило проверяет, что все значения enum имеют префикс, совпадающий с именем enum."
 ---
 
-Категории:
-
-- **MINIMAL**
-- **BASIC**
-- **DEFAULT**
+- **ID правила:** `ENUM_VALUE_PREFIX`
+- **Группа:** `DEFAULT`
+- **Входит в пресеты (`linters.default`):** `STANDARD`, `COMMENTS`
 
 Это правило проверяет, что все значения enum имеют префикс, совпадающий с именем enum.
 
-## Examples
+## Примеры
 
-### Bad
+### Неправильно
 
 ```proto
 syntax = "proto3";
@@ -22,7 +21,7 @@ enum Foo {
 }
 ```
 
-### Good
+### Правильно
 
 ```proto
 syntax = "proto3";

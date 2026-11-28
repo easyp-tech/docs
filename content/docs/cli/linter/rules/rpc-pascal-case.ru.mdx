@@ -1,18 +1,17 @@
 ---
 title: "Rpc Pascal Case"
+description: "Это правило проверяет, что все имена RPC написаны в стиле PascalCase."
 ---
 
-Категории:
-
-- **MINIMAL**
-- **BASIC**
-- **DEFAULT**
+- **ID правила:** `RPC_PASCAL_CASE`
+- **Группа:** `BASIC`
+- **Входит в пресеты (`linters.default`):** `BASIC`, `STANDARD`, `COMMENTS`
 
 Это правило проверяет, что все имена RPC написаны в стиле PascalCase.
 
 ## Примеры
 
-### Bad
+### Неправильно
 
 ```proto
 syntax = "proto3";
@@ -22,7 +21,7 @@ service foo_bar {
 }
 ```
 
-### Good
+### Правильно
 
 ```proto
 syntax = "proto3";

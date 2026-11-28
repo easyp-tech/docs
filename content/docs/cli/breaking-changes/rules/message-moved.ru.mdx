@@ -1,0 +1,60 @@
+---
+title: "Message Moved"
+description: "Проверяет, что сообщения не переносятся в другой .proto-файл в профиле FILE."
+---
+
+- **ID правила:** `MESSAGE_MOVED`
+- **Профили:** `FILE`
+
+В профиле `FILE` перенос `message` в другой `.proto`-файл (даже внутри того же пакета) запрещён, поскольку файловые импорты в сгенерированном коде (например, заголовки C++, модули Python или внешние классы Java) зависят от пути файла. Для разрешённых переносов внутри пакета используйте профиль `PACKAGE`.
+
+## Примеры
+
+### Неправильно
+
+**До:**
+
+```proto
+// File: myapi/v1/user.proto
+syntax = "proto3";
+
+package myapi.v1;
+
+message Address {
+  string city = 1;
+}
+```
+
+**После:**
+
+```proto
+// File: myapi/v1/address.proto
+syntax = "proto3";
+
+package myapi.v1;
+
+message Address {
+  string city = 1;
+}
+```
+
+**Ошибка:**
+
+```text
+myapi/v1/user.proto:6:1: Message "myapi.v1.Address" was moved from "myapi/v1/user.proto" to "myapi/v1/address.proto". (MESSAGE_MOVED)
+```
+
+### Правильно
+
+Оставьте сообщение в исходном `.proto`-файле при использовании профиля `FILE`:
+
+```proto
+// File: myapi/v1/user.proto
+syntax = "proto3";
+
+package myapi.v1;
+
+message Address {
+  string city = 1;
+}
+```

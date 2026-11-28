@@ -1,0 +1,58 @@
+---
+title: "Message Same Json Format"
+description: "Checks that messages do not downgrade JSON format support from ALLOW to LEGACY_BEST_EFFORT."
+---
+
+- **Rule ID:** `MESSAGE_SAME_JSON_FORMAT`
+- **Profiles:** `FILE`, `PACKAGE`, `WIRE_JSON`
+
+This rule checks that a message whose effective `features.json_format` is `ALLOW` (the default in `proto3` and Editions 2023) does not downgrade to `LEGACY_BEST_EFFORT`. Downgrading breaks JSON serialization guarantees in `FILE`, `PACKAGE`, and `WIRE_JSON`.
+
+## Examples
+
+### Bad
+
+**Before:**
+
+```proto
+edition = "2023";
+
+package myapi.v1;
+
+message User {
+  string id = 1;
+}
+```
+
+**After:**
+
+```proto
+edition = "2023";
+
+package myapi.v1;
+
+message User {
+  option features.json_format = LEGACY_BEST_EFFORT;
+  string id = 1;
+}
+```
+
+**Error:**
+
+```text
+user.proto:5:1: Message "myapi.v1.User" changed JSON format support. (MESSAGE_SAME_JSON_FORMAT)
+```
+
+### Good
+
+Keep `features.json_format = ALLOW` on messages that already support standard JSON:
+
+```proto
+edition = "2023";
+
+package myapi.v1;
+
+message User {
+  string id = 1;
+}
+```

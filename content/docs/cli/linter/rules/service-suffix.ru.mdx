@@ -1,33 +1,57 @@
 ---
 title: "Service Suffix"
+description: "Проверяет, что имена всех сервисов заканчиваются на заданный суффикс (по умолчанию Service)."
 ---
 
-Категории:
+- **ID правила:** `SERVICE_SUFFIX`
+- **Группа:** `DEFAULT`
+- **Входит в пресеты (`linters.default`):** `STANDARD`, `COMMENTS`
 
-- **MINIMAL**
-- **BASIC**
-- **DEFAULT**
+- **ID правила:** `SERVICE_SUFFIX`
+- **Группа:** `DEFAULT`
+- **Входит в пресеты (`linters.default`):** `STANDARD`, `COMMENTS`
 
-Это правило проверяет, что все сервисы имеют суффикс `Service` или ваш пользовательский суффикс.
+Это правило проверяет, что имена всех `service` оканчиваются на `Service` либо на пользовательский суффикс из `linters-settings.SERVICE_SUFFIX.suffix`.
+
+## Конфигурация
+
+```yaml
+version: v1
+linters-settings:
+  SERVICE_SUFFIX:
+    suffix: API
+```
 
 ## Примеры
 
-### Bad
+### Неправильно
 
 ```proto
 syntax = "proto3";
 
 service Foo {
-    rpc Bar(BarRequest) returns (BarResponse);
+  rpc Bar(BarRequest) returns (BarResponse);
 }
 ```
 
-### Good
+### Правильно
+
+С суффиксом по умолчанию (`Service`):
 
 ```proto
 syntax = "proto3";
 
 service FooService {
-    rpc Bar(BarRequest) returns (BarResponse); 
+  rpc Bar(BarRequest) returns (BarResponse);
+}
+```
+
+С настройкой `suffix: API`:
+
+```proto
+syntax = "proto3";
+
+service FooAPI {
+  rpc Bar(BarRequest) returns (BarResponse);
 }
 ```

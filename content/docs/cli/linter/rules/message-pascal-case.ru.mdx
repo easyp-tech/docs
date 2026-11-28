@@ -1,17 +1,17 @@
 ---
 title: "Message Pascal Case"
+description: "Это правило проверяет, что имена сообщений (message) записаны в стиле PascalCase."
 ---
 
-Категории:
-- **MINIMAL**
-- **BASIC**
-- **DEFAULT**
+- **ID правила:** `MESSAGE_PASCAL_CASE`
+- **Группа:** `BASIC`
+- **Входит в пресеты (`linters.default`):** `BASIC`, `STANDARD`, `COMMENTS`
 
 Это правило проверяет, что имена сообщений (message) записаны в стиле PascalCase.
 
 ## Примеры
 
-### Bad
+### Неправильно
 
 ```proto
 syntax = "proto3";
@@ -23,7 +23,7 @@ message foo_bar {
 }
 ```
 
-### Good
+### Правильно
 
 ```proto
 syntax = "proto3";

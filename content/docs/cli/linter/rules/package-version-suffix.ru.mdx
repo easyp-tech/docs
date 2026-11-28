@@ -1,18 +1,28 @@
 ---
 title: "Package Version Suffix"
+description: "Проверяет, что последний сегмент имени пакета через точку является корректным суффиксом версии (например, v1 или v1beta1)."
 ---
 
-Категории:
+- **ID правила:** `PACKAGE_VERSION_SUFFIX`
+- **Группа:** `DEFAULT`
+- **Входит в пресеты (`linters.default`):** `STANDARD`, `COMMENTS`
 
-- **MINIMAL**
-- **BASIC**
-- **DEFAULT**
+- **ID правила:** `PACKAGE_VERSION_SUFFIX`
+- **Группа:** `DEFAULT`
+- **Входит в пресеты (`linters.default`):** `STANDARD`, `COMMENTS`
 
-Это правило проверяет, что суффикс версии пакета имеет формат `_vX`, где `X` — числовая версия.
+Это правило проверяет, что имя пакета состоит минимум из двух сегментов, разделённых точкой, а последний сегмент является корректным версионным суффиксом:
+
+- `vN` (например, `foo.v1`, `acme.users.v2`)
+- `vNalpha`, `vNalphaM`, `vNbeta`, `vNbetaM` (например, `foo.v1alpha1`, `foo.v1beta2`)
+- `vNpMalpha`, `vNpMalphaK`, `vNpMbeta`, `vNpMbetaK` (например, `foo.v1p1alpha1`, `foo.v1p1beta1`)
+- `vNtest...` (например, `foo.v1test`, `foo.v1testfoo`)
+
+Все номера версий (`N`, `M`, `K`) должны быть целыми числами `>= 1`. Суффиксы через подчёркивание вроде `_v1` и односегментные пакеты вроде `v1` отклоняются.
 
 ## Примеры
 
-### Bad
+### Неправильно
 
 ```proto
 syntax = "proto3";
@@ -20,10 +30,46 @@ syntax = "proto3";
 package foo;
 ```
 
-### Good
+```proto
+syntax = "proto3";
+
+package foo_v1;
+```
+
+```proto
+syntax = "proto3";
+
+package v1;
+```
+
+```proto
+syntax = "proto3";
+
+package foo.v0;
+```
+
+### Правильно
 
 ```proto
 syntax = "proto3";
 
 package foo.v1;
+```
+
+```proto
+syntax = "proto3";
+
+package foo.v1beta1;
+```
+
+```proto
+syntax = "proto3";
+
+package foo.v1p1alpha1;
+```
+
+```proto
+syntax = "proto3";
+
+package foo.v1test;
 ```

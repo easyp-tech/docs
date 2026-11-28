@@ -1,0 +1,68 @@
+---
+title: "Field Wire Json Compatible Cardinality"
+description: "Проверяет, что изменения кардинальности поля остаются совместимыми по бинарному формату и JSON в профиле WIRE_JSON."
+---
+
+- **ID правила:** `FIELD_WIRE_JSON_COMPATIBLE_CARDINALITY`
+- **Профили:** `WIRE_JSON`
+
+В профиле `WIRE_JSON` допускается переключение между неявным и явным `optional` (`string` ↔ `optional string`). Преобразование между `repeated` и `map` отклоняется, потому что в JSON `repeated` сериализуется как массив, а `map` — как объект.
+
+## Примеры
+
+### Неправильно
+
+**До:**
+
+```proto
+syntax = "proto3";
+
+package myapi.v1;
+
+message LabelEntry {
+  string key = 1;
+  string value = 2;
+}
+
+message Resource {
+  repeated LabelEntry labels = 1;
+}
+```
+
+**После:**
+
+```proto
+syntax = "proto3";
+
+package myapi.v1;
+
+message Resource {
+  map<string, string> labels = 1;
+}
+```
+
+**Ошибка:**
+
+```text
+resource.proto:11:3: Field "labels" (1) on "myapi.v1.Resource" changed cardinality from repeated to map. (FIELD_WIRE_JSON_COMPATIBLE_CARDINALITY)
+```
+
+### Правильно
+
+Добавьте новое поле `map` вместо замены существующего поля `repeated`:
+
+```proto
+syntax = "proto3";
+
+package myapi.v1;
+
+message LabelEntry {
+  string key = 1;
+  string value = 2;
+}
+
+message Resource {
+  repeated LabelEntry labels = 1 [deprecated = true];
+  map<string, string> label_map = 2;
+}
+```

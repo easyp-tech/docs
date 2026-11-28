@@ -1,0 +1,63 @@
+---
+title: "Rpc Same Idempotency Level"
+description: "Проверяет, что RPC-методы сохраняют прежнее значение опции idempotency_level."
+---
+
+- **ID правила:** `RPC_SAME_IDEMPOTENCY_LEVEL`
+- **Профили:** `FILE`, `PACKAGE`, `WIRE_JSON`, `WIRE`
+
+Это правило проверяет, что RPC-метод сохраняет значение `option idempotency_level` (`IDEMPOTENCY_UNKNOWN`, `NO_SIDE_EFFECTS` или `IDEMPOTENT`). Прокси, HTTP/GET-транскодеры и политики повторных попыток опираются на гарантии идемпотентности, поэтому её изменение отклоняется во всех четырёх профилях (`FILE`, `PACKAGE`, `WIRE_JSON`, `WIRE`).
+
+## Примеры
+
+### Неправильно
+
+**До:**
+
+```proto
+syntax = "proto3";
+
+package myapi.v1;
+
+service UserService {
+  rpc GetUser(GetUserRequest) returns (GetUserResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+}
+```
+
+**После:**
+
+```proto
+syntax = "proto3";
+
+package myapi.v1;
+
+service UserService {
+  rpc GetUser(GetUserRequest) returns (GetUserResponse) {
+    option idempotency_level = IDEMPOTENT;
+  }
+}
+```
+
+**Ошибка:**
+
+```text
+user.proto:6:3: RPC "GetUser" changed idempotency level. (RPC_SAME_IDEMPOTENCY_LEVEL)
+```
+
+### Правильно
+
+Не изменяйте `idempotency_level` на существующем RPC (при смене семантики побочных эффектов добавьте новый RPC):
+
+```proto
+syntax = "proto3";
+
+package myapi.v1;
+
+service UserService {
+  rpc GetUser(GetUserRequest) returns (GetUserResponse) {
+    option idempotency_level = NO_SIDE_EFFECTS;
+  }
+}
+```

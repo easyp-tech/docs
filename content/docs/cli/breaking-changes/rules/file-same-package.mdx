@@ -1,0 +1,57 @@
+---
+title: "File Same Package"
+description: "Checks that a file keeps the same protobuf package declaration."
+---
+
+- **Rule ID:** `FILE_SAME_PACKAGE`
+- **Profiles:** `FILE`, `PACKAGE`, `WIRE_JSON`, `WIRE`
+
+This rule checks that a `.proto` file does not change its `package` declaration. Changing `package` alters every fully qualified type name, gRPC service path, and generated namespace across all four profiles (`FILE`, `PACKAGE`, `WIRE_JSON`, `WIRE`).
+
+## Examples
+
+### Bad
+
+**Before:**
+
+```proto
+syntax = "proto3";
+
+package myapi.v1;
+
+message User {
+  string id = 1;
+}
+```
+
+**After:**
+
+```proto
+syntax = "proto3";
+
+package acme.users.v1;
+
+message User {
+  string id = 1;
+}
+```
+
+**Error:**
+
+```text
+user.proto:1:1: File "user.proto" changed package from "myapi.v1" to "acme.users.v1". (FILE_SAME_PACKAGE)
+```
+
+### Good
+
+Keep the package unchanged in existing files; create new files under a new package (such as `acme.users.v1` or `myapi.v2`) when restructuring.
+
+```proto
+syntax = "proto3";
+
+package myapi.v1;
+
+message User {
+  string id = 1;
+}
+```

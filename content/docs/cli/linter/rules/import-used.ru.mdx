@@ -1,17 +1,17 @@
 ---
 title: "Import Used"
+description: "Это правило проверяет, что все импорты используются в proto-файле."
 ---
 
-Категории:
-- **MINIMAL**
-- **BASIC**
-- **DEFAULT**
+- **ID правила:** `IMPORT_USED`
+- **Группа:** `BASIC`
+- **Входит в пресеты (`linters.default`):** `BASIC`, `STANDARD`, `COMMENTS`
 
 Это правило проверяет, что все импорты используются в proto-файле.
 
 ## Примеры
 
-### Bad
+### Неправильно
 
 ```proto
 syntax = "proto3";
@@ -21,7 +21,7 @@ package foo;
 import "bar.proto";
 ```
 
-### Good
+### Правильно
 
 ```proto
 syntax = "proto3";

@@ -1,18 +1,17 @@
 ---
 title: "Package Same Php Namespace"
+description: "Это правило проверяет, что все файлы с одним и тем же package используют одно и то же значение опции php_namespace."
 ---
 
-Категории:
-
-- **MINIMAL**
-- **BASIC**
-- **DEFAULT**
+- **ID правила:** `PACKAGE_SAME_PHP_NAMESPACE`
+- **Группа:** `BASIC`
+- **Входит в пресеты (`linters.default`):** `BASIC`, `STANDARD`, `COMMENTS`
 
 Это правило проверяет, что все файлы с одним и тем же `package` используют одно и то же значение опции `php_namespace`.
 
 ## Примеры
 
-### Bad
+### Неправильно
 
 ```proto
 // File: pkg/foo.proto
@@ -34,7 +33,7 @@ package pkg;
 option php_namespace = "Foo\\Baz";
 ```
 
-### Good
+### Правильно
 
 ```proto
 // File: pkg/foo.proto

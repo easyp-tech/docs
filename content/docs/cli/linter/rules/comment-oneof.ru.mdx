@@ -1,16 +1,17 @@
 ---
 title: "Comment Oneof"
+description: "Это правило проверяет, что oneof имеет комментарий."
 ---
 
-Категории:
-
-- **COMMENT**
+- **ID правила:** `COMMENT_ONEOF`
+- **Группа:** `COMMENTS`
+- **Входит в пресеты (`linters.default`):** `COMMENTS`
 
 Это правило проверяет, что oneof имеет комментарий.
 
 ## Примеры
 
-### Bad
+### Неправильно
 
 ```proto
 syntax = "proto3";
@@ -23,7 +24,7 @@ message Foo {
 }
 ```
 
-### Good
+### Правильно
 
 ```proto
 syntax = "proto3";

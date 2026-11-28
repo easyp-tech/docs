@@ -1,0 +1,62 @@
+---
+title: "Message Same Required Fields"
+description: "Checks that messages do not add or remove required fields."
+---
+
+- **Rule ID:** `MESSAGE_SAME_REQUIRED_FIELDS`
+- **Profiles:** `FILE`, `PACKAGE`, `WIRE_JSON`, `WIRE`
+
+This rule checks that a message keeps the exact same set of required field numbers (proto2 `required` or Editions `LEGACY_REQUIRED`). Adding a new required field makes previously valid messages fail validation; removing a required field breaks older readers that reject payloads missing that field. Enforced across all four profiles (`FILE`, `PACKAGE`, `WIRE_JSON`, `WIRE`).
+
+## Examples
+
+### Bad
+
+**Before:**
+
+```proto
+syntax = "proto2";
+
+package myapi.v1;
+
+message Record {
+  required string id = 1;
+  optional string label = 2;
+}
+```
+
+**After:**
+
+```proto
+syntax = "proto2";
+
+package myapi.v1;
+
+message Record {
+  required string id = 1;
+  optional string label = 2;
+  required int64 created_at = 3;
+}
+```
+
+**Error:**
+
+```text
+record.proto:8:3: Message "myapi.v1.Record" added required field number 3. (MESSAGE_SAME_REQUIRED_FIELDS)
+```
+
+### Good
+
+Add new fields as `optional` (never `required`) and never remove existing `required` fields in the same major version:
+
+```proto
+syntax = "proto2";
+
+package myapi.v1;
+
+message Record {
+  required string id = 1;
+  optional string label = 2;
+  optional int64 created_at = 3;
+}
+```

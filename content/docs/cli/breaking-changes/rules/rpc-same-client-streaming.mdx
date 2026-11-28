@@ -1,0 +1,58 @@
+---
+title: "Rpc Same Client Streaming"
+description: "Checks that RPC methods do not change client streaming behavior."
+---
+
+- **Rule ID:** `RPC_SAME_CLIENT_STREAMING`
+- **Profiles:** `FILE`, `PACKAGE`, `WIRE_JSON`, `WIRE`
+
+This rule checks that an RPC method does not toggle `stream` on its request type. Switching between unary and client-streaming changes both the RPC wire framing and generated client/server method signatures across all four profiles (`FILE`, `PACKAGE`, `WIRE_JSON`, `WIRE`).
+
+## Examples
+
+### Bad
+
+**Before:**
+
+```proto
+syntax = "proto3";
+
+package myapi.v1;
+
+service UploadService {
+  rpc Upload(UploadRequest) returns (UploadResponse);
+}
+```
+
+**After:**
+
+```proto
+syntax = "proto3";
+
+package myapi.v1;
+
+service UploadService {
+  rpc Upload(stream UploadRequest) returns (UploadResponse);
+}
+```
+
+**Error:**
+
+```text
+upload.proto:6:3: RPC "Upload" changed client streaming behavior. (RPC_SAME_CLIENT_STREAMING)
+```
+
+### Good
+
+Add a new streaming RPC method instead of changing the streaming mode of an existing RPC:
+
+```proto
+syntax = "proto3";
+
+package myapi.v1;
+
+service UploadService {
+  rpc Upload(UploadRequest) returns (UploadResponse);
+  rpc UploadStream(stream UploadStreamRequest) returns (UploadStreamResponse);
+}
+```

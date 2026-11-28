@@ -1,22 +1,24 @@
 ---
 title: "Package Same Ruby Package"
+description: "Проверяет, что все файлы одного пакета задают одинаковое значение option ruby_package."
 ---
 
-Categories:
+- **ID правила:** `PACKAGE_SAME_RUBY_PACKAGE`
+- **Группа:** `BASIC`
+- **Входит в пресеты (`linters.default`):** `BASIC`, `STANDARD`, `COMMENTS`
 
-- **MINIMAL**
-- **BASIC**
-- **DEFAULT**
+- **ID правила:** `PACKAGE_SAME_RUBY_PACKAGE`
+- **Группа:** `BASIC`
+- **Входит в пресеты (`linters.default`):** `BASIC`, `STANDARD`, `COMMENTS`
 
-This rule checks that all files with a given package are in the same Ruby package.
+Это правило уровня модуля проверяет, что все файлы с одинаковым `package` задают одинаковое значение опции `ruby_package`.
 
-## Examples
+## Примеры
 
-### Bad
+### Неправильно
 
 ```proto
 // File: pkg/foo.proto
-
 syntax = "proto3";
 
 package pkg;
@@ -26,7 +28,6 @@ option ruby_package = "Foo";
 
 ```proto
 // File: pkg/bar.proto
-
 syntax = "proto3";
 
 package pkg;
@@ -34,11 +35,10 @@ package pkg;
 option ruby_package = "Bar";
 ```
 
-### Good
+### Правильно
 
 ```proto
 // File: pkg/foo.proto
-
 syntax = "proto3";
 
 package pkg;
@@ -48,7 +48,6 @@ option ruby_package = "Foo";
 
 ```proto
 // File: pkg/bar.proto
-
 syntax = "proto3";
 
 package pkg;

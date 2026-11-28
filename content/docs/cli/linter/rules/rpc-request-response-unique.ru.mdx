@@ -1,35 +1,46 @@
 ---
 title: "Rpc Request Response Unique"
+description: "Проверяет, что каждый тип запроса и ответа RPC уникален среди всех RPC и не используется одновременно как запрос и ответ."
 ---
 
-Категории:
+- **ID правила:** `RPC_REQUEST_RESPONSE_UNIQUE`
+- **Группа:** `DEFAULT`
+- **Входит в пресеты (`linters.default`):** `STANDARD`, `COMMENTS`
 
-- **MINIMAL**
-- **BASIC**
-- **DEFAULT**
+- **ID правила:** `RPC_REQUEST_RESPONSE_UNIQUE`
+- **Группа:** `DEFAULT`
+- **Входит в пресеты (`linters.default`):** `STANDARD`, `COMMENTS`
 
-Это правило проверяет, что все сообщения запроса и ответа RPC уникальны: для каждого метода используются собственные (не переиспользуются одинаковые пары `Request` / `Response` у разных RPC).
+Это правило уровня модуля проверяет два требования по всем проверяемым файлам:
+
+- Ни один тип сообщения запроса или ответа не должен повторно использоваться более чем в одном RPC (в том числе в разных сервисах или файлах).
+- Один и тот же RPC не должен использовать один и тот же тип сообщения одновременно для запроса и для ответа.
 
 ## Примеры
 
-### Bad
+### Неправильно
 
 ```proto
 syntax = "proto3";
 
-service Foo {
-    rpc GetFoo (FooRequest) returns (FooResponse) {}
-    rpc GetBar (FooRequest) returns (FooResponse) {}
+service FooService {
+  // Повторное использование типа запроса между RPC:
+  rpc GetFoo(FooRequest) returns (FooResponse) {}
+  rpc GetBar(FooRequest) returns (BarResponse) {}
+
+  // Один и тот же тип для запроса и ответа:
+  rpc Ping(PingPayload) returns (PingPayload) {}
 }
 ```
 
-### Good
+### Правильно
 
 ```proto
 syntax = "proto3";
 
-service Foo {
-    rpc GetFoo (FooRequest) returns (FooResponse) {}
-    rpc GetBar (BarRequest) returns (BarResponse) {}
+service FooService {
+  rpc GetFoo(GetFooRequest) returns (GetFooResponse) {}
+  rpc GetBar(GetBarRequest) returns (GetBarResponse) {}
+  rpc Ping(PingRequest) returns (PingResponse) {}
 }
 ```

@@ -1,18 +1,17 @@
 ---
 title: "Enum First Value Zero"
+description: "Это правило проверяет, что первое значение enum равно нулю."
 ---
 
-Категории:
-
-- **MINIMAL**
-- **BASIC**
-- **DEFAULT**
+- **ID правила:** `ENUM_FIRST_VALUE_ZERO`
+- **Группа:** `BASIC`
+- **Входит в пресеты (`linters.default`):** `BASIC`, `STANDARD`, `COMMENTS`
 
 Это правило проверяет, что первое значение enum равно нулю.
 
-## Examples
+## Примеры
 
-### Bad
+### Неправильно
 
 ```proto
 syntax = "proto3";
@@ -25,7 +24,7 @@ enum Foo {
 }
 ```
 
-### Good
+### Правильно
 
 ```proto
 syntax = "proto3";

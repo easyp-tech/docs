@@ -1,0 +1,60 @@
+---
+title: "Extension Message No Delete"
+description: "Проверяет, что сообщения не удаляют и не сужают существующие диапазоны номеров расширений (extensions)."
+---
+
+- **ID правила:** `EXTENSION_MESSAGE_NO_DELETE`
+- **Профили:** `FILE`, `PACKAGE`
+
+Это правило проверяет, что все ранее объявленные на сообщении диапазоны расширений (`extensions 100 to 199;`) по-прежнему полностью покрываются новыми диапазонами. Удаление или сужение диапазона ломает зависимые схемы, определяющие расширения в этих номерах.
+
+## Примеры
+
+### Неправильно
+
+**До:**
+
+```proto
+syntax = "proto2";
+
+package myapi.v1;
+
+message Event {
+  optional string id = 1;
+  extensions 100 to 199;
+}
+```
+
+**После:**
+
+```proto
+syntax = "proto2";
+
+package myapi.v1;
+
+message Event {
+  optional string id = 1;
+  extensions 100 to 149;
+}
+```
+
+**Ошибка:**
+
+```text
+event.proto:5:1: Message "myapi.v1.Event" removed or narrowed an extension range. (EXTENSION_MESSAGE_NO_DELETE)
+```
+
+### Правильно
+
+Сохраняйте все существующие диапазоны расширений (расширять диапазон или добавлять новые диапазоны безопасно):
+
+```proto
+syntax = "proto2";
+
+package myapi.v1;
+
+message Event {
+  optional string id = 1;
+  extensions 100 to 299;
+}
+```

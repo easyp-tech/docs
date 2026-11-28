@@ -1,17 +1,17 @@
 ---
 title: "Enum Value Upper Snake Case"
+description: "Это правило проверяет, что значения enum записаны в стиле UPPER_SNAKE_CASE."
 ---
 
-Категории:
-- **MINIMAL**
-- **BASIC**
-- **DEFAULT**
+- **ID правила:** `ENUM_VALUE_UPPER_SNAKE_CASE`
+- **Группа:** `BASIC`
+- **Входит в пресеты (`linters.default`):** `BASIC`, `STANDARD`, `COMMENTS`
 
 Это правило проверяет, что значения enum записаны в стиле UPPER_SNAKE_CASE.
 
 ## Примеры
 
-### Bad
+### Неправильно
 
 ```proto
 syntax = "proto3";
@@ -24,7 +24,7 @@ enum Foo {
 }
 ```
 
-### Good
+### Правильно
 
 ```proto
 syntax = "proto3";

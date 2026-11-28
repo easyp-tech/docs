@@ -1,18 +1,19 @@
 ---
 title: "Service No Delete"
+description: "Проверяет, что ни одно объявление сервиса не было удалено."
 ---
 
-Категории:
+- **ID правила:** `SERVICE_NO_DELETE`
+- **Профили:** `FILE`, `PACKAGE`, `WIRE_JSON`, `WIRE`
 
-- **WIRE+**
-
-Данное правило проверяет, что ни один service не был удалён из proto‑файлов. Удаление service ломает сгенерированный код и клиентские приложения, которые на него опираются.
+Это правило проверяет, что ни одно объявление `service` не было удалено. Удаление сервиса убирает сгенерированные клиентские и серверные интерфейсы и ломает все RPC-эндпоинты этого сервиса.
 
 ## Примеры
 
-### Плохой (Breaking)
+### Неправильно
 
 **До:**
+
 ```proto
 syntax = "proto3";
 
@@ -20,7 +21,6 @@ package myapi.v1;
 
 service UserService {
   rpc GetUser(GetUserRequest) returns (GetUserResponse);
-  rpc CreateUser(CreateUserRequest) returns (CreateUserResponse);
 }
 
 service OrderService {
@@ -29,6 +29,7 @@ service OrderService {
 ```
 
 **После:**
+
 ```proto
 syntax = "proto3";
 
@@ -36,20 +37,21 @@ package myapi.v1;
 
 service UserService {
   rpc GetUser(GetUserRequest) returns (GetUserResponse);
-  rpc CreateUser(CreateUserRequest) returns (CreateUserResponse);
 }
 
-// OrderService удалён — BREAKING CHANGE!
+// Сервис OrderService удалён
 ```
 
 **Ошибка:**
-```
-services.proto:8:1: Previously present service "OrderService" was deleted from file. (BREAKING_CHECK)
+
+```text
+services.proto:9:1: Service "myapi.v1.OrderService" was deleted. (SERVICE_NO_DELETE)
 ```
 
-### Хороший (Безопасный)
+### Правильно
 
-**Вместо удаления — отметьте service как deprecated:**
+Вместо удаления пометьте сервис как устаревший:
+
 ```proto
 syntax = "proto3";
 
@@ -57,7 +59,6 @@ package myapi.v1;
 
 service UserService {
   rpc GetUser(GetUserRequest) returns (GetUserResponse);
-  rpc CreateUser(CreateUserRequest) returns (CreateUserResponse);
 }
 
 service OrderService {
@@ -68,22 +69,8 @@ service OrderService {
 }
 ```
 
-## Влияние
-
-- **Generated Code:** Классы / интерфейсы сервиса исчезают — клиенты не компилируются
-- **Client Applications:** Существующие вызовы к удалённому сервису падают на этапе сборки
-- **Runtime:** gRPC клиенты теряют определение метода/сервиса
-
 ## Стратегия миграции
 
-1. **Сначала деприкация:**
-   ```proto
-   service OldService {
-     option deprecated = true;
-     // ... methods
-   }
-   ```
-
-2. **Уведомите клиентов** о сроках вывода из эксплуатации
-
-3. **Удалите после периода миграции** в следующей major‑версии
+1. Пометьте сервис опцией `option deprecated = true;` и сообщите клиентам о сроках вывода из эксплуатации.
+2. Сохраняйте сервис активным до завершения миграции клиентов.
+3. Удалите сервис только в новой мажорной версии пакета (например, `myapi.v2`).

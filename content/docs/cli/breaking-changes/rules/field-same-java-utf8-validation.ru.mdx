@@ -1,0 +1,58 @@
+---
+title: "Field Same Java Utf8 Validation"
+description: "Проверяет, что строковые поля сохраняют прежнее поведение проверки UTF-8 в Java."
+---
+
+- **ID правила:** `FIELD_SAME_JAVA_UTF8_VALIDATION`
+- **Профили:** `FILE`, `PACKAGE`
+
+Это правило проверяет, что строковые поля (`string`) сохраняют эффективный режим валидации UTF-8 в Java, определяемый из `features.(pb.java).utf8_validation`, `features.utf8_validation`, настроек синтаксиса по умолчанию и файловой опции `java_string_check_utf8`. Изменение меняет поведение сгенерированного Java-кода при невалидном UTF-8.
+
+## Примеры
+
+### Неправильно
+
+**До:**
+
+```proto
+edition = "2023";
+
+package myapi.v1;
+
+message Note {
+  string text = 1 [features.utf8_validation = VERIFY];
+}
+```
+
+**После:**
+
+```proto
+edition = "2023";
+
+package myapi.v1;
+
+message Note {
+  string text = 1 [features.utf8_validation = NONE];
+}
+```
+
+**Ошибка:**
+
+```text
+note.proto:6:3: Field "myapi.v1.Note.text" changed Java UTF-8 validation behavior. (FIELD_SAME_JAVA_UTF8_VALIDATION)
+```
+
+### Правильно
+
+Сохраняйте режим валидации UTF-8 неизменным для существующих `string`-полей (для произвольных байтов добавьте новое поле типа `bytes`):
+
+```proto
+edition = "2023";
+
+package myapi.v1;
+
+message Note {
+  string text = 1 [features.utf8_validation = VERIFY];
+  bytes raw_text = 2;
+}
+```

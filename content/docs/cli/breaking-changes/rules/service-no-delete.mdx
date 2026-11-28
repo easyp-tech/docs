@@ -1,18 +1,19 @@
 ---
 title: "Service No Delete"
+description: "Checks that no service declarations are deleted."
 ---
 
-Categories:
+- **Rule ID:** `SERVICE_NO_DELETE`
+- **Profiles:** `FILE`, `PACKAGE`, `WIRE_JSON`, `WIRE`
 
-- **WIRE+**
-
-This rule checks that no services are deleted from proto files. Deleting a service breaks both generated code and client applications that depend on the service.
+This rule checks that no `service` declarations are deleted. Deleting a service removes generated client/server interfaces and breaks all RPC endpoints exposed under that service name.
 
 ## Examples
 
 ### Bad
 
 **Before:**
+
 ```proto
 syntax = "proto3";
 
@@ -20,7 +21,6 @@ package myapi.v1;
 
 service UserService {
   rpc GetUser(GetUserRequest) returns (GetUserResponse);
-  rpc CreateUser(CreateUserRequest) returns (CreateUserResponse);
 }
 
 service OrderService {
@@ -29,6 +29,7 @@ service OrderService {
 ```
 
 **After:**
+
 ```proto
 syntax = "proto3";
 
@@ -36,20 +37,21 @@ package myapi.v1;
 
 service UserService {
   rpc GetUser(GetUserRequest) returns (GetUserResponse);
-  rpc CreateUser(CreateUserRequest) returns (CreateUserResponse);
 }
 
-// OrderService was deleted - BREAKING CHANGE!
+// OrderService was deleted
 ```
 
 **Error:**
-```
-services.proto:8:1: Previously present service "OrderService" was deleted from file. (BREAKING_CHECK)
+
+```text
+services.proto:9:1: Service "myapi.v1.OrderService" was deleted. (SERVICE_NO_DELETE)
 ```
 
 ### Good
 
-**Instead of deleting, deprecate the service:**
+Mark the service deprecated instead of deleting it:
+
 ```proto
 syntax = "proto3";
 
@@ -57,7 +59,6 @@ package myapi.v1;
 
 service UserService {
   rpc GetUser(GetUserRequest) returns (GetUserResponse);
-  rpc CreateUser(CreateUserRequest) returns (CreateUserResponse);
 }
 
 service OrderService {
@@ -68,22 +69,8 @@ service OrderService {
 }
 ```
 
-## Impact
-
-- **Generated Code:** Service classes/interfaces are removed, breaking client compilation
-- **Client Applications:** Existing client code fails to compile
-- **Runtime:** gRPC clients lose service definition
-
 ## Migration Strategy
 
-1. **Deprecate first:**
-   ```proto
-   service OldService {
-     option deprecated = true;
-     // ... methods
-   }
-   ```
-
-2. **Notify clients** about deprecation timeline
-
-3. **Remove after migration period** in a new major version
+1. Mark the service with `option deprecated = true;` and communicate the sunset schedule.
+2. Keep the service registered until active clients migrate.
+3. Remove the service only in a new major package version (for example, `myapi.v2`).

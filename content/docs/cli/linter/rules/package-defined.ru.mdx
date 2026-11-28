@@ -1,17 +1,17 @@
 ---
 title: "Package Defined"
+description: "Это правило проверяет, что во всех файлах присутствует директива package."
 ---
 
-Категории:
-- **MINIMAL**
-- **BASIC**
-- **DEFAULT**
+- **ID правила:** `PACKAGE_DEFINED`
+- **Группа:** `MINIMAL`
+- **Входит в пресеты (`linters.default`):** `MINIMAL`, `BASIC`, `STANDARD`, `COMMENTS`
 
 Это правило проверяет, что во всех файлах присутствует директива package.
 
 ## Примеры
 
-### Bad
+### Неправильно
 
 ```proto
 syntax = "proto3";
@@ -22,7 +22,7 @@ message Foo {
 
 ```
 
-### Good
+### Правильно
 
 ```proto
 syntax = "proto3";

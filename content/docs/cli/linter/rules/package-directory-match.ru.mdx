@@ -1,40 +1,60 @@
 ---
 title: "Package Directory Match"
+description: "Проверяет, что пакет файла соответствует относительному пути его каталога (или форме <moduleBase>.<dir> с префиксом модуля)."
 ---
 
-Категории:
-- **MINIMAL**
-- **BASIC**
-- **DEFAULT**
+- **ID правила:** `PACKAGE_DIRECTORY_MATCH`
+- **Группа:** `MINIMAL`
+- **Входит в пресеты (`linters.default`):** `MINIMAL`, `BASIC`, `STANDARD`, `COMMENTS`
 
-Это правило проверяет, что все файлы находятся в директории, имя которой соответствует имени их пакета.
+- **ID правила:** `PACKAGE_DIRECTORY_MATCH`
+- **Группа:** `MINIMAL`
+- **Входит в пресеты (`linters.default`):** `MINIMAL`, `BASIC`, `STANDARD`, `COMMENTS`
 
-## Examples
+Это правило проверяет, что каждый `.proto`-файл находится в каталоге, путь которого соответствует объявленному `package` (с заменой `/` на `.`).
 
-### Bad
+Если в проекте есть манифест `protobuf.mod`, EasyP принимает оба варианта:
+
+- путь каталога относительно корня модуля (`<dir>`, например `users.v1` для `users/v1/user.proto`);
+- квалифицированное именем модуля название `<moduleBase>.<dir>` (например `acme.users.v1`, если в `protobuf.mod` указано `module github.com/org/acme`; суффиксы мажорной версии `/v2+` и `.git` при этом отбрасываются).
+
+## Примеры
+
+### Неправильно
 
 ```proto
-// File: bar/foo.proto
-
+// File: bar/v1/foo.proto
 syntax = "proto3";
 
-package foo;
+package foo.v1;
 
 message Foo {
-    string bar = 1;
+  string bar = 1;
 }
 ```
 
-### Good
+### Правильно
 
 ```proto
-// File: bar/foo.proto
-
+// File: bar/v1/foo.proto
 syntax = "proto3";
 
-package bar;
+package bar.v1;
 
 message Foo {
-    string bar = 1;
+  string bar = 1;
+}
+```
+
+При `module github.com/org/acme` в `protobuf.mod`:
+
+```proto
+// File: bar/v1/foo.proto
+syntax = "proto3";
+
+package acme.bar.v1;
+
+message Foo {
+  string bar = 1;
 }
 ```

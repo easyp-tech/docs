@@ -1,0 +1,63 @@
+---
+title: "File Same Php Metadata Namespace"
+description: "Проверяет, что файлы сохраняют прежнее значение опции php_metadata_namespace."
+---
+
+- **ID правила:** `FILE_SAME_PHP_METADATA_NAMESPACE`
+- **Профили:** `FILE`, `PACKAGE`
+
+Это правило проверяет, что файловая опция `php_metadata_namespace` не изменилась у файла (а также у объявлений, перенесённых в другой файл того же пакета). Изменение `php_metadata_namespace` меняет пространство имён PHP для сгенерированных классов метаданных дескрипторов и ломает совместимость сгенерированного кода для PHP.
+
+## Примеры
+
+### Неправильно
+
+**До:**
+
+```proto
+syntax = "proto3";
+
+package myapi.v1;
+
+option php_metadata_namespace = "Acme\\MyApi\\GPBMetadata";
+
+message User {
+  string id = 1;
+}
+```
+
+**После:**
+
+```proto
+syntax = "proto3";
+
+package myapi.v1;
+
+option php_metadata_namespace = "Acme\\Users\\GPBMetadata";
+
+message User {
+  string id = 1;
+}
+```
+
+**Ошибка:**
+
+```text
+user.proto:1:1: File option php_metadata_namespace changed. (FILE_SAME_PHP_METADATA_NAMESPACE)
+```
+
+### Правильно
+
+Сохраняйте `option php_metadata_namespace` неизменной в текущей мажорной версии пакета; меняйте её только в новой мажорной версии (например, `myapi.v2`).
+
+```proto
+syntax = "proto3";
+
+package myapi.v1;
+
+option php_metadata_namespace = "Acme\\MyApi\\GPBMetadata";
+
+message User {
+  string id = 1;
+}
+```

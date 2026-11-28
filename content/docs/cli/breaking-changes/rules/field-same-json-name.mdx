@@ -1,0 +1,57 @@
+---
+title: "Field Same Json Name"
+description: "Checks that fields keep the same protobuf JSON field name."
+---
+
+- **Rule ID:** `FIELD_SAME_JSON_NAME`
+- **Profiles:** `FILE`, `PACKAGE`, `WIRE_JSON`
+
+This rule checks that a field with the same proto name preserves its effective JSON name (either the default lowerCamelCase name or an explicit `[json_name = "..."]` override). Changing the JSON name breaks protobuf JSON serialization and deserialization across `FILE`, `PACKAGE`, and `WIRE_JSON`.
+
+## Examples
+
+### Bad
+
+**Before:**
+
+```proto
+syntax = "proto3";
+
+package myapi.v1;
+
+message User {
+  string user_id = 1 [json_name = "userId"];
+}
+```
+
+**After:**
+
+```proto
+syntax = "proto3";
+
+package myapi.v1;
+
+message User {
+  string user_id = 1 [json_name = "uid"];
+}
+```
+
+**Error:**
+
+```text
+user.proto:6:3: Field "user_id" (1) changed JSON name from "userId" to "uid". (FIELD_SAME_JSON_NAME)
+```
+
+### Good
+
+Keep the effective `json_name` unchanged on existing fields:
+
+```proto
+syntax = "proto3";
+
+package myapi.v1;
+
+message User {
+  string user_id = 1 [json_name = "userId"];
+}
+```

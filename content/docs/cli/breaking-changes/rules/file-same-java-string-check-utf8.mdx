@@ -1,0 +1,63 @@
+---
+title: "File Same Java String Check Utf8"
+description: "Checks that files keep the same java_string_check_utf8 option value."
+---
+
+- **Rule ID:** `FILE_SAME_JAVA_STRING_CHECK_UTF8`
+- **Profiles:** `FILE`, `PACKAGE`
+
+This rule checks that the file-level `java_string_check_utf8` option does not change for a file or for any declaration moved to another file in the same package. Changing `java_string_check_utf8` alters UTF-8 validation checks in generated Java string accessors, breaking source compatibility for Java consumers.
+
+## Examples
+
+### Bad
+
+**Before:**
+
+```proto
+syntax = "proto3";
+
+package myapi.v1;
+
+option java_string_check_utf8 = true;
+
+message User {
+  string id = 1;
+}
+```
+
+**After:**
+
+```proto
+syntax = "proto3";
+
+package myapi.v1;
+
+option java_string_check_utf8 = false;
+
+message User {
+  string id = 1;
+}
+```
+
+**Error:**
+
+```text
+user.proto:1:1: File option java_string_check_utf8 changed. (FILE_SAME_JAVA_STRING_CHECK_UTF8)
+```
+
+### Good
+
+Keep `option java_string_check_utf8` unchanged in the existing package version; change it only in a new major package version (for example, `myapi.v2`).
+
+```proto
+syntax = "proto3";
+
+package myapi.v1;
+
+option java_string_check_utf8 = true;
+
+message User {
+  string id = 1;
+}
+```

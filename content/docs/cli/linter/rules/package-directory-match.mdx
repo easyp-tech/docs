@@ -1,41 +1,60 @@
 ---
 title: "Package Directory Match"
+description: "Checks that each file's package matches its module-relative directory path (or module-qualified <moduleBase>.<dir>)."
 ---
 
-Categories:
-- **MINIMAL**
-- **BASIC**
-- **DEFAULT**
+- **Rule ID:** `PACKAGE_DIRECTORY_MATCH`
+- **Group:** `MINIMAL`
+- **Included in presets (`linters.default`):** `MINIMAL`, `BASIC`, `STANDARD`, `COMMENTS`
 
-This rule checks that all files are in a directory that matches their package name.
+- **Rule ID:** `PACKAGE_DIRECTORY_MATCH`
+- **Group:** `MINIMAL`
+- **Included in presets (`linters.default`):** `MINIMAL`, `BASIC`, `STANDARD`, `COMMENTS`
+
+This rule checks that each `.proto` file resides in a directory matching its declared `package` (with `/` separators replaced by `.`).
+
+When a `protobuf.mod` manifest is present, EasyP accepts either:
+
+- the module-relative directory path (`<dir>`, e.g. `users.v1` for `users/v1/user.proto`), or
+- the module-qualified package `<moduleBase>.<dir>` (e.g. `acme.users.v1` when `protobuf.mod` declares `module github.com/org/acme`, stripping any `/v2+` major-version suffix and `.git`).
 
 ## Examples
 
 ### Bad
 
 ```proto
-// File: bar/foo.proto
-
+// File: bar/v1/foo.proto
 syntax = "proto3";
 
-package foo;
+package foo.v1;
 
 message Foo {
-    string bar = 1;
+  string bar = 1;
 }
-
 ```
 
 ### Good
 
 ```proto
-// File: bar/foo.proto
-
+// File: bar/v1/foo.proto
 syntax = "proto3";
 
-package bar;
+package bar.v1;
 
 message Foo {
-    string bar = 1;
+  string bar = 1;
+}
+```
+
+With `module github.com/org/acme` in `protobuf.mod`:
+
+```proto
+// File: bar/v1/foo.proto
+syntax = "proto3";
+
+package acme.bar.v1;
+
+message Foo {
+  string bar = 1;
 }
 ```

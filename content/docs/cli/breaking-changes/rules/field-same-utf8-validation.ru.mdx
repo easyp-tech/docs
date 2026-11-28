@@ -1,0 +1,57 @@
+---
+title: "Field Same Utf8 Validation"
+description: "Проверяет, что строковые поля сохраняют прежний эффективный режим проверки UTF-8."
+---
+
+- **ID правила:** `FIELD_SAME_UTF8_VALIDATION`
+- **Профили:** `FILE`, `PACKAGE`
+
+Это правило проверяет, что поля типа `string` сохраняют эффективный режим валидации UTF-8 (`VERIFY` или `NONE`), вычисляемый из `features.utf8_validation` на поле или охватывающих областях видимости либо из значения по умолчанию для синтаксиса (`VERIFY` в `proto3` и Editions 2023; `NONE` в `proto2`).
+
+## Примеры
+
+### Неправильно
+
+**До:**
+
+```proto
+edition = "2023";
+
+package myapi.v1;
+
+message Label {
+  string value = 1 [features.utf8_validation = VERIFY];
+}
+```
+
+**После:**
+
+```proto
+edition = "2023";
+
+package myapi.v1;
+
+message Label {
+  string value = 1 [features.utf8_validation = NONE];
+}
+```
+
+**Ошибка:**
+
+```text
+label.proto:6:3: Field "myapi.v1.Label.value" changed UTF-8 validation behavior. (FIELD_SAME_UTF8_VALIDATION)
+```
+
+### Правильно
+
+Не изменяйте `features.utf8_validation` на существующих полях `string`:
+
+```proto
+edition = "2023";
+
+package myapi.v1;
+
+message Label {
+  string value = 1 [features.utf8_validation = VERIFY];
+}
+```

@@ -1,0 +1,60 @@
+---
+title: "Enum Same Type"
+description: "Checks that enums do not switch between open and closed semantics."
+---
+
+- **Rule ID:** `ENUM_SAME_TYPE`
+- **Profiles:** `FILE`, `PACKAGE`
+
+This rule checks that an enum does not switch between **open** (default in `proto3` and Editions 2023, preserving unrecognized integer values in the field) and **closed** (default in `proto2`, moving unrecognized values to unknown fields and restricting generated types). Changing openness changes runtime handling and generated source semantics in `FILE` and `PACKAGE`.
+
+## Examples
+
+### Bad
+
+**Before:**
+
+```proto
+edition = "2023";
+
+package myapi.v1;
+
+enum Status {
+  option features.enum_type = OPEN;
+  STATUS_UNSPECIFIED = 0;
+}
+```
+
+**After:**
+
+```proto
+edition = "2023";
+
+package myapi.v1;
+
+enum Status {
+  option features.enum_type = CLOSED;
+  STATUS_UNSPECIFIED = 0;
+}
+```
+
+**Error:**
+
+```text
+status.proto:5:1: Enum "myapi.v1.Status" changed between open and closed semantics. (ENUM_SAME_TYPE)
+```
+
+### Good
+
+Preserve the enum `OPEN`/`CLOSED` semantics across releases in the same major version:
+
+```proto
+edition = "2023";
+
+package myapi.v1;
+
+enum Status {
+  option features.enum_type = OPEN;
+  STATUS_UNSPECIFIED = 0;
+}
+```

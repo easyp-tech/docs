@@ -1,0 +1,64 @@
+---
+title: "Enum Value No Delete Unless Name Reserved"
+description: "Checks that any enum value deleted in WIRE_JSON has its name reserved."
+---
+
+- **Rule ID:** `ENUM_VALUE_NO_DELETE_UNLESS_NAME_RESERVED`
+- **Profiles:** `WIRE_JSON`
+
+In the `WIRE_JSON` profile, deleting an enum value is permitted only if its number is reserved (checked by `ENUM_VALUE_NO_DELETE_UNLESS_NUMBER_RESERVED`) **and** its name is reserved with `reserved "NAME";`. Reserving the name prevents reusing it later for a different numeric value in JSON payloads.
+
+## Examples
+
+### Bad
+
+**Before:**
+
+```proto
+syntax = "proto3";
+
+package myapi.v1;
+
+enum Color {
+  COLOR_UNSPECIFIED = 0;
+  COLOR_RED = 1;
+  COLOR_BLUE = 2;
+}
+```
+
+**After:**
+
+```proto
+syntax = "proto3";
+
+package myapi.v1;
+
+enum Color {
+  reserved 2;
+  COLOR_UNSPECIFIED = 0;
+  COLOR_RED = 1;
+}
+```
+
+**Error:**
+
+```text
+color.proto:5:1: Deleted enum name "COLOR_BLUE" in "myapi.v1.Color" must be reserved for JSON compatibility. (ENUM_VALUE_NO_DELETE_UNLESS_NAME_RESERVED)
+```
+
+### Good
+
+Reserve both the deleted enum number and its name:
+
+```proto
+syntax = "proto3";
+
+package myapi.v1;
+
+enum Color {
+  reserved 2;
+  reserved "COLOR_BLUE";
+  COLOR_UNSPECIFIED = 0;
+  COLOR_RED = 1;
+}
+```

@@ -1,0 +1,54 @@
+---
+title: "File No Delete"
+description: "Проверяет, что ни один целевой .proto-файл не был удалён или переименован."
+---
+
+- **ID правила:** `FILE_NO_DELETE`
+- **Профили:** `FILE`
+
+Это правило проверяет, что ни один целевой `.proto`-файл из базовой ревизии не был удалён или переименован. Удаление файла ломает `import` в зависимых схемах и убирает сгенерированные файловые артефакты. Если нужно переносить объявления между файлами внутри одного пакета, используйте профиль `PACKAGE` вместо `FILE`.
+
+## Примеры
+
+### Неправильно
+
+**До:**
+
+```proto
+// File: myapi/v1/legacy.proto
+syntax = "proto3";
+
+package myapi.v1;
+
+message LegacyItem {
+  string id = 1;
+}
+```
+
+**После:**
+
+```proto
+// File myapi/v1/legacy.proto was deleted
+```
+
+**Ошибка:**
+
+```text
+myapi/v1/legacy.proto:1:1: File "myapi/v1/legacy.proto" was deleted. (FILE_NO_DELETE)
+```
+
+### Правильно
+
+Оставьте файл на месте и пометьте его объявления как `deprecated` до следующей мажорной версии пакета:
+
+```proto
+// File: myapi/v1/legacy.proto
+syntax = "proto3";
+
+package myapi.v1;
+
+message LegacyItem {
+  option deprecated = true;
+  string id = 1;
+}
+```

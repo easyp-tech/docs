@@ -1,0 +1,63 @@
+---
+title: "File Same Ruby Package"
+description: "Проверяет, что файлы сохраняют прежнее значение опции ruby_package."
+---
+
+- **ID правила:** `FILE_SAME_RUBY_PACKAGE`
+- **Профили:** `FILE`, `PACKAGE`
+
+Это правило проверяет, что файловая опция `ruby_package` не изменилась у файла (а также у объявлений, перенесённых в другой файл того же пакета). Изменение `ruby_package` меняет иерархию сгенерированных модулей Ruby и ломает совместимость сгенерированного кода для Ruby.
+
+## Примеры
+
+### Неправильно
+
+**До:**
+
+```proto
+syntax = "proto3";
+
+package myapi.v1;
+
+option ruby_package = "Acme::MyApi::V1";
+
+message User {
+  string id = 1;
+}
+```
+
+**После:**
+
+```proto
+syntax = "proto3";
+
+package myapi.v1;
+
+option ruby_package = "Acme::Users::V1";
+
+message User {
+  string id = 1;
+}
+```
+
+**Ошибка:**
+
+```text
+user.proto:1:1: File option ruby_package changed. (FILE_SAME_RUBY_PACKAGE)
+```
+
+### Правильно
+
+Сохраняйте `option ruby_package` неизменной в текущей мажорной версии пакета; меняйте её только в новой мажорной версии (например, `myapi.v2`).
+
+```proto
+syntax = "proto3";
+
+package myapi.v1;
+
+option ruby_package = "Acme::MyApi::V1";
+
+message User {
+  string id = 1;
+}
+```

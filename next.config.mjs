@@ -86,6 +86,37 @@ const config = {
         destination: '/ru/docs/cli/auto-completion',
         permanent: true,
       },
+      // Removed breaking-change rules
+      {
+        source: '/docs/cli/breaking-changes/rules/import-no-delete',
+        destination: '/docs/cli/breaking-changes',
+        permanent: true,
+      },
+      {
+        source: '/docs/cli/breaking-changes/rules/oneof-field-no-delete',
+        destination: '/docs/cli/breaking-changes',
+        permanent: true,
+      },
+      {
+        source: '/docs/cli/breaking-changes/rules/oneof-field-same-type',
+        destination: '/docs/cli/breaking-changes',
+        permanent: true,
+      },
+      {
+        source: '/ru/docs/cli/breaking-changes/rules/import-no-delete',
+        destination: '/ru/docs/cli/breaking-changes',
+        permanent: true,
+      },
+      {
+        source: '/ru/docs/cli/breaking-changes/rules/oneof-field-no-delete',
+        destination: '/ru/docs/cli/breaking-changes',
+        permanent: true,
+      },
+      {
+        source: '/ru/docs/cli/breaking-changes/rules/oneof-field-same-type',
+        destination: '/ru/docs/cli/breaking-changes',
+        permanent: true,
+      },
     ];
   },
 };

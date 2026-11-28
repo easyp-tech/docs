@@ -1,0 +1,61 @@
+---
+title: "Extension No Delete"
+description: "Проверяет, что ни одно объявление расширения не было удалено."
+---
+
+- **ID правила:** `EXTENSION_NO_DELETE`
+- **Профили:** `FILE`, `PACKAGE`
+
+Это правило проверяет, что не удалено ни одно объявление расширения (`extend`, верхнего уровня или вложенное). Удаление расширения убирает сгенерированные идентификаторы расширений и ломает код и схемы, которые его используют.
+
+## Примеры
+
+### Неправильно
+
+**До:**
+
+```proto
+syntax = "proto3";
+
+package myapi.v1;
+
+import "google/protobuf/descriptor.proto";
+
+extend google.protobuf.FieldOptions {
+  bool sensitive = 50001;
+}
+```
+
+**После:**
+
+```proto
+syntax = "proto3";
+
+package myapi.v1;
+
+import "google/protobuf/descriptor.proto";
+
+// sensitive extension deleted
+```
+
+**Ошибка:**
+
+```text
+options.proto:8:3: Extension "myapi.v1.sensitive" was deleted. (EXTENSION_NO_DELETE)
+```
+
+### Правильно
+
+Пометьте расширение как `deprecated` вместо удаления:
+
+```proto
+syntax = "proto3";
+
+package myapi.v1;
+
+import "google/protobuf/descriptor.proto";
+
+extend google.protobuf.FieldOptions {
+  bool sensitive = 50001 [deprecated = true];
+}
+```
