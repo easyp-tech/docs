@@ -1,0 +1,10 @@
+{
+  "title": "Миграция",
+  "pages": [
+    "easyp-v0",
+    "buf-cli",
+    "protoc",
+    "protolock",
+    "prototool"
+  ]
+}

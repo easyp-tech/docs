@@ -68,7 +68,8 @@ The nearest explicit <code>options.go.package_prefix</code> wins. The backend ab
 
 ## Key Configuration Elements
 
-- <code>generate.modules</code> selects complete local modules or canonical module identities available in the selected dependency context. With no list, generation uses the nearest enclosing module, or the project directory when no manifest exists.
+- <code>generate.modules</code> accepts plain module strings (local paths or canonical module identities) or module objects (`{ module, paths, packages }`) with per-module source filters intersected with global filters. With no list, generation uses the nearest enclosing module, or the project directory when no manifest exists.
+- <code>generate.paths</code> selects literal files or directory subtrees relative to each selected module directory (usable with or without <code>generate.modules</code>).
 - <code>generate.packages</code> selects exact protobuf package names, not prefixes or globs. Empty selects all source files.
 - Each plugin selects exactly one source: <code>name</code>, <code>path</code>, <code>command</code>, or <code>remote</code>, and requires <code>out</code>.
 - <code>opts</code> accepts a map or a list of option strings. <code>with_imports: true</code> also generates transitive imports for that plugin.
@@ -77,7 +78,7 @@ The nearest explicit <code>options.go.package_prefix</code> wins. The backend ab
 
 | Source | Version control |
 | --- | --- |
-| <code>name</code> | Uses the installed executable; supported built-in names fall back to bundled WASM when no matching executable is on PATH. Pin the build environment and EasyP binary. |
+| <code>name</code> | Uses `protoc-gen-<name>` on `PATH`; the 15 built-in WASM names (`cpp`, `csharp`, `java`, `kotlin`, `objc`, `php`, `python`, `ruby`, `grpc_*`) fall back to bundled WASM when not on `PATH` (`go` and `go-grpc` are not bundled WASM). Pin the build environment and EasyP binary. |
 | <code>path</code> or <code>command</code> | Uses the executable you provide. Manage its version outside the generator YAML. |
 | <code>remote</code> | Requires a separate pinned semantic <code>version</code>; do not embed the version in the remote name. |
 
@@ -135,15 +136,15 @@ options:
     package_prefix: github.com/acme/app/gen/go
 ~~~
 
-Run each profile from that directory:
+Run each profile from that directory with command-local <code>--config</code> (or the short alias <code>easyp g</code>):
 
 ~~~bash
-easyp generate --gen-config private.easyp.gen.yaml
-easyp generate --gen-config public.easyp.gen.yaml
+easyp generate --config private.easyp.gen.yaml
+easyp generate --config public.easyp.gen.yaml
 ~~~
 
 The selected packages become generation targets; required imports remain available for linking. Each file keeps the usual module-relative source filters and file-relative plugin outputs, so changing the filename requires no path adjustments. These profiles explicitly repeat the Go prefix: a standard <code>easyp.gen.yaml</code> in the same directory is independent. Only standard files in ancestor directories provide inherited options.
 
-<code>--gen-config</code> selects one file and cannot be combined with <code>--project</code> or <code>--all</code>. Recursive discovery continues to look for standard <code>easyp.gen.yaml</code> files. Use separate commands to run multiple named profiles.
+<code>--config</code> selects one generation file and cannot be combined with <code>--project</code> or <code>--all</code>. Recursive discovery continues to look for standard <code>easyp.gen.yaml</code> files. Use separate commands to run multiple named profiles.
 
 See the [generator reference](/docs/reference/easyp-gen-yaml) and [build reproducibility guide](/docs/guides/reproducibility).

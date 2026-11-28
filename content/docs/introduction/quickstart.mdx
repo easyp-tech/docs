@@ -1,15 +1,17 @@
 ---
 title: "Quickstart"
-description: "Create a protobuf module and generate code with EasyP v1 nightly."
+description: "Create a protobuf module, add dependencies, generate code, lint, and check breaking changes with EasyP v1."
 ---
 
-Install an [explicit v1 nightly](/docs/introduction/install#opt-into-v1-nightly) and make sure Git is available. The `go` plugin uses `protoc-gen-go` from `PATH` when installed, otherwise EasyP uses its bundled WASM generator.
+[Install EasyP v1](/docs/introduction/install) and make sure Git is available. EasyP v1 compiles `.proto` files with its built-in pure-Go `easyprotoc` compiler, so **`protoc` is not required**.
+
+<Callout type="info">
+EasyP includes **15 built-in WASM plugins** (`cpp`, `csharp`, `java`, `kotlin`, `objc`, `php`, `python`, `ruby`, and their `grpc_*` counterparts). **`go` and `go-grpc` are not built-in WASM plugins**: either run them remotely via `plugins.easyp.tech` (zero local plugin setup) or install `protoc-gen-go` on your `PATH`.
+</Callout>
 
 ## 1. Initialize a module
 
 ```bash
-# Use the nightly installed in the installation guide for this terminal session.
-export PATH="$HOME/.local/share/easyp-nightly/bin:$PATH"
 easyp --version
 
 mkdir contracts && cd contracts
@@ -17,7 +19,7 @@ git init
 easyp init --module github.com/acme/contracts
 ```
 
-`init` creates three files: `protobuf.mod` for the module, `easyp.yaml` for lint and breaking policies, and `easyp.gen.yaml` for generation. If a file already exists, EasyP asks before replacing it. Automatic migration from Buf dependencies is not part of the pilot.
+`init` creates three files: `protobuf.mod` for the module, `easyp.yaml` for lint and breaking policies, and `easyp.gen.yaml` for generation. If a file already exists, EasyP asks before replacing it.
 
 ## 2. Add a proto file
 
@@ -44,29 +46,71 @@ module github.com/acme/contracts
 roots proto
 ```
 
-## 3. Configure generation
-
-Replace the empty plugin list in `easyp.gen.yaml`:
-
-```yaml
-version: v1
-generate:
-  modules: [github.com/acme/contracts]
-plugins:
-  - name: go
-    out: ./gen/go
-    opts:
-      paths: source_relative
-```
-
-## 4. Run the commands
+If your protos import external Git modules (for example `google/api/annotations.proto`), add them with `easyp get`:
 
 ```bash
+easyp get github.com/googleapis/googleapis
+```
+
+`easyp get` adds the direct requirement to `protobuf.mod`, records transitive dependencies as `// indirect`, and pins exact commits and hashes in `protobuf.lock`.
+
+## 3. Configure generation
+
+Replace the empty plugin list in `easyp.gen.yaml`. Choose either a **remote plugin** (no local Go plugin required) or a **local `protoc-gen-go` binary** on `PATH`:
+
+<Tabs items={["Remote plugin (zero local setup)", "Local protoc-gen-go"]}>
+  <Tab value="Remote plugin (zero local setup)">
+    ```yaml
+    version: v1
+    generate:
+      modules: [github.com/acme/contracts]
+    plugins:
+      - remote: plugins.easyp.tech/protocolbuffers/go
+        version: v1.36.11
+        out: ./gen/go
+        opts:
+          paths: source_relative
+    ```
+  </Tab>
+  <Tab value="Local protoc-gen-go">
+    Install `protoc-gen-go` on `PATH` first:
+
+    ```bash
+    go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
+    ```
+
+    Then configure `easyp.gen.yaml`:
+
+    ```yaml
+    version: v1
+    generate:
+      modules: [github.com/acme/contracts]
+    plugins:
+      - name: go
+        out: ./gen/go
+        opts:
+          paths: source_relative
+    ```
+  </Tab>
+</Tabs>
+
+## 4. Validate, generate, lint, and check compatibility
+
+```bash
+easyp validate-config
 easyp mod tidy
 easyp generate
 easyp lint --path proto
 ```
 
-`mod tidy` creates `protobuf.lock`. Add `require module version` lines to `protobuf.mod` before running it when your sources import another Git module. `mod download` later fetches the exact locked commits. Commit `protobuf.mod` and `protobuf.lock` alongside the source files.
+Commit your initial files to Git (`git add . && git commit -m "init"`). Once you have a baseline commit or branch, verify backward compatibility against it:
 
-For a full field reference, see [configuration](/docs/cli/configuration), [generation](/docs/cli/generator), and [dependencies](/docs/cli/package-manager).
+```bash
+easyp breaking --against main
+```
+
+- `validate-config` checks `easyp.yaml`, `easyp.gen.yaml`, `protobuf.mod`, and `protobuf.lock` against the v1 schema and semantic rules.
+- `mod tidy` reconciles `protobuf.mod` and writes `protobuf.lock`. Later, `easyp mod download --frozen` fetches the exact locked commits in CI.
+- Commit `protobuf.mod` and `protobuf.lock` alongside your `.proto` files.
+
+For a full field reference, see [configuration](/docs/cli/configuration), [generation](/docs/cli/generator), [dependencies](/docs/cli/package-manager), and [breaking checks](/docs/cli/breaking-changes).

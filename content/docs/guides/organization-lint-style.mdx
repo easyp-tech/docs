@@ -72,11 +72,11 @@ A common ancestor policy is resolved independently for each checked module, usin
 ## Validation
 
 ~~~bash
-easyp validate-config --cfg easyp.yaml
+easyp validate-config --config easyp.yaml
 easyp lint
 easyp breaking --against main
 ~~~
 
 The parser validates reference syntax without network access. The CLI additionally follows local references and verifies already cached dependency content. Missing cached policies produce an actionable error: run <code>easyp mod download</code>, then validate again. Validation itself does not download dependencies. Invalid bases, cycles and boundary violations include the consuming field and the reference chain.
 
-Loading policies never runs generation plugins or imports a base's <code>issues.exclude-rules</code>. Environment variables are expanded once in each original file, not again after merging. See the [policy reference](/docs/reference/easyp-yaml).
+Loading policies never runs generation plugins or imports a base's <code>issues.exclude-rules</code>. For security, `${...}` environment-variable expansion applies **only** to the consumer's own policy file and its local (`./` / `../`) `extends` chain — expanded once per file, never re-expanded after merging. Policy files loaded from dependency modules or local `replace` targets are parsed literally (`ParsePolicyLiteral`) without expanding environment variables. See the [policy reference](/docs/reference/easyp-yaml).

@@ -1,11 +1,14 @@
 ---
 title: "GitLab CI"
+description: "Run frozen EasyP v1 config validation, dependency verification, linting, breaking checks, and code generation in GitLab CI."
 ---
 
-Set <code>EASYP_CI_IMAGE</code> to a pinned image containing a reviewed EasyP v1 build, Git and the required plugins. Commit configs and the lock. This example has one module and a root generation config; in a monorepo run module commands per module and explicitly select generation projects.
+Use a pinned EasyP v1 image such as `ghcr.io/easyp-tech/easyp:v1.0.0` (or a derived project image that also includes any required local `protoc-gen-*` executables; remote and 15 built-in WASM plugins require no extra local binaries). Commit your configs and `protobuf.lock`. This example has one module and a root generation config; in a monorepo run module commands per module and explicitly select generation projects with `--project` or `--all`.
 
 ~~~yaml
-image: $EASYP_CI_IMAGE
+image:
+  name: ghcr.io/easyp-tech/easyp:v1.0.0
+  entrypoint: [""]
 
 variables:
   GIT_DEPTH: "0"
@@ -16,13 +19,13 @@ contracts:
   stage: validate
   script:
     - easyp validate-config
-    - easyp mod download
-    - easyp lint
+    - easyp mod download --frozen
+    - easyp lint --frozen
     - git fetch origin +refs/heads/main:refs/remotes/origin/main
-    - easyp breaking --against refs/remotes/origin/main
-    - easyp generate
+    - easyp breaking --frozen --against refs/remotes/origin/main
+    - easyp generate --frozen
     - git diff --exit-code
     - test -z "$(git status --porcelain --untracked-files=normal -- gen)"
 ~~~
 
-Adjust <code>main</code> and <code>gen</code> to the project baseline and output directory. The last assertion catches newly generated untracked files. Do not mask breaking failures with <code>|| echo</code>. Configure private Git access through the runner; do not put credentials into EasyP YAML.
+Adjust `main` and `gen` to the project baseline and output directory. Passing `--frozen` enforces the committed `protobuf.lock` and rejects any local `replace` directives in CI. The last assertion catches newly generated untracked files. Do not mask breaking failures with `|| echo`. Configure private Git access through the runner; do not put credentials into EasyP YAML.

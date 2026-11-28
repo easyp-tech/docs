@@ -1,24 +1,32 @@
 ---
 title: "Документация EasyP"
-description: "Современный инструментарий Protocol Buffers — lint, generate, packages, breaking changes."
+description: "Современный инструментарий Protocol Buffers — pure-Go компилятор, линтинг, Git-зависимости, генерация кода и проверка совместимости."
 ---
 
-Современный инструментарий Protocol Buffers: линтинг, управление пакетами, генерация кода и проверка breaking changes.
+EasyP v1 — современный инструментарий для Protocol Buffers со встроенным pure-Go компилятором (`easyprotoc`, без установки `protoc`), поддержкой Protobuf Editions 2023, 44 правилами линтинга, 69 проверками breaking changes, Git-нативным управлением зависимостями (MVS), 15 встроенными WASM-плагинами, локальной и удалённой генерацией кода и MCP-сервером `easyp-mcp` для ИИ-инструментов.
 
 <Callout type="info">
-Впервые здесь? Начните с [Quickstart](/ru/docs/introduction/quickstart).
+Впервые здесь? Начните с [Быстрого старта](/ru/docs/introduction/quickstart) или [установки EasyP v1](/ru/docs/introduction/install). Переходите с v0? Используйте руководство по [миграции с EasyP v0](/ru/docs/migration/easyp-v0).
 </Callout>
 
 ## С чего начать
 
-- [Что такое EasyP?](/ru/docs/introduction/what-is)
-- [Quickstart](/ru/docs/introduction/quickstart)
-- [Установка](/ru/docs/introduction/install)
+- [Что такое EasyP?](/ru/docs/introduction/what-is) — обзор архитектуры, компилятор `easyprotoc` и структура файлов v1
+- [Установка EasyP](/ru/docs/introduction/install) — Homebrew (macOS и Linux), Go 1.26.6+, архивы релизов, Docker и `easyp-mcp`
+- [Быстрый старт](/ru/docs/introduction/quickstart) — создание модуля v1, добавление зависимостей, генерация, линтинг и проверка совместимости
 
-## Разделы
+## Основные разделы
 
-- [CLI](/ru/docs/cli) — lint, generate, packages, breaking checks
-- [API Service](/ru/docs/api-service/overview) — удалённое выполнение плагинов
-- [Миграция](/ru/docs/migration/buf-cli) — с Buf, protoc и других
-- [CI/CD](/ru/docs/ci-cd/github-actions) — GitHub Actions и GitLab
-- [Блог](/ru/docs/blog/finally-give-up-gin-echo)
+- [CLI](/ru/docs/cli) — команды, флаги, линтер, проверка breaking changes, генератор кода и менеджер пакетов
+- [Руководства](/ru/docs/guides/adding-dependency) — практические сценарии: зависимости, мультитаргет-генерация, общие политики линтинга, CI-проверки и миграция с Buf
+- [Справочник](/ru/docs/reference/easyp-yaml) — схемы файлов `easyp.yaml`, `easyp.gen.yaml`, `protobuf.mod` и `protobuf.lock`
+- [Архитектура](/ru/docs/architecture/mvs-dependency-resolution) — алгоритм Minimal Version Selection (MVS), селективный `dirhash` и верификация lock-файла
+- [API Service](/ru/docs/api-service/overview) — удалённое выполнение плагинов и self-hosted развёртывание
+- [Миграция](/ru/docs/migration/easyp-v0) — переход с EasyP v0, Buf CLI, `protoc`, `protolock` и `prototool`
+- [CI/CD](/ru/docs/ci-cd/github-actions) — воспроизводимые пайплайны с `--frozen` в GitHub Actions и GitLab CI
+- [Блог](/ru/docs/blog/finally-give-up-gin-echo) — инженерные статьи и практики работы с Protobuf
+
+## Экосистема
+
+- [Каталог плагинов](/ru/plugins) — готовые удалённые плагины на `plugins.easyp.tech`
+- [Дорожная карта](/ru/roadmap) — вышедшие возможности v1.0 и дальнейшие планы

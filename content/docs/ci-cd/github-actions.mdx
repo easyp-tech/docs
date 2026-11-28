@@ -9,7 +9,7 @@ Run dependency verification, linting, breaking checks, and generation as separat
 
 This example assumes a root <code>protobuf.mod</code> and committed <code>protobuf.lock</code>, a root <code>easyp.yaml</code>, schemas in <code>proto</code>, and a root <code>easyp.gen.yaml</code> writing to tracked files under <code>gen</code>.
 
-The workflow uses a prepared self-hosted Linux runner with the custom label <code>easyp-v1</code>. Assign that label only after provisioning your chosen v1-capable EasyP binary and required local plugins on <code>PATH</code>. For a hosted runner, supply your project's pinned toolchain setup before the EasyP steps. The example does not assume a particular published v1 release artifact.
+The workflow below installs a pinned EasyP v1 release archive on a standard GitHub-hosted `ubuntu-latest` runner (you can also use the container image `ghcr.io/easyp-tech/easyp:v1.0.0`, Homebrew on Linux/macOS, or a pre-provisioned self-hosted runner). Pass <code>--frozen</code> on CI steps so EasyP validates the committed manifest and lock, rejects local <code>replace</code> directives, and never modifies dependency files.
 
 Local and bundled plugins cannot use a YAML <code>version</code> pin; their versions are controlled by the installed executables and EasyP binary. Remote plugins require a separate pinned semantic <code>version</code> in <code>easyp.gen.yaml</code>.
 
@@ -26,28 +26,40 @@ permissions:
 
 jobs:
   verify:
-    runs-on: [self-hosted, linux, x64, easyp-v1]
+    runs-on: ubuntu-latest
+    env:
+      EASYP_VERSION: "1.0.0"
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Verify toolchain
-        run: easyp --version
+      - name: Install EasyP v1
+        run: |
+          ASSET="easyp-${EASYP_VERSION}-linux-amd64.tar.gz"
+          curl -fLO "https://github.com/easyp-tech/easyp/releases/download/v${EASYP_VERSION}/${ASSET}"
+          curl -fLO "https://github.com/easyp-tech/easyp/releases/download/v${EASYP_VERSION}/easyp-${EASYP_VERSION}-checksums.txt"
+          sha256sum --check --ignore-missing "easyp-${EASYP_VERSION}-checksums.txt"
+          tar -xzf "$ASSET"
+          sudo install "easyp-${EASYP_VERSION}-linux-amd64/easyp" /usr/local/bin/easyp
+          easyp --version
+
+      - name: Validate configuration
+        run: easyp validate-config
 
       - name: Verify locked dependencies
-        run: easyp mod download
+        run: easyp mod download --frozen
 
       - name: Lint schemas
-        run: easyp lint --path proto
+        run: easyp lint --frozen --path proto
 
       - name: Check compatibility
         env:
           BASE_REF: ${{ github.event.pull_request.base.sha }}
-        run: easyp breaking --path proto --against "$BASE_REF"
+        run: easyp breaking --frozen --path proto --against "$BASE_REF"
 
       - name: Generate code
-        run: easyp generate --project .
+        run: easyp generate --frozen --project .
 
       - name: Check committed generated files
         run: |
@@ -82,7 +94,7 @@ easyp breaking --path proto --against refs/tags/v1.2.0
 
 Choose the intended previous release rather than assuming tag creation order defines compatibility history. Each revision uses its own module manifests, locks, and dependencies, so a breaking check can fetch dependencies beyond those needed by the current checkout.
 
-<code>FILE</code> is the only supported additional category. <code>ignore_unstable</code> works for the supported package suffixes. Ignore paths are relative to the policy file defining the <code>breaking</code> section: here <code>proto/experimental</code> is relative to the root policy. Nested sections replace whole sections; <code>extends</code> explicitly loads a section base from a local file or an existing locked module.
+All four descriptor-backed profiles are supported: <code>FILE</code>, <code>PACKAGE</code>, <code>WIRE_JSON</code>, and <code>WIRE</code> (omitted or empty <code>categories</code> defaults to <code>["FILE"]</code>). <code>ignore_unstable</code> works for the supported package suffixes. Ignore paths are relative to the policy file defining the <code>breaking</code> section: here <code>proto/experimental</code> is relative to the root policy. Nested sections replace whole sections; <code>extends</code> explicitly loads a section base from a local file or an existing locked module.
 
 ## Selecting Generation Projects
 
@@ -102,7 +114,7 @@ Dependencies belong in <code>protobuf.mod</code>, with resolved commits and hash
 
 EasyP storage defaults to <code>~/.easyp</code> and can be relocated with <code>EASYPPATH</code>. If you cache it, include the OS, EasyP toolchain version, and relevant lockfile hashes in the cache key. A restored cache is an optimization; dependency verification still runs.
 
-For private dependencies, provision the Git authentication required by your sources before the dependency step. Keep credentials in the runner's approved secret mechanism and out of logs. A local replacement does not eliminate downloads unless the entire dependency graph is local or already verified in cache; remote plugins still need the network. <code>tidy</code> and <code>update</code> reject active local replacements and are not read-only verification commands.
+For private dependencies, provision the Git authentication required by your sources before the dependency step. Keep credentials in the runner's approved secret mechanism and out of logs. A local replacement does not eliminate downloads unless the entire dependency graph is local or already verified in cache; remote plugins still need the network. Outside <code>--frozen</code>, <code>mod tidy</code> and <code>mod update</code> work with local replacements without rewriting <code>protobuf.lock</code>, and they are mutating commands rather than read-only CI checks; in CI, pass <code>--frozen</code> to reject every <code>replace</code> directive and refuse graph mutations.
 
 ## Troubleshooting
 

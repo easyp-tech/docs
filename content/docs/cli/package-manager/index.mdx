@@ -29,7 +29,7 @@ For a Git repository with several manifests, require each nested module separate
 
 For a selected tag or commit, module identity, roots, and requirements come from that revision. A nested module remains usable even if its directory was deleted or replaced by a regular file at current HEAD. Native manifests must match the requested identity at the selected revision; invalid native metadata does not fall back to Buf or legacy EasyP, and a pinned revision is never replaced with HEAD.
 
-Module commands and <code>get</code> find the nearest ancestor <code>protobuf.mod</code> within the workspace. <code>easyp get &lt;module&gt;</code> adds a direct requirement; <code>@v1.2.3</code> or <code>@&lt;full-commit&gt;</code> selects a version. Without a suffix, the unconstrained-requirement rules above apply. Transitive requirements are added with <code>// indirect</code>, and repeated calls do not duplicate entries. Resolution errors leave the manifest and lock unchanged.
+Module commands and <code>get</code> find the nearest ancestor <code>protobuf.mod</code> within the workspace. <code>easyp get &lt;module&gt;</code> adds a direct requirement; <code>@v1.2.3</code> (SemVer), <code>@&lt;tag&gt;</code> (non-SemVer Git tag, resolved to its full commit SHA before writing the requirement), or <code>@&lt;full-commit&gt;</code> selects a version. Without a suffix, the unconstrained-requirement rules above apply. Transitive requirements are added with <code>// indirect</code>, and repeated calls do not duplicate entries. Resolution errors leave the manifest and lock unchanged.
 
 Major versions use Go-style identities: v0/v1 are unsuffixed; v2+ requires matching <code>/vN</code>. The <code>+incompatible</code> exception requires verified pre-native metadata; it never bypasses a native manifest. See [exact grammar and Git mapping](/docs/reference/protobuf-mod).
 
@@ -69,7 +69,7 @@ An ambiguous mapping or deleted imported source stops before project writes and 
 
 | Command | Behavior |
 |---------|----------|
-| <code>easyp get &lt;module&gt;[@version&#124;@commit]</code> | Adds or promotes a direct requirement, resolves transitive requirements, and writes <code>protobuf.lock</code> |
+| <code>easyp get &lt;module&gt;[@version&#124;@tag&#124;@commit]</code> | Adds or promotes a direct requirement (resolving non-SemVer Git tags to full commits), resolves transitive requirements, and writes <code>protobuf.lock</code> |
 | <code>easyp mod tidy</code> | Resolves direct and transitive requirements and writes <code>protobuf.lock</code> |
 | <code>easyp mod download</code> | Downloads the exact commits in <code>protobuf.lock</code> and verifies their hashes |
 | <code>easyp mod update</code> | Refreshes requirements within their current major versions, then updates the lock |

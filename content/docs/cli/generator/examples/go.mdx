@@ -27,7 +27,7 @@ plugins:
       paths: source_relative
 ```
 
-Run `easyp generate`. If `protoc-gen-go` or `protoc-gen-go-grpc` is on `PATH`, EasyP uses that executable; otherwise it uses the corresponding bundled WASM plugin. A `go_package` option in each source file, or a managed `options.go.package_prefix`, supplies the Go import path. See the [managed options reference](/docs/reference/easyp-gen-yaml).
+Install `protoc-gen-go` and `protoc-gen-go-grpc` on `PATH` (note: `go` and `go-grpc` are **not** among the 15 built-in WASM plugins; to run without installing local Go plugins, use `remote: plugins.easyp.tech/protocolbuffers/go` and `remote: plugins.easyp.tech/grpc/go` with pinned `version:` fields), then run `easyp generate`. A `go_package` option in each source file, or a managed `options.go.package_prefix`, supplies the Go import path. See the [managed options reference](/docs/reference/easyp-gen-yaml).
 
 For example, adding `options.go.package_prefix: github.com/acme/contracts/gen/go` maps the protobuf package `common.v1` to `github.com/acme/contracts/gen/go/common/v1`. With `paths: source_relative`, the generated files go to `gen/go/common/v1`, keeping directories aligned with the Go imports.
 

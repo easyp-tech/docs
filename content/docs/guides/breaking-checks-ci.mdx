@@ -14,21 +14,22 @@ breaking:
   ignore: [proto/experimental]
 ~~~
 
-<code>FILE</code> adds declaration-move checks; existing compatibility checks stay enabled. Other categories are unsupported. Set <code>ignore_unstable: true</code> only if you intend to skip packages with supported unstable version suffixes; see the [breaking checker](/docs/cli/breaking-changes) for the exact forms.
+All four descriptor-backed compatibility profiles are supported: <code>FILE</code>, <code>PACKAGE</code>, <code>WIRE_JSON</code>, and <code>WIRE</code>. Multiple profiles apply their union; omitted or empty <code>categories</code> defaults to <code>["FILE"]</code>. Set <code>ignore_unstable: true</code> only if you intend to skip packages with supported unstable version suffixes; see the [breaking checker](/docs/cli/breaking-changes) for the profile matrix and exact unstable forms.
 
 The ignore path is relative to the file defining the effective <code>breaking</code> section. In <code>proto/easyp.yaml</code>, the same directory would be <code>ignore: [experimental]</code>. Changing <code>--root</code> does not change that base.
 
 ## Run the checks
 
-From the repository root, with the dependency lock prepared:
+From the repository root, with the dependency lock committed, use <code>--frozen</code> in CI so EasyP verifies the committed manifest and lock without rewriting files or allowing local replacements:
 
 ~~~bash
-easyp mod download
-easyp lint --path proto
-easyp breaking --path proto
+easyp validate-config
+easyp mod download --frozen
+easyp lint --frozen --path proto
+easyp breaking --frozen --path proto
 ~~~
 
-<code>mod download</code> verifies the commits and content hashes recorded in <code>protobuf.lock</code>. The breaking checker uses each revision's own manifests, locks, and dependency context; the baseline may need additional downloads. Keep manifests and locks committed and resolve dependency updates before the CI check.
+<code>mod download --frozen</code> verifies the commits and content hashes recorded in <code>protobuf.lock</code>. The breaking checker uses each revision's own manifests, locks, and dependency context; the baseline may need additional downloads. Keep manifests and locks committed and resolve dependency updates before the CI check.
 
 ## Make the baseline available
 
@@ -36,7 +37,7 @@ The baseline can be a branch, lightweight or annotated tag, full commit SHA, or 
 
 An explicit <code>--against</code> overrides <code>breaking.baseline</code>; without either, the default is <code>master</code>. Pass the ref directly to the flag, without <code>git:</code> or <code>git-ref=</code>.
 
-After provisioning a v1-capable EasyP binary, these GitHub Actions steps compare with the pull request's base commit:
+After installing EasyP v1 (for example from release archives, Homebrew, or `ghcr.io/easyp-tech/easyp:v1.0.0`), these GitHub Actions steps compare with the pull request's base commit:
 
 ~~~yaml
 - uses: actions/checkout@v4
@@ -45,7 +46,7 @@ After provisioning a v1-capable EasyP binary, these GitHub Actions steps compare
 - name: Check protobuf compatibility
   env:
     BASE_REF: ${{ github.event.pull_request.base.sha }}
-  run: easyp breaking --path proto --against "$BASE_REF"
+  run: easyp breaking --frozen --path proto --against "$BASE_REF"
 ~~~
 
 Use this snippet in a <code>pull_request</code> job. Full history makes the baseline available in ordinary PR checkouts; a missing revision fails the check instead of selecting a different baseline. See the complete [GitHub Actions workflow](/docs/ci-cd/github-actions).

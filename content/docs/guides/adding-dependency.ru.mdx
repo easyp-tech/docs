@@ -13,11 +13,14 @@ description: "Добавление зависимостей Protobuf-модул�
 
 ```bash
 easyp get github.com/acme/weather
-# Либо укажите тег или полный Git-коммит:
+# Укажите SemVer-тег, не-SemVer Git-тег или полный Git-коммит:
 easyp get github.com/acme/weather@v1.2.3
+easyp get github.com/acme/weather@release-2026-10
+# Задайте проверенный корень импортов для зависимости без метаданных корней:
+easyp get --import-root api/proto github.com/acme/legacy-schemas@v1.0.0
 ```
 
-Команда добавляет выбранный модуль как прямой `require`, записывает его транзитивные зависимости с пометкой `// indirect` и обновляет `protobuf.lock` с точными коммитами и хешами содержимого. Вложенный модуль указывают по полному пути, например `github.com/acme/contracts/proto/user`. Тег необязателен: без него EasyP закрепляет текущий HEAD репозитория. Для каждого локального модуля с собственным `protobuf.mod` запускайте команду в его каталоге.
+Команда добавляет выбранный модуль как прямой `require`, записывает его транзитивные зависимости с пометкой `// indirect` и обновляет `protobuf.lock` с точными коммитами и хешами содержимого. Именованные не-SemVer Git-теги (`@<тег>`) предварительно разрешаются в полный SHA коммита до записи в `protobuf.mod`. Вложенный модуль указывают по полному пути, например `github.com/acme/contracts/proto/user`. Тег необязателен: без него EasyP закрепляет текущий HEAD репозитория. Для каждого локального модуля с собственным `protobuf.mod` запускайте команду в его каталоге.
 
 Добавьте нужный protobuf `import` в `.proto`, затем проверьте и закоммитьте `protobuf.mod` и `protobuf.lock`.
 
@@ -39,9 +42,12 @@ easyp get github.com/acme/weather@v1.2.3
 
 ```protobuf
 // proto/user/protobuf.mod
+module github.com/acme/contracts/proto/user
+
+roots proto
 
 require (
-    github.com/googleapis/googleapis v1.5.0
+    github.com/googleapis/googleapis 03a91044136a014466d4293eb1fe91f2b02075d2
     github.com/acme/weather v1.2.3
 )
 ```
@@ -79,20 +85,27 @@ easyp mod tidy
 Проект-потребитель по-прежнему объявляет Git-источник через `require`. Репозиторий зависимости может использовать другой формат:
 
 - EasyP v1 `protobuf.mod`: читаются `roots` и `require`.
-- Buf v2 `buf.yaml`: `modules[].path` задаёт корни импортов.
-- Buf v1 `buf.work.yaml`: читаются `directories`; одиночный модуль с `buf.yaml` v1 использует `.`.
-- Buf v1beta1 `buf.yaml`: читаются `build.roots`, по умолчанию `.`.
+- Buf v2 `buf.yaml`: читаются `modules[].path`, а также фильтры `modules[].includes` и `modules[].excludes`.
+- Buf v1 `buf.work.yaml`: читаются `directories` и `build.excludes` вложенных `buf.yaml`; одиночный модуль с `buf.yaml` v1 использует `.` и `build.excludes`.
+- Buf v1beta1 `buf.yaml`: читаются `build.roots` (по умолчанию `.`) и `build.excludes`.
 - Старый EasyP: из прежнего `protobuf.mod` читаются зависимости `direct`, а из `easyp.yaml` — локальные `generate.inputs[].directory.root` и Git-входы.
 
-Если в старой зависимости EasyP у Git-зависимости не указана версия, `mod tidy` разрешает HEAD Git-репозитория и фиксирует его коммит в v1 lock. Тег не нужен. Старый формат EasyP `source@<commit>` также читается транзитивно. `deps` из Buf Registry не являются Git-источниками: когда нужны их импорты, укажите соответствующий Git-модуль в `protobuf.mod` проекта-потребителя. Фильтры Buf `includes`/`excludes` для корней Git-зависимости пока не поддерживаются и вызывают явную ошибку.
+Если в старой зависимости EasyP у Git-зависимости не указана версия, `mod tidy` разрешает HEAD Git-репозитория и фиксирует его коммит в v1 lock. Тег не нужен. Старый формат EasyP `source@<commit>` также читается транзитивно.
 
-Обновлённый `protobuf.mod`:
+Если Git-зависимость на Buf объявляет `deps` из BSR, встроенный `bsr.StaticResolver` сопоставляет **5 популярных BSR-модулей** (`buf.build/googleapis/googleapis`, `buf.build/grpc-ecosystem/grpc-gateway`, `buf.build/mercari/grpc-federation`, `buf.build/envoyproxy/protoc-gen-validate` и `buf.build/bufbuild/protovalidate`) с зафиксированными Git-снимками и сохраняет привязку в `modules[].bsr` файла `protobuf.lock`. Неизвестные BSR-модули вызывают явную ошибку (Git URL не угадывается), а прямые BSR-зависимости в `protobuf.mod` потребителя не поддерживаются.
+
+Обновлённый `protobuf.mod` (нативные модули v2+ требуют суффикс мажорной версии `/v2` в пути модуля):
 
 ```protobuf
+// proto/user/protobuf.mod
+module github.com/acme/contracts/proto/user
+
+roots proto
+
 require (
-    github.com/googleapis/googleapis v1.5.0
+    github.com/googleapis/googleapis 03a91044136a014466d4293eb1fe91f2b02075d2
     github.com/acme/weather v1.2.3
-    github.com/grpc-ecosystem/grpc-gateway v2.19.0 // indirect
+    github.com/grpc-ecosystem/grpc-gateway/v2 v2.19.0 // indirect
 )
 ```
 

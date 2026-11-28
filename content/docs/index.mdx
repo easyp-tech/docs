@@ -1,24 +1,32 @@
 ---
 title: "EasyP Documentation"
-description: "Modern Protocol Buffers toolkit — lint, generate, packages, breaking changes."
+description: "Modern Protocol Buffers toolkit — pure-Go compiler, linting, Git-native dependencies, code generation, and breaking-change checks."
 ---
 
-Modern Protocol Buffers toolkit: linting, package management, code generation, and breaking-change detection.
+EasyP v1 is a modern Protocol Buffers toolkit powered by its own pure-Go compiler (`easyprotoc`, no `protoc` required) with Protobuf Editions 2023 support, 44 lint rules, 69 breaking-change checks, Git-native MVS dependency management, 15 built-in WASM plugins, local and remote code generation, and the `easyp-mcp` stdio server for AI tools.
 
 <Callout type="info">
-New here? Start with the [Quickstart](/docs/introduction/quickstart).
+New here? Start with the [Quickstart](/docs/introduction/quickstart) or [Install EasyP v1](/docs/introduction/install). Upgrading from v0? Follow the [Migration from EasyP v0](/docs/migration/easyp-v0) guide.
 </Callout>
 
 ## Start here
 
-- [What is EasyP?](/docs/introduction/what-is)
-- [Quickstart](/docs/introduction/quickstart)
-- [Installation](/docs/introduction/install)
+- [What is EasyP?](/docs/introduction/what-is) — architecture, `easyprotoc` compiler, and v1 file model
+- [Install EasyP](/docs/introduction/install) — Homebrew (macOS & Linux), Go 1.26.6+, release archives, Docker, and `easyp-mcp`
+- [Quickstart](/docs/introduction/quickstart) — initialize a v1 module, add dependencies, generate code, lint, and check breaking changes
 
-## Product areas
+## Core documentation
 
-- [CLI](/docs/cli) — local lint, generate, packages, breaking checks
-- [API Service](/docs/api-service/overview) — remote plugin execution
-- [Migration](/docs/migration/buf-cli) — from Buf, protoc, and others
-- [CI/CD](/docs/ci-cd/github-actions) — GitHub Actions & GitLab
-- [Blog](/docs/blog/finally-give-up-gin-echo)
+- [CLI](/docs/cli) — commands, flags, linter, breaking changes, code generator, and package manager
+- [Guides](/docs/guides/adding-dependency) — practical workflows for dependencies, multi-target generation, shared lint policies, CI breaking checks, and Buf migration
+- [Reference](/docs/reference/easyp-yaml) — schemas for `easyp.yaml`, `easyp.gen.yaml`, `protobuf.mod`, and `protobuf.lock`
+- [Architecture](/docs/architecture/mvs-dependency-resolution) — Minimal Version Selection (MVS), selective `dirhash`, and lockfile verification
+- [API Service](/docs/api-service/overview) — remote plugin execution service and self-hosted deployment
+- [Migration](/docs/migration/easyp-v0) — migrating from EasyP v0, Buf CLI, `protoc`, `protolock`, and `prototool`
+- [CI/CD](/docs/ci-cd/github-actions) — reproducible pipelines with `--frozen` on GitHub Actions and GitLab CI
+- [Blog](/docs/blog/finally-give-up-gin-echo) — engineering articles and Protobuf patterns
+
+## Ecosystem
+
+- [Plugin Registry](/plugins) — browse hosted remote plugins at `plugins.easyp.tech`
+- [Roadmap](/roadmap) — shipped v1.0 milestones and upcoming work

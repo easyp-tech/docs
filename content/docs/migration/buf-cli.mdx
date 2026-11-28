@@ -1,5 +1,77 @@
 ---
-title: "Buf CLI"
+title: "Migrating from Buf CLI"
+description: "Quick migration checklist from Buf CLI (buf.yaml, buf.gen.yaml, buf.lock) to EasyP v1."
 ---
 
-## Work in progress
+EasyP v1 replaces `buf.yaml`, `buf.gen.yaml`, and `buf.lock` with three focused native files (`protobuf.mod`, `easyp.yaml`, and `easyp.gen.yaml`) plus `protobuf.lock`. EasyP compiles `.proto` files with its built-in pure-Go `easyprotoc` compiler (no `protoc` required) and works directly with Git repositories instead of requiring a hosted schema registry.
+
+<Callout type="info">
+`easyp migrate` is designed for migrating **EasyP v0** configurations (`easyp.yaml` + `easyp.lock`). Projects currently on Buf CLI migrate by creating native v1 files directly as shown below and in the [step-by-step Buf migration guide](/docs/guides/buf-migration).
+</Callout>
+
+## File and command mapping
+
+| Buf CLI | EasyP v1 | Notes |
+| --- | --- | --- |
+| `buf.yaml` (`modules`, `deps`) | `protobuf.mod` | Canonical Git `module`, `roots`, `require`, and local `replace` directives |
+| `buf.lock` | `protobuf.lock` | Locked Git commit SHAs, selective `dirhash.Hash1` digests, and BSR compatibility bindings |
+| `buf.yaml` (`lint`, `breaking`) | `easyp.yaml` | 44 lint rules (`MINIMAL`/`BASIC`/`STANDARD`/`COMMENTS`) and 69 breaking rules (`FILE`/`PACKAGE`/`WIRE_JSON`/`WIRE`) |
+| `buf.gen.yaml` | `easyp.gen.yaml` | `generate` (`modules`, `paths`, `packages`, `managed`), `options.go.package_prefix`, and `plugins` (`name`/`path`/`command`/`remote`) |
+| `buf dep update` | `easyp mod tidy` | Reconciles `protobuf.mod` via MVS and writes `protobuf.lock` |
+| `buf lint` | `easyp lint` | Runs effective `easyp.yaml` lint policy |
+| `buf breaking --against .git#branch=main` | `easyp breaking --against main` | Compares against any local Git branch, tag, or commit SHA |
+| `buf generate` | `easyp generate` (`easyp g`) | Runs plugins for the nearest `easyp.gen.yaml` (`--project`, `--all`, or `--config <file>`) |
+
+## Quick checklist
+
+1. **Create `protobuf.mod`** for each module with its canonical Git identity, source `roots`, and Git `require` entries:
+
+```text
+module github.com/acme/contracts
+roots proto
+
+require (
+    github.com/googleapis/googleapis 03a91044136a014466d4293eb1fe91f2b02075d2
+)
+```
+
+Upstream Git repositories that still use Buf v1, v1beta1, or v2 (`buf.yaml` / `buf.work.yaml`, including `includes`/`excludes` filters and 5 commonly used BSR modules via `bsr.StaticResolver`) can be consumed directly without rewriting them. See [Buf-configured Git dependencies](/docs/cli/package-manager/easyp-vs-buf).
+
+2. **Create `easyp.yaml`** for lint and breaking policies:
+
+```yaml
+version: v1
+linters:
+  default: STANDARD
+breaking:
+  baseline: git:main
+  categories: [FILE]
+```
+
+3. **Create `easyp.gen.yaml`** for code generation (use `generate.paths`, `generate.packages`, or `{ module, paths, packages }` entries under `generate.modules` to mirror Buf path/package filters):
+
+```yaml
+version: v1
+generate:
+  modules: [github.com/acme/contracts]
+plugins:
+  - remote: plugins.easyp.tech/protocolbuffers/go
+    version: v1.36.11
+    out: ./gen/go
+    opts:
+      paths: source_relative
+```
+
+4. **Resolve, validate, and verify** before removing `buf.*`:
+
+```bash
+easyp mod tidy
+easyp validate-config
+easyp lint
+easyp breaking --against main
+easyp generate
+```
+
+5. **Enforce lockfiles in CI** with `--frozen` (`easyp mod download --frozen`, `easyp lint --frozen`, `easyp breaking --frozen --against "$BASE_REF"`, `easyp generate --frozen`).
+
+For the full walkthrough including managed mode and multi-module workspaces, see the [Migrating from Buf to EasyP guide](/docs/guides/buf-migration).

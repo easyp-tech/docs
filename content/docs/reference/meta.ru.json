@@ -1,0 +1,9 @@
+{
+  "title": "Справочник",
+  "pages": [
+    "easyp-yaml",
+    "easyp-gen-yaml",
+    "protobuf-mod",
+    "protobuf-lock"
+  ]
+}

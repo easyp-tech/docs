@@ -130,7 +130,7 @@ Historical v0 archive verification remains a separate migration step. A valid hi
 
 ## Explicit limitations
 
-Invalid known fields, invalid or multi-document YAML, ambiguous source selection, unsupported references, and conflicting native outputs are rejected. Keys ignored by v0 are omitted with warnings and remain in the legacy backup. Custom Git-input roots/subdirectories, external or sliced local inputs whose exact selection cannot be preserved, unsafe managed selectors, and full lock conversion with local replacements may require manual migration. Buf configurations are not inputs to this v0 converter.
+Invalid known fields, invalid or multi-document YAML, ambiguous source selection, unsupported references, and conflicting native outputs are rejected. Keys ignored by v0 are omitted with warnings and remain in the legacy backup. External or sliced local inputs whose exact selection cannot be preserved, unsafe managed selectors, and full lock conversion with local replacements may require manual migration. Buf configurations are not inputs to this v0 converter.
 
 The command stages all outputs and checks observed inputs again before applying. Ordinary application failures are rolled back. Several file replacements are not one process-crash-atomic transaction: after a machine or process failure, inspect the preserved backups and Git state before continuing. Uncooperative concurrent writers cannot be made safe by this command.
 

@@ -12,8 +12,8 @@ description: "Как Minimal Version Selection (MVS) выбирает верси
 Рассмотрим модуль сервиса <code>user</code>, который зависит от двух пакетов: <code>common</code> и <code>weather</code>.
 
 - <code>user</code> напрямую требует <code>common v1.2.0</code>.
-- <code>user</code> напрямую требует <code>weather v2.1.0</code>.
-- <code>weather v2.1.0</code> транзитивно требует <code>common v1.3.0</code>.
+- <code>user</code> напрямую требует <code>weather/v2 v2.1.0</code>.
+- <code>weather/v2 v2.1.0</code> транзитивно требует <code>common v1.3.0</code>.
 
 ~~~text
                +-------------------+
@@ -23,16 +23,16 @@ description: "Как Minimal Version Selection (MVS) выбирает верси
            +-------------+-------------+
            |                           |
            v                           v
-+---------------------+     +---------------------+
-| github.com/acme/    |     | github.com/acme/    |
-| common v1.2.0       |     | weather v2.1.0      |
-+---------------------+     +----------+----------+
-                                       |
-                                       v
-                            +---------------------+
-                            | github.com/acme/    |
-                            | common v1.3.0       |
-                            +---------------------+
++---------------------+     +-----------------------+
+| github.com/acme/    |     | github.com/acme/      |
+| common v1.2.0       |     | weather/v2 v2.1.0     |
++---------------------+     +-----------+-----------+
+                                        |
+                                        v
+                             +---------------------+
+                             | github.com/acme/    |
+                             | common v1.3.0       |
+                             +---------------------+
 ~~~
 
 ---

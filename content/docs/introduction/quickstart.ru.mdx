@@ -1,15 +1,17 @@
 ---
 title: "Быстрый старт"
-description: "Создание protobuf-модуля и генерация кода в EasyP v1 nightly."
+description: "Создание protobuf-модуля, добавление зависимостей, генерация кода, линтинг и проверка совместимости в EasyP v1."
 ---
 
-Установите [явно выбранный v1 nightly](/ru/docs/introduction/install#явная-установка-v1-nightly) и убедитесь, что доступен Git. Плагин `go` использует `protoc-gen-go` из `PATH`, если он установлен; иначе EasyP запускает встроенный WASM-генератор.
+[Установите EasyP v1](/ru/docs/introduction/install) и убедитесь, что доступен Git. EasyP v1 компилирует `.proto`-файлы встроенным pure-Go компилятором `easyprotoc`, поэтому **устанавливать `protoc` не нужно**.
+
+<Callout type="info">
+В EasyP встроены **15 WASM-плагинов** (`cpp`, `csharp`, `java`, `kotlin`, `objc`, `php`, `python`, `ruby` и их gRPC-пары `grpc_*`). **`go` и `go-grpc` не входят во встроенные WASM-плагины**: запускайте их удалённо через `plugins.easyp.tech` (без локальной установки плагинов) или установите `protoc-gen-go` в `PATH`.
+</Callout>
 
 ## 1. Создайте модуль
 
 ```bash
-# Выберите nightly из инструкции по установке для текущего терминала.
-export PATH="$HOME/.local/share/easyp-nightly/bin:$PATH"
 easyp --version
 
 mkdir contracts && cd contracts
@@ -17,7 +19,7 @@ git init
 easyp init --module github.com/acme/contracts
 ```
 
-`init` создаёт три файла: `protobuf.mod` для модуля, `easyp.yaml` для политик линтинга и проверки совместимости, `easyp.gen.yaml` для генерации. Перед заменой существующего файла EasyP спрашивает пользователя. Автоматическая миграция зависимостей Buf в пилотную версию не входит.
+`init` создаёт три файла: `protobuf.mod` для модуля, `easyp.yaml` для политик линтинга и проверки совместимости и `easyp.gen.yaml` для генерации. Перед перезаписью существующего файла EasyP запрашивает подтверждение.
 
 ## 2. Добавьте proto-файл
 
@@ -44,29 +46,71 @@ module github.com/acme/contracts
 roots proto
 ```
 
-## 3. Настройте генерацию
-
-Замените пустой список плагинов в `easyp.gen.yaml`:
-
-```yaml
-version: v1
-generate:
-  modules: [github.com/acme/contracts]
-plugins:
-  - name: go
-    out: ./gen/go
-    opts:
-      paths: source_relative
-```
-
-## 4. Запустите команды
+Если ваши `.proto` импортируют внешние Git-модули (например, `google/api/annotations.proto`), добавьте их командой `easyp get`:
 
 ```bash
+easyp get github.com/googleapis/googleapis
+```
+
+`easyp get` добавляет прямую зависимость в `protobuf.mod`, записывает транзитивные зависимости с пометкой `// indirect` и фиксирует точные коммиты и хеши в `protobuf.lock`.
+
+## 3. Настройте генерацию
+
+Замените пустой список плагинов в `easyp.gen.yaml`. Выберите **удалённый плагин** (не требует локальной установки Go-плагина) или **локальный бинарник `protoc-gen-go`** в `PATH`:
+
+<Tabs items={["Удалённый плагин (без локальной настройки)", "Локальный protoc-gen-go"]}>
+  <Tab value="Удалённый плагин (без локальной настройки)">
+    ```yaml
+    version: v1
+    generate:
+      modules: [github.com/acme/contracts]
+    plugins:
+      - remote: plugins.easyp.tech/protocolbuffers/go
+        version: v1.36.11
+        out: ./gen/go
+        opts:
+          paths: source_relative
+    ```
+  </Tab>
+  <Tab value="Локальный protoc-gen-go">
+    Сначала установите `protoc-gen-go` в `PATH`:
+
+    ```bash
+    go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
+    ```
+
+    Затем настройте `easyp.gen.yaml`:
+
+    ```yaml
+    version: v1
+    generate:
+      modules: [github.com/acme/contracts]
+    plugins:
+      - name: go
+        out: ./gen/go
+        opts:
+          paths: source_relative
+    ```
+  </Tab>
+</Tabs>
+
+## 4. Проверьте конфиг, сгенерируйте код, запустите линтер и проверку совместимости
+
+```bash
+easyp validate-config
 easyp mod tidy
 easyp generate
 easyp lint --path proto
 ```
 
-`mod tidy` создаёт `protobuf.lock`. Если исходники импортируют другой Git-модуль, сначала добавьте в `protobuf.mod` строку `require module version`. Позже `mod download` скачает точные коммиты из lock. Храните `protobuf.mod` и `protobuf.lock` вместе с исходниками в репозитории.
+Зафиксируйте начальные файлы в Git (`git add . && git commit -m "init"`). Когда в репозитории появится базовая ветка или коммит, проверьте обратную совместимость:
 
-Подробности: [конфигурация](/ru/docs/cli/configuration), [генерация](/ru/docs/cli/generator), [зависимости](/ru/docs/cli/package-manager).
+```bash
+easyp breaking --against main
+```
+
+- `validate-config` проверяет `easyp.yaml`, `easyp.gen.yaml`, `protobuf.mod` и `protobuf.lock` по схемам и семантическим правилам v1.
+- `mod tidy` согласовывает `protobuf.mod` и записывает `protobuf.lock`. В CI команда `easyp mod download --frozen` скачивает точные зафиксированные коммиты.
+- Храните `protobuf.mod` и `protobuf.lock` в репозитории вместе с `.proto`-файлами.
+
+Подробности: [конфигурация](/ru/docs/cli/configuration), [генерация](/ru/docs/cli/generator), [зависимости](/ru/docs/cli/package-manager) и [проверка breaking changes](/ru/docs/cli/breaking-changes).

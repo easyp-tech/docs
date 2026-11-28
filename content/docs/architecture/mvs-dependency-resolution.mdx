@@ -23,17 +23,17 @@ A commit is not considered “newer” than a minimum version based on its date 
 ~~~text
 user
 ├── common v1.2.0
-└── weather v2.1.0
+└── weather/v2 v2.1.0
     └── common v1.3.0
 ~~~
 
-The <code>user</code> graph selects <code>common v1.3.0</code> and <code>weather v2.1.0</code>. Numerically, <code>v1.3.0</code> satisfies both common minimums; dependency resolution does not prove schema compatibility. Run <code>easyp breaking</code> separately for that check.
+The <code>user</code> graph selects <code>common v1.3.0</code> and <code>weather/v2 v2.1.0</code>. Numerically, <code>v1.3.0</code> satisfies both common minimums; dependency resolution does not prove schema compatibility. Run <code>easyp breaking</code> separately for that check.
 
 If user pins a SHA, the selected <code>common v1.3.0</code> tag must point to that exact commit. A <code>v1.2.0</code> tag at that SHA is insufficient when the maximum requirement is <code>v1.3.0</code>. If user's common requirement has no version, weather's semantic minimum determines the selection.
 
 ## Module and descriptor boundaries
 
-Each module has its own <code>protobuf.mod</code> and <code>protobuf.lock</code>. For example, <code>proto/user</code> can select <code>common v1.3.0</code> while <code>proto/order</code> selects <code>common v2.0.0</code> in an independent graph.
+Each module has its own <code>protobuf.mod</code> and <code>protobuf.lock</code>. For example, <code>proto/user</code> can select <code>common v1.3.0</code> while <code>proto/order</code> selects <code>common/v2 v2.0.0</code> in an independent graph.
 
 Independent graphs do not guarantee that their combined generation output is compatible:
 
@@ -52,14 +52,14 @@ module github.com/acme/user
 roots proto
 require (
     github.com/acme/common v1.2.0
-    github.com/acme/weather v2.1.0
+    github.com/acme/weather/v2 v2.1.0
 )
-replace github.com/acme/weather => ../weather-fork
+replace github.com/acme/weather/v2 => ../weather-fork
 ~~~
 
 <code>roots</code> is relative to the manifest directory and defaults to <code>.</code>. The <code>get</code> and <code>mod</code> commands find the nearest ancestor manifest within the workspace. Transitive requirements are recorded with <code>// indirect</code>.
 
-A relative <code>replace</code> target is resolved from its owning <code>protobuf.mod</code>; an absolute target is used directly. Generation and linting support local replacements. <code>get</code>, <code>mod tidy</code>, <code>mod update</code>, and <code>mod vendor</code> reject them: remove replacements before these commands create or use a reproducible Git lock. This is command validation, not a CI rule rejecting commits.
+A relative <code>replace</code> target is resolved from its owning <code>protobuf.mod</code>; an absolute target is used directly. Outside <code>--frozen</code>, generation, linting, <code>get</code>, <code>mod tidy</code>, <code>mod update</code>, <code>mod download</code>, and <code>mod vendor</code> all operate on the local effective graph while keeping <code>protobuf.lock</code> byte-for-byte untouched (never creating a lock or writing local/fork-only transitives into it). Remove replacements and run <code>mod tidy</code> to produce a publishable lock. Only explicit <code>--frozen</code> rejects <code>replace</code> directives (including unused ones) before accessing paths or fetching dependencies.
 
 For nested Git modules, require each identity declared by its manifest. Versionless requirements need no tags. Version <code>v1.2.3</code> of a module in <code>proto/user</code> uses tag <code>proto/user/v1.2.3</code>.
 
@@ -78,7 +78,7 @@ modules:
 
 During <code>tidy</code>, <code>get</code>, and <code>update</code>, a fetched previously locked SemVer must match its recorded commit and hash. A mismatch raises <code>ErrLockedVersionChanged</code> before installing the new graph or writing the manifest or lock, including for transitive requirements and warm caches. A new version may be selected; unconstrained versionless requirements still refresh to HEAD, while explicit SHAs stay pinned.
 
-<code>mod download</code> can retrieve the old commit after a tag moves if that commit remains available. The Go <code>dirhash.Hash1</code> digest covers Git-tracked regular files with repository-relative paths. Both newly downloaded and installed cached files are verified.
+<code>mod download</code> can retrieve the old commit after a tag moves if that commit remains available. The Go <code>dirhash.Hash1</code> digest is selective: it covers the materialized logical snapshot of selected <code>.proto</code> files and canonical EasyP/Buf configuration metadata (with repository-relative paths), omitting unrelated application code, documentation, and build outputs. Both newly downloaded and installed cached files are verified.
 
 ## Git object reuse
 

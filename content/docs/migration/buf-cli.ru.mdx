@@ -1,5 +1,77 @@
 ---
-title: "Buf CLI"
+title: "Миграция с Buf CLI"
+description: "Краткий чеклист перехода с Buf CLI (buf.yaml, buf.gen.yaml, buf.lock) на EasyP v1."
 ---
 
-## В работе
+EasyP v1 заменяет `buf.yaml`, `buf.gen.yaml` и `buf.lock` тремя специализированными файлами (`protobuf.mod`, `easyp.yaml`, `easyp.gen.yaml`) и `protobuf.lock`. EasyP компилирует `.proto` встроенным pure-Go компилятором `easyprotoc` (без установки `protoc`) и работает напрямую с Git-репозиториями без привязки к внешнему реестру схем.
+
+<Callout type="info">
+Команда `easyp migrate` предназначена для миграции проектов с **EasyP v0** (`easyp.yaml` + `easyp.lock`). Проекты на Buf CLI переходят путём создания нативных файлов v1 по шагам ниже и в [подробном руководстве по миграции с Buf](/ru/docs/guides/buf-migration).
+</Callout>
+
+## Соответствие файлов и команд
+
+| Buf CLI | EasyP v1 | Примечание |
+| --- | --- | --- |
+| `buf.yaml` (`modules`, `deps`) | `protobuf.mod` | Канонический Git `module`, `roots`, `require` и локальные `replace` |
+| `buf.lock` | `protobuf.lock` | Зафиксированные SHA Git-коммитов, селективные хеши `dirhash.Hash1` и привязки BSR |
+| `buf.yaml` (`lint`, `breaking`) | `easyp.yaml` | 44 правила линтинга (`MINIMAL`/`BASIC`/`STANDARD`/`COMMENTS`) и 69 правил breaking (`FILE`/`PACKAGE`/`WIRE_JSON`/`WIRE`) |
+| `buf.gen.yaml` | `easyp.gen.yaml` | `generate` (`modules`, `paths`, `packages`, `managed`), `options.go.package_prefix` и `plugins` (`name`/`path`/`command`/`remote`) |
+| `buf dep update` | `easyp mod tidy` | Разрешает `protobuf.mod` по MVS и записывает `protobuf.lock` |
+| `buf lint` | `easyp lint` | Запускает эффективную политику линтинга из `easyp.yaml` |
+| `buf breaking --against .git#branch=main` | `easyp breaking --against main` | Сравнивает с любой локальной веткой, тегом или SHA коммита Git |
+| `buf generate` | `easyp generate` (`easyp g`) | Запускает плагины для ближайшего `easyp.gen.yaml` (`--project`, `--all` или `--config <файл>`) |
+
+## Краткий чеклист
+
+1. **Создайте `protobuf.mod`** для каждого модуля с каноническим Git-именем, корнями `roots` и Git-зависимостями `require`:
+
+```text
+module github.com/acme/contracts
+roots proto
+
+require (
+    github.com/googleapis/googleapis 03a91044136a014466d4293eb1fe91f2b02075d2
+)
+```
+
+Внешние Git-репозитории с конфигом Buf v1, v1beta1 или v2 (`buf.yaml` / `buf.work.yaml`, включая фильтры `includes`/`excludes` и 5 популярных BSR-модулей через `bsr.StaticResolver`) подключаются напрямую без переписывания исходного репозитория. См. [Git-зависимости с конфигом Buf](/ru/docs/cli/package-manager/easyp-vs-buf).
+
+2. **Создайте `easyp.yaml`** для политик линтинга и совместимости:
+
+```yaml
+version: v1
+linters:
+  default: STANDARD
+breaking:
+  baseline: git:main
+  categories: [FILE]
+```
+
+3. **Создайте `easyp.gen.yaml`** для кодогенерации (используйте `generate.paths`, `generate.packages` или объекты `{ module, paths, packages }` в `generate.modules` для точного переноса фильтров Buf):
+
+```yaml
+version: v1
+generate:
+  modules: [github.com/acme/contracts]
+plugins:
+  - remote: plugins.easyp.tech/protocolbuffers/go
+    version: v1.36.11
+    out: ./gen/go
+    opts:
+      paths: source_relative
+```
+
+4. **Разрешите зависимости и проверьте результат** до удаления `buf.*`:
+
+```bash
+easyp mod tidy
+easyp validate-config
+easyp lint
+easyp breaking --against main
+easyp generate
+```
+
+5. **Закрепите проверки в CI** флагом `--frozen` (`easyp mod download --frozen`, `easyp lint --frozen`, `easyp breaking --frozen --against "$BASE_REF"`, `easyp generate --frozen`).
+
+Полное пошаговое руководство с managed mode и мультимодульными проектами — на странице [Миграция с Buf на EasyP](/ru/docs/guides/buf-migration).

@@ -1,135 +1,140 @@
 ---
 title: "What is EasyP?"
+description: "Overview of EasyP v1: pure-Go easyprotoc compiler, Git-native dependencies, linting, breaking-change detection, and code generation."
 ---
 
-EasyP is a modern Protocol Buffers toolkit that consolidates your entire protobuf workflow into a single, powerful CLI tool. It combines linting, package management, code generation, and compatibility checking in a unified interface designed to eliminate the complexity of traditional protobuf development.
+EasyP is a modern Protocol Buffers toolkit that consolidates your protobuf workflow into a single CLI tool (`easyp`) plus an optional MCP server (`easyp-mcp`). It combines a pure-Go compiler, linting, Git-native package management, code generation, and breaking-change detection in one cohesive workflow.
 
 <Callout type="info">
-Just want to try it out? Skip to the [Quickstart](/docs/introduction/quickstart).
+Just want to try it out? Skip to the [Quickstart](/docs/introduction/quickstart) or browse hosted plugins in the [Plugin Registry](/plugins).
 </Callout>
 
 ## The Problem: Fragmented Proto Workflows
 
-Working with Protocol Buffers across projects creates unnecessary complexity and friction:
+Working with Protocol Buffers across projects often creates unnecessary friction:
 
 ### Tool Chaos
-- **Multiple tools for different tasks**: Separate tools for linting, generation, and dependency management
-- **Inconsistent configurations**: Different config formats across projects and teams
-- **Complex setup**: Time-consuming onboarding for new developers joining projects
+- **Multiple tools for different tasks**: Separate binaries for `protoc`, linting, breaking checks, generation, and dependency syncing
+- **Inconsistent configurations**: Different ad-hoc shell scripts and flags across services and teams
+- **Complex onboarding**: Developers must install matching `protoc` and plugin versions locally before compiling a single file
 
-### Dependency Management Issues  
-- **No standardized approach**: Each project handles proto dependencies differently
-- **Version conflicts**: Difficult to resolve conflicts between different proto libraries
-- **Build reproducibility**: Hard to ensure consistent builds across environments
+### Dependency Management Issues
+- **No standardized approach**: Projects copy `.proto` files manually or rely on fragile Git submodules
+- **Version conflicts**: Difficult to resolve transitive proto libraries cleanly across teams
+- **Build reproducibility**: Hard to guarantee identical descriptors and generated code between laptops and CI
 
-### Development Friction
-- **Manual processes**: Repetitive workflows for common proto tasks
-- **Configuration sprawl**: Multiple config files with different formats
-- **Time-consuming compatibility checks**: Manual verification of API changes
+### Compatibility & Maintenance Risk
+- **Manual reviews**: Breaking API changes slip through without automated checks against Git baselines
+- **Vendor lock-in**: Teams are pushed toward proprietary registries when all their schemas already live in Git
 
-## The Solution: Unified Proto Toolkit
+## The Solution: EasyP v1
 
-EasyP addresses these challenges by providing a comprehensive, opinionated toolkit that standardizes protobuf workflows:
+EasyP replaces fragile `protoc` scripts with a self-contained v1 workflow built around four pillars:
 
-### One Tool, All Tasks
-Instead of juggling multiple tools, EasyP provides everything you need:
-- **Linting** with comprehensive rule sets
-- **Package management** with Git-native dependencies
-- **Code generation** with local and remote plugin support
-- **Breaking change detection** for API compatibility
+### Built-in Pure-Go Compiler (`easyprotoc`)
+EasyP v1 compiles `.proto` files with its own pure-Go compiler, **`easyprotoc`** (`v0.1.1`) — **no `protoc` installation is required** and third-party compiler/parser wrappers (`protocompile`, `go-protoparser`) are no longer needed:
+- Produces `FileDescriptorSet` output equivalent to `protoc` (verified on the full `googleapis` corpus in CI), including source info, comments, and custom options
+- Ships standard `google/protobuf/*.proto` well-known types built in
+- Supports **proto2**, **proto3**, and **Protobuf Editions 2023**
+- Compiles in parallel across all CPU cores (for example, compiling all 7,416 `googleapis` files with `--include_imports --include_source_info` takes ~0.88 s vs ~3.83 s for `protoc` on Apple M5 Pro)
 
-### Standardized Configuration
-A single `easyp.yaml` file configures your entire protobuf workflow, eliminating configuration sprawl and ensuring consistency across projects.
+### Clear Separation of Concerns in Configuration
+Instead of overloading one file with unrelated concerns, EasyP v1 separates configuration into three focused files plus a lockfile:
+- **`protobuf.mod`** (+ **`protobuf.lock`**) — module identity, source `roots`, Git `require` dependencies with Minimal Version Selection (MVS), and local `replace` overrides
+- **`easyp.yaml`** — lint policies (`44` built-in rules) and breaking-change checks (`69` rules across `FILE`, `PACKAGE`, `WIRE_JSON`, and `WIRE`)
+- **`easyp.gen.yaml`** — generation targets (`modules`, `paths`, `packages`), managed mode, and code-generation `plugins`
 
 ### Git-Native Dependencies
-Direct integration with Git repositories for proto dependencies eliminates the need for centralized registries while providing version control and reproducibility.
+Any Git repository (GitHub, GitLab, Bitbucket, or private self-hosted Git) works directly as a protobuf module. EasyP verifies full commit SHAs and selective `dirhash.Hash1` digests in `protobuf.lock`, and supports `--frozen` mode in CI for zero-mutation reproducible builds.
+
+### AI-Ready Configuration via `easyp-mcp`
+Release archives, Homebrew, and Go installs also provide `easyp-mcp`, a stdio Model Context Protocol server exposing `easyp_config_describe` backed by the exact same JSON Schemas used by `easyp validate-config`.
 
 ## Key Features
 
 | Feature | Description |
 |---------|-------------|
-| 🔍 **Comprehensive Linting** | Built-in support for buf's linting rules with customizable configurations to enforce API design best practices. |
-| 📦 **Smart Package Manager** | Git-based dependency management with lock file support for reproducible builds across environments. |
-| ⚡ **Code Generation** | Multi-language code generation with support for both local protoc plugins and remote plugin execution. |
-| 🔄 **Breaking Change Detection** | Automated API compatibility verification against Git branches to prevent accidental breaking changes. |
-| 🌐 **Remote Plugin Support** | Execute plugins via centralized EasyP API service for consistent, isolated execution without local dependencies. |
-| 🎯 **Developer Experience** | Auto-completion, intuitive commands, clear error messages, and comprehensive documentation. |
+| **Built-in `easyprotoc` Compiler** | Pure-Go `.proto` compiler with zero `protoc` dependency, built-in well-known types, and Protobuf Editions 2023 support. |
+| **Comprehensive Linting** | 44 rules organized across `MINIMAL`, `BASIC`, `DEFAULT`, `COMMENTS`, and `UNARY_RPC` with reusable remote `extends` policies. |
+| **Breaking Change Detection** | 69 descriptor-backed rules across `FILE`, `PACKAGE`, `WIRE_JSON`, and `WIRE` profiles compared against any Git branch, tag, or commit. |
+| **Git-Native Package Manager** | MVS dependency resolution, `easyp get`, `mod tidy`/`download`/`update`/`vendor`, local `replace`, and cryptographic `protobuf.lock` verification. |
+| **Flexible Code Generation** | 15 built-in WASM plugins, local `PATH`/`path`/`command` plugins, and hosted or self-hosted remote plugins via EasyP API Service. |
+| **Developer & Agent Experience** | `easyp validate-config`, `--format json`, bash/zsh completions, and the `easyp-mcp` stdio server. |
 
-## Supported Plugin Types
+## Supported Plugin Sources
 
-EasyP provides flexibility in how you execute code generation plugins:
+In `easyp.gen.yaml`, each entry under `plugins:` selects one of four execution sources:
 
-### Local Plugins
-Standard protoc plugins installed on your system:
+### Local or Built-in WASM Plugins (`name:`)
+Uses `protoc-gen-<name>` from `PATH`, or falls back to one of the **15 built-in WASM plugins** (`cpp`, `csharp`, `java`, `kotlin`, `objc`, `php`, `python`, `ruby`, and `grpc_*` counterparts):
 ```yaml
+version: v1
 plugins:
-  - name: go
-    out: .
+  - name: python
+    out: ./gen/python
+```
+
+### Explicit Binary Path (`path:`)
+Invokes a specific executable path (resolved relative to the working directory where `easyp generate` starts):
+```yaml
+version: v1
+plugins:
+  - path: ./tools/bin/protoc-gen-custom
+    out: ./gen/custom
+```
+
+### Command + Arguments (`command:`)
+Runs a wrapper script, interpreter, or tool launcher such as `go run` or `npx`:
+```yaml
+version: v1
+plugins:
+  - command: ["go", "run", "./cmd/protoc-gen-internal"]
+    out: ./gen/internal
+```
+
+### Remote Plugins (`remote:` + `version:`)
+Executes pinned plugins remotely via [`plugins.easyp.tech`](/plugins) or a self-hosted [EasyP API Service](/docs/api-service/overview) — no local plugin installation needed:
+```yaml
+version: v1
+plugins:
+  - remote: plugins.easyp.tech/protocolbuffers/go
+    version: v1.36.11
+    out: ./gen/go
     opts:
       paths: source_relative
 ```
 
-### Remote Plugins
-Plugins executed via EasyP API service for consistent results:
-```yaml
-plugins:
-  - remote: api.easyp.tech/protoc-gen-typescript:latest
-    out: ./web/generated
-```
-
-### Custom Plugins
-Support for custom plugin development and distribution through the ecosystem.
-
 ## Decentralized Package Management
 
-Unlike other tools, EasyP doesn't rely on a centralized server for package distribution. Instead, any Git repository can serve as a package source, giving you:
+Unlike tools centered on a hosted registry, any Git repository can serve as a module source:
 
-- **Flexibility and Control**: Use any Git hosting service (GitHub, GitLab, self-hosted)
-- **No Vendor Lock-in**: Your dependencies aren't tied to a specific registry
-- **Version Control**: Full Git history and branching for your proto dependencies
-- **Enterprise-Friendly**: Works with private repositories and corporate Git infrastructure
+- **Flexibility and Control**: Works with GitHub, GitLab, Bitbucket, and private corporate Git servers
+- **No Vendor Lock-in**: Schemas stay in your repositories with your existing access controls and review process
+- **Reproducible by Default**: `protobuf.lock` pins full Git commit SHAs and content hashes, enforced by `--frozen` in CI
 
-## Using Buf-configured dependencies
+## Using Buf-Configured Dependencies
 
-An EasyP v1 project declares Git dependencies in `protobuf.mod`. When a Git dependency uses Buf v1 or v2 configuration, EasyP reads its declared proto roots for imports. Older EasyP dependency configuration is supported in the same way. The consuming project still uses separate `protobuf.mod`, `easyp.gen.yaml`, and `easyp.yaml` files.
+An EasyP v1 project declares Git dependencies in `protobuf.mod`. When a Git dependency uses Buf v1, v1beta1, or v2 configuration (`buf.yaml` / `buf.work.yaml`), EasyP reads its declared roots, `includes`/`excludes` filters, and supported compatibility BSR mappings automatically. Older EasyP v0 dependency repositories are supported in the same way, while the consuming project uses native `protobuf.mod`, `easyp.gen.yaml`, and `easyp.yaml` files.
 
 See [Buf-configured Git dependencies](/docs/cli/package-manager/easyp-vs-buf) for supported formats and limits.
-
-## Our Goals for Protobuf
-
-EasyP's mission is to accelerate the adoption of **schema-driven API development** by making Protocol Buffers more accessible and reliable:
-
-### Modern Protobuf Ecosystem
-We're building on Protobuf's proven foundation to create a modern development experience that rivals the simplicity of REST/JSON while providing superior type safety and performance.
-
-### Developer Experience First
-Every feature is designed with developer productivity in mind, from intuitive CLI commands to comprehensive error messages and documentation.
-
-### Enterprise Ready
-Built for teams and organizations with features like reproducible builds, private repository support, and comprehensive CI/CD integration.
 
 ## Why Choose EasyP?
 
 ### For Individual Developers
-- **Quick Setup**: Get started with protobuf projects in minutes, not hours
-- **Unified Workflow**: One tool for all your protobuf needs
-- **Clear Documentation**: Comprehensive guides and examples
+- **Zero `protoc` setup**: Install one binary and start linting, checking compatibility, and generating code in minutes
+- **Unified Workflow**: One consistent CLI across all protobuf tasks
+- **Clear Diagnostics**: Exact file, line, and column diagnostics for syntax, lint, breaking, and config validation
 
 ### For Teams
-- **Consistent Standards**: Enforced linting rules and formatting across all projects
-- **Reproducible Builds**: Lock files ensure everyone builds the same way
-- **Easy Onboarding**: New team members can be productive immediately
+- **Consistent Standards**: Share organization-wide lint and breaking policies via Git modules (`extends`)
+- **Reproducible Builds**: `protobuf.lock` and `--frozen` keep laptops and CI in sync
+- **Multi-Language Ready**: Mix built-in WASM, local `path`/`command`, and remote plugins in one `easyp.gen.yaml`
 
 ### For Organizations
-- **No Vendor Lock-in**: Git-based dependencies work with your existing infrastructure
-- **Enterprise Security**: Support for private repositories and custom authentication
-- **CI/CD Ready**: Designed for automated workflows and continuous integration
+- **No Vendor Lock-in**: Git-native modules work with existing private repositories and air-gapped networks
+- **Self-Hostable Plugin Service**: Run your own [EasyP API Service](/docs/api-service/overview) for internal plugins
+- **CI/CD Native**: Built for automated verification with [GitHub Actions](/docs/ci-cd/github-actions) and [GitLab CI](/docs/ci-cd/gitlab)
 
 ## What's Next?
 
-EasyP simplifies protobuf development so you can focus on building great APIs instead of managing toolchain complexity. Whether you're starting a new project or migrating from existing tools, EasyP provides a smooth path to modern protobuf development.
-
-Ready to get started? Check out our [Installation Guide](/docs/introduction/install) and [Quickstart Tutorial](/docs/introduction/quickstart).
-
-## Stargazers over time
-[](https://starchart.cc/easyp-tech/easyp)
+Ready to get started? Continue with the [Installation Guide](/docs/introduction/install) and [Quickstart Tutorial](/docs/introduction/quickstart), or check the [Roadmap](/roadmap) to see what is coming next.

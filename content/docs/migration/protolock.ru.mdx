@@ -1,5 +1,60 @@
 ---
-title: "Protolock"
+title: "Переход с protolock на EasyP v1"
+description: "Замена файла proto.lock на проверку breaking changes по истории Git в EasyP v1."
 ---
 
-## В процессе разработки
+`protolock` отслеживает ломающие изменения, храня и обновляя JSON-снимок `proto.lock` рядом с `.proto`-файлами. EasyP v1 заменяет этот дополнительный снимок прямым сравнением дескрипторов по истории Git по **69 правилам совместимости** в четырёх профилях (`FILE`, `PACKAGE`, `WIRE_JSON` и `WIRE`).
+
+## Соответствие концепций
+
+| `protolock` | EasyP v1 | Примечание |
+| --- | --- | --- |
+| `protolock init` / `proto.lock` | История Git (`breaking.baseline`) | Сравнение с любой локальной веткой, тегом или SHA коммита — файл `proto.lock` больше не нужен |
+| `protolock status` | `easyp breaking` | Проверка совместимости относительно `breaking.baseline` или `--against <ref>` |
+| `protolock commit` | Обычный `git commit` / merge | После слияния в базовую ветку (например `main`) новая схема автоматически становится базой |
+| `protolock status --uptodate` | CI `easyp breaking --frozen --against "$BASE_REF"` | Блокирует PR при ломающих изменениях и проверяет зафиксированный `protobuf.lock` |
+
+## 1. Настройте `protobuf.mod` и `easyp.yaml`
+
+Объявите корень модуля в `protobuf.mod`:
+
+```text
+module github.com/acme/contracts
+roots proto
+```
+
+Задайте базовую ветку и профиль совместимости в `easyp.yaml`:
+
+```yaml
+version: v1
+breaking:
+  baseline: git:main
+  categories: [FILE]
+  ignore_unstable: false
+```
+
+- Выберите `FILE` (по умолчанию) для полной совместимости исходников и сгенерированного кода, `PACKAGE` для разрешения переноса объявлений между файлами одного пакета, `WIRE_JSON` для бинарной + JSON-совместимости или `WIRE` только для бинарной совместимости.
+- Поле `breaking.ignore` (пути относительно `easyp.yaml`) исключает экспериментальные или внутренние подкаталоги.
+
+## 2. Проверьте локально и в CI
+
+Один раз создайте `protobuf.lock` командой `easyp mod tidy`, закоммитьте `protobuf.mod`, `protobuf.lock` и `easyp.yaml`, затем выполните:
+
+```bash
+easyp validate-config
+easyp breaking --against main
+```
+
+В CI выгружайте полную историю Git (`fetch-depth: 0` или `GIT_DEPTH: "0"`) и передавайте `--frozen`, чтобы проверять совместимость относительно целевой ветки или базового коммита PR без изменения файлов:
+
+```bash
+easyp validate-config
+easyp mod download --frozen
+easyp breaking --frozen --against origin/main
+```
+
+## 3. Удалите `proto.lock`
+
+Запускайте `easyp breaking` параллельно с `protolock status` на нескольких pull request, чтобы убедиться в покрытии требований команды, после чего удалите `proto.lock` и старый шаг `protolock` в CI.
+
+Подробнее о профилях и правилах — в [справочнике breaking changes](/ru/docs/cli/breaking-changes) и руководстве [Breaking-проверки в CI](/ru/docs/guides/breaking-checks-ci).

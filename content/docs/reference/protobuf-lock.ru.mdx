@@ -12,8 +12,8 @@ description: "Спецификация файла protobuf.lock, автомат�
 <TypeTable
   type={{
     version: {
-      description: "Версия формата lock-файла. Текущая версия — 1.",
-      type: "number",
+      description: "Целочисленная версия формата lock-файла. Текущая версия — 1.",
+      type: "integer",
       default: "1"
     },
     modules: {
@@ -39,6 +39,22 @@ description: "Спецификация файла protobuf.lock, автомат�
     "modules[].roots": {
       description: "Необязательные проверенные fallback-каталоги корней импортов от закреплённого снимка Git-репозитория зависимости без метаданных. Используются на холодном кеше и в frozen; не переопределяют корни из метаданных зависимости.",
       type: "string[]"
+    },
+    "modules[].bsr": {
+      description: "Необязательные привязки BSR-зависимостей, записанные у требующего их Git-модуля; frozen-команды воспроизводят их без обращения к резолверу.",
+      type: "object[]"
+    },
+    "modules[].bsr[].dependency": {
+      description: "Исходный BSR-запрос из buf.yaml/buf.lock зависимости: обязательные module и config (относительный путь к buf.yaml), а также опциональные reference, commit (32 hex-символа) и digest.",
+      type: "object"
+    },
+    "modules[].bsr[].git": {
+      description: "Выбранный Git-источник: обязательные module и закреплённая version (SemVer или полный SHA коммита).",
+      type: "object"
+    },
+    "modules[].bsr[].resolution": {
+      description: "Режим сопоставления: compatibility_snapshot (фиксированный Git-снимок без проверки эквивалентности ревизии и дайджеста BSR) или exact_revision.",
+      type: "string"
     }
   }}
 />
@@ -55,6 +71,18 @@ modules:
     version: v1.2.3
     commit: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
     hash: h1:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
+  - source: github.com/acme/buf-service
+    version: v1.0.0
+    commit: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+    hash: h1:BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB=
+    bsr:
+      - dependency:
+          module: buf.build/googleapis/googleapis
+          config: buf.yaml
+        git:
+          module: github.com/googleapis/googleapis
+          version: 03a91044136a014466d4293eb1fe91f2b02075d2
+        resolution: compatibility_snapshot
 ~~~
 
 ---

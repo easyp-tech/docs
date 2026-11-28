@@ -1,21 +1,23 @@
 ---
 title: "CLI"
-description: "EasyP command-line toolkit: lint, generate, mod, breaking."
+description: "EasyP v1 command-line toolkit: lint, breaking, generate, mod, get, migrate, validate-config, and more."
 ---
 
-The EasyP CLI is the local toolkit for Protocol Buffers workflows.
+The EasyP CLI is the local toolkit for Protocol Buffers workflows, powered by the built-in pure-Go `easyprotoc` compiler (no `protoc` required). Release archives, Homebrew, and Go installs also ship the `easyp-mcp` stdio server for AI clients.
 
-| Command | Purpose |
-|---------|---------|
-| `easyp lint` | Enforce API design rules |
-| `easyp breaking` | Detect breaking changes |
-| `easyp generate` | Run local/remote plugins |
-| `easyp mod` | Git-based dependencies |
-| `easyp init` | Project bootstrap |
-| `easyp validate-config` | Recursively validate v1 configuration and module files |
-| `easyp ls-files` | List local protos and reachable imports |
-| `easyp schema-gen` | Generate v1 JSON Schemas |
-| `easyp completion bash\|zsh` | Print a shell completion script |
+| Command | Alias | Purpose |
+|---------|-------|---------|
+| `easyp lint` | `l` | Enforce API design rules (44 built-in rules) |
+| `easyp breaking` | — | Detect breaking changes against Git baselines (69 rules across 4 profiles) |
+| `easyp generate` | `g` | Run built-in WASM, local (`name`/`path`/`command`), or remote plugins and export descriptors |
+| `easyp mod` | `m` | Manage Git-based dependencies (`download`, `tidy`, `update`, `vendor`) |
+| `easyp get` | — | Add a direct Git module (`<module>[@version\|@tag\|@commit]`) and resolve transitive dependencies |
+| `easyp init` | `i` | Initialize native v1 `protobuf.mod`, `easyp.yaml`, and `easyp.gen.yaml` |
+| `easyp migrate` | — | Guided wizard or preview-first migration from EasyP v0 to v1 |
+| `easyp validate-config` | `validate` | Recursively validate v1 configuration, named profiles, and module/lock files |
+| `easyp ls-files` | `ls` | List local protos and reachable imports (`-I` / `--include-imports`, `--format json`) |
+| `easyp schema-gen` | — | Generate v1 JSON Schemas for `easyp.yaml`, `easyp.gen.yaml`, and `protobuf.lock` |
+| `easyp completion bash\|zsh` | — | Print a shell completion script for bash or zsh |
 
 ## Sections
 

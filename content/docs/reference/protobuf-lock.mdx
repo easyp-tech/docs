@@ -13,7 +13,7 @@ description: "Specification for protobuf.lock, the generated lockfile securing r
   type={{
     version: {
       description: "Lockfile format version integer. Currently 1.",
-      type: "number",
+      type: "integer",
       default: "1"
     },
     modules: {
@@ -39,6 +39,22 @@ description: "Specification for protobuf.lock, the generated lockfile securing r
     "modules[].roots": {
       description: "Optional verified fallback import-root directories relative to a metadata-free dependency's pinned Git repository snapshot. Replayed on cold-cache and frozen operations; does not override authoritative dependency metadata.",
       type: "string[]"
+    },
+    "modules[].bsr": {
+      description: "Optional BSR dependency bindings recorded on the requiring Git module so frozen commands replay them without consulting a resolver.",
+      type: "object[]"
+    },
+    "modules[].bsr[].dependency": {
+      description: "Original BSR request from the dependency's buf.yaml/buf.lock: required module and config (relative buf.yaml path), plus optional reference, commit (32-hex BSR commit), and digest.",
+      type: "object"
+    },
+    "modules[].bsr[].git": {
+      description: "Resolved Git target: required module identity and pinned version (SemVer or full commit SHA).",
+      type: "object"
+    },
+    "modules[].bsr[].resolution": {
+      description: "Mapping strategy: compatibility_snapshot (fixed Git snapshot; BSR revision equivalence and digest are not verified) or exact_revision.",
+      type: "string"
     }
   }}
 />
@@ -55,6 +71,18 @@ modules:
     version: v1.2.3
     commit: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
     hash: h1:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
+  - source: github.com/acme/buf-service
+    version: v1.0.0
+    commit: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+    hash: h1:BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB=
+    bsr:
+      - dependency:
+          module: buf.build/googleapis/googleapis
+          config: buf.yaml
+        git:
+          module: github.com/googleapis/googleapis
+          version: 03a91044136a014466d4293eb1fe91f2b02075d2
+        resolution: compatibility_snapshot
 ~~~
 
 ---

@@ -177,7 +177,7 @@ generate:
     - proto/user
 
 plugins:
-  - remote: gen.easyp.tech/es
+  - remote: plugins.easyp.tech/bufbuild/es
     version: v2.0.0
     out: ./src/gen
     opts:
@@ -224,7 +224,7 @@ The generator selects module sources by default. Nonempty <code>generate.package
 
 Remote plugins require a <code>version</code> such as <code>v2.0.0</code>. EasyP sends that exact version to the remote generator. For local <code>protoc-gen-&#42;</code> executables and bundled WASM plugins, the executable selected at runtime determines the version; the separate <code>version</code> field is rejected because EasyP cannot verify it.
 
-For bundled names such as <code>go</code> and <code>go-grpc</code>, a matching <code>protoc-gen-*</code> executable on <code>PATH</code> takes precedence. Otherwise EasyP uses the bundled WASM plugin. Use <code>path</code> or <code>command</code> to select an explicit executable.
+For the **15 built-in WASM plugin names** (`cpp`, `csharp`, `java`, `kotlin`, `objc`, `php`, `python`, `ruby`, `grpc_cpp`, `grpc_csharp`, `grpc_java`, `grpc_objc`, `grpc_php`, `grpc_python`, `grpc_ruby`), a matching `protoc-gen-*` executable on `PATH` takes precedence, and EasyP falls back to the bundled WASM binary if none is installed. Other plugin names such as `go` and `go-grpc` are **not** bundled as WASM and require a matching `protoc-gen-*` binary on `PATH` (or use `path`, `command`, or `remote` with `version`).
 
 Each plugin declares exactly one source: <code>name</code>, <code>path</code>, <code>command</code>, or <code>remote</code>. Use <code>path</code> for a specific binary and <code>command</code> for an executable plus arguments. Both run from the directory where <code>easyp generate</code> starts and, like any Protobuf plugin, must read a <code>CodeGeneratorRequest</code> from stdin and write a <code>CodeGeneratorResponse</code> to stdout.
 
@@ -243,7 +243,7 @@ The separate <code>version</code> field is also unavailable for <code>path</code
 
 By default, <code>easyp generate</code> selects the closest config in the current directory or a workspace ancestor. Repeat <code>--project</code> to choose multiple consumers explicitly; <code>--all</code> separately opts into recursive selection. <code>--workspace</code> sets the boundary for module paths and inheritance.
 
-Use <code>easyp generate --gen-config private.easyp.gen.yaml</code> to select one native generation file with a different name. The path is relative to the invocation directory, or absolute, and must remain inside the workspace. This flag is mutually exclusive with <code>--project</code> and <code>--all</code>; the global policy selector <code>--config</code> cannot replace it. A missing or invalid file fails without a fallback. Defaults and recursive discovery still use <code>easyp.gen.yaml</code>.
+Use <code>easyp generate --config private.easyp.gen.yaml</code> to select one native generation file with a different name. The path is relative to the invocation directory, or absolute, and must remain inside the workspace. This flag is mutually exclusive with <code>--project</code> and <code>--all</code>. Names ending in <code>.easyp.yaml</code> are rejected as policy files instead of being parsed as generation configs. A missing or invalid file fails without a fallback. Defaults and recursive discovery still use <code>easyp.gen.yaml</code>.
 
 The selected file's directory remains the base for plugin output paths. Module selectors and source filters keep their existing workspace/module coordinates. Options inherit only from standard <code>easyp.gen.yaml</code> files in ancestor directories, not a sibling file in the same directory. See [named generation configs](/docs/cli/generator#named-generation-configs).
 
@@ -251,7 +251,7 @@ The selected file's directory remains the base for plugin output paths. Module s
 
 ## Managed-option validation
 
-Both configuration validation and generation reject unknown managed file or field options and values of the wrong type. Boolean options such as <code>java_multiple_files</code> require a YAML boolean, not a quoted string. String options require strings. <code>optimize_for</code> accepts <code>SPEED</code>, <code>CODE_SIZE</code> or <code>LITE_RUNTIME</code>; <code>jstype</code> accepts <code>JS_NORMAL</code>, <code>JS_STRING</code> or <code>JS_NUMBER</code>. Invalid rules cannot silently fall back to managed defaults.
+Both configuration validation and generation reject unknown managed file or field options and values of the wrong type. EasyP supports **19 managed `file_option` values** (`go_package`, `go_package_prefix`, `java_package`, `java_package_prefix`, `java_package_suffix`, `java_multiple_files`, `java_outer_classname`, `java_string_check_utf8`, `csharp_namespace`, `csharp_namespace_prefix`, `ruby_package`, `ruby_package_suffix`, `php_namespace`, `php_metadata_namespace`, `php_metadata_namespace_suffix`, `objc_class_prefix`, `swift_prefix`, `optimize_for`, `cc_enable_arenas`) and **1 managed `field_option`** (`jstype`). Boolean options such as <code>java_multiple_files</code> and <code>cc_enable_arenas</code> require a YAML boolean, not a quoted string. String options require strings. <code>optimize_for</code> accepts <code>SPEED</code>, <code>CODE_SIZE</code> or <code>LITE_RUNTIME</code>; <code>jstype</code> accepts <code>JS_NORMAL</code>, <code>JS_STRING</code> or <code>JS_NUMBER</code>. Invalid rules cannot silently fall back to managed defaults.
 
 Place a remote version in the separate <code>version</code> field, not after a colon in the final plugin path. A server port in the host is allowed. For example, use <code>remote: localhost:8080/go</code> with <code>version: v1.2.3</code>.
 

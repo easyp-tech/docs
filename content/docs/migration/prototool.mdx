@@ -1,64 +1,83 @@
 ---
 title: "Moving from prototool to EasyP v1"
+description: "Translate prototool.yaml (protoc, lint, break, and generate sections) to EasyP v1."
 ---
 
-Map the existing source roots, plugins and checks to v1 explicitly. The <code>easyp migrate</code> command accepts EasyP v0 configuration, not arbitrary scripts or another tool's configuration. Keep the original inputs and generated output for comparison.
+`prototool` combined `protoc` downloading, linting, breaking checks, and code generation in a single `prototool.yaml`. EasyP v1 replaces `prototool.yaml` with three focused files (`protobuf.mod`, `easyp.yaml`, and `easyp.gen.yaml`) and compiles `.proto` files directly with its built-in pure-Go `easyprotoc` compiler — no `protoc` download or version pinning is required.
 
-## Module and source roots
+## Mapping `prototool.yaml` to EasyP v1
 
-<code>protobuf.mod</code>:
+| `prototool.yaml` section | EasyP v1 equivalent | Notes |
+| --- | --- | --- |
+| `protoc.version` | Not needed | EasyP embeds the pure-Go `easyprotoc` compiler and standard `google/protobuf/*.proto` well-known types |
+| `protoc.includes` / `excludes` | `protobuf.mod` (`roots`, `require`) & `easyp.gen.yaml` (`generate.paths`) | External protos become Git `require` entries; sub-directory selection uses `generate.paths` |
+| `lint.group`, `lint.rules.add`/`remove`, `lint.ignores` | `easyp.yaml` (`linters.default`, `enable`, `disable`, `issues.exclude-rules`) | Map individual rules by name; presets (`MINIMAL`, `BASIC`, `STANDARD`, `COMMENTS`) differ from `uber2` |
+| `break.descriptor_set` / `prototool break check` | `easyp.yaml` (`breaking.baseline`, `categories`, `ignore`) + `easyp breaking` | Compares directly against Git branches, tags, or commit SHAs across `FILE`, `PACKAGE`, `WIRE_JSON`, and `WIRE` |
+| `generate.go_options` | `easyp.gen.yaml` (`options.go.package_prefix` or `generate.managed`) | Controls `go_package` without editing `.proto` files |
+| `generate.plugins` | `easyp.gen.yaml` (`plugins[]`) | Supports `name` (local `PATH` or 15 built-in WASM plugins), `path`, `command`, or `remote` + `version` |
 
-~~~text
+## 1. Declare roots and dependencies in `protobuf.mod`
+
+Replace `protoc.includes` and vendored third-party directories with `roots` and Git `require` entries:
+
+```text
 module github.com/acme/contracts
 roots proto
-~~~
 
-A file at <code>proto/hello/v1/hello.proto</code> has the import name <code>hello/v1/hello.proto</code>. If the previous invocation selected only part of a root, do not silently broaden it: v1 generates complete selected modules.
+require (
+    github.com/googleapis/googleapis 03a91044136a014466d4293eb1fe91f2b02075d2
+)
+```
 
-## Generation
+## 2. Translate lint and breaking rules to `easyp.yaml`
 
-<code>easyp.gen.yaml</code>:
-
-~~~yaml
-version: v1
-plugins:
-  - name: go
-    out: gen/go
-    opts: [paths=source_relative]
-  - name: go-grpc
-    out: gen/go
-    opts: [paths=source_relative]
-~~~
-
-Pin the actual plugin executables in the environment. Preserve existing <code>go_package</code> values and align them with the physical output. Set <code>with_imports: true</code> per plugin when imported contracts also need generated code; this is independent of descriptor export.
-
-## Check policy
-
-<code>easyp.yaml</code>:
-
-~~~yaml
+```yaml
 version: v1
 linters:
-  default: BASIC
+  default: STANDARD
+  disable:
+    - PACKAGE_VERSION_SUFFIX
+issues:
+  exclude-rules:
+    - path: proto/legacy
+      linters: [FIELD_LOWER_SNAKE_CASE]
 breaking:
   baseline: git:main
   categories: [FILE]
-~~~
+```
 
-Map individual checks by their actual identifiers and results; similarly named presets in different tools do not prove equivalence. <code>breaking.ignore</code> contains paths, not rule names.
+## 3. Translate `generate` to `easyp.gen.yaml`
 
-## Dependencies and result verification
+Replace `generate.go_options` and `generate.plugins` with `easyp.gen.yaml`. If `prototool.yaml` excluded directories or targeted a subset of files, use `generate.paths` or `generate.packages`:
 
-Declare external dependencies with <code>easyp get</code> or manifest <code>require</code> directives. An arbitrary proto import does not uniquely identify a Git source. Run <code>mod tidy</code> for initial resolution and commit the lock; subsequent checks use <code>mod download</code>, not an implicit version update.
+```yaml
+version: v1
+generate:
+  paths: [proto/api]
+options:
+  go:
+    package_prefix: github.com/acme/contracts/gen/go
+plugins:
+  - name: go
+    out: ./gen/go
+    opts:
+      paths: source_relative
+  - name: go-grpc
+    out: ./gen/go
+    opts:
+      paths: source_relative
+```
 
-~~~bash
-easyp validate-config
+Install `protoc-gen-go` and `protoc-gen-go-grpc` on `PATH`, or switch them to hosted remote plugins (`remote: plugins.easyp.tech/protocolbuffers/go` + `version:`).
+
+## 4. Validate and compare output
+
+```bash
 easyp mod tidy
+easyp validate-config
 easyp lint
 easyp breaking --against main
 easyp generate
-~~~
+```
 
-The selected baseline must exist locally. Compare filenames, import paths and contents with the old generator, then build and test the consumer. Keep the old scripts until this comparison succeeds. Multiple projects require repeated <code>--project</code> or explicit <code>--all</code>.
-
-For an existing EasyP v0 project, start with the [migration preview](/docs/migration/easyp-v0).
+Diff generated files against your previous `prototool generate` output and run your consumer tests before removing `prototool.yaml`. For an existing EasyP v0 project, start with the [EasyP v0 migration guide](/docs/migration/easyp-v0).

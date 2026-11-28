@@ -175,7 +175,7 @@ generate:
     - proto/user
 
 plugins:
-  - remote: gen.easyp.tech/es
+  - remote: plugins.easyp.tech/bufbuild/es
     version: v2.0.0
     out: ./src/gen
     opts:
@@ -222,7 +222,7 @@ plugins:
 
 Удалённому плагину нужен <code>version</code>, например <code>v2.0.0</code>. EasyP передаёт именно эту версию удалённому генератору. Для локального <code>protoc-gen-&#42;</code> и встроенного WASM версию определяет выбранный исполняемый файл; отдельное поле <code>version</code> отклоняется, поскольку EasyP не может его проверить.
 
-Для встроенных имён вроде <code>go</code> и <code>go-grpc</code> приоритет имеет соответствующий <code>protoc-gen-*</code> в <code>PATH</code>. Если его нет, EasyP использует встроенный WASM-плагин. Для явного выбора исполняемого файла задайте <code>path</code> или <code>command</code>.
+Для **15 встроенных WASM-плагинов** (`cpp`, `csharp`, `java`, `kotlin`, `objc`, `php`, `python`, `ruby`, `grpc_cpp`, `grpc_csharp`, `grpc_java`, `grpc_objc`, `grpc_php`, `grpc_python`, `grpc_ruby`) приоритет имеет соответствующий `protoc-gen-*` в `PATH`; если его нет, EasyP запускает встроенный WASM-плагин. Остальные имена, включая `go` и `go-grpc`, **не** встроены в WASM и требуют локального бинарника `protoc-gen-*` в `PATH` (либо явного `path`, `command` или `remote` с `version`).
 
 Для каждого плагина указывают ровно один источник: <code>name</code>, <code>path</code>, <code>command</code> или <code>remote</code>. <code>path</code> запускает конкретный бинарный файл, а <code>command</code> принимает список из программы и её аргументов. Оба варианта работают из каталога запуска <code>easyp generate</code> и, как любой плагин Protobuf, должны принимать <code>CodeGeneratorRequest</code> из stdin и возвращать <code>CodeGeneratorResponse</code> в stdout.
 
@@ -241,7 +241,7 @@ plugins:
 
 По умолчанию <code>easyp generate</code> выбирает ближайший конфиг в текущем или родительском каталоге workspace. Повторяйте <code>--project</code> для явного выбора нескольких потребителей; <code>--all</code> отдельно включает рекурсивный выбор. <code>--workspace</code> задаёт границу для путей модулей и наследования.
 
-Команда <code>easyp generate --gen-config private.easyp.gen.yaml</code> выбирает один нативный файл генерации с другим именем. Путь считается от каталога запуска или задаётся абсолютно и должен оставаться внутри workspace. Флаг несовместим с <code>--project</code> и <code>--all</code>; общий флаг выбора политик <code>--config</code> его не заменяет. Отсутствующий или некорректный файл вызывает ошибку без fallback. Автоматический и рекурсивный поиск по-прежнему используют <code>easyp.gen.yaml</code>.
+Команда <code>easyp generate --config private.easyp.gen.yaml</code> выбирает один нативный файл генерации с другим именем. Путь считается от каталога запуска или задаётся абсолютно и должен оставаться внутри workspace. Флаг несовместим с <code>--project</code> и <code>--all</code>. Файлы с суффиксом <code>.easyp.yaml</code> отклоняются как файлы политик. Отсутствующий или некорректный файл вызывает ошибку без fallback. Автоматический и рекурсивный поиск по-прежнему используют <code>easyp.gen.yaml</code>.
 
 Каталог выбранного файла остаётся базой путей результатов плагинов. Пути модулей и фильтры исходников сохраняют прежние координаты workspace/модуля. Опции наследуются только из стандартных <code>easyp.gen.yaml</code> в родительских каталогах, а не из соседнего файла в том же каталоге. См. [конфиги генерации с разными именами](/ru/docs/cli/generator#конфиги-генерации-с-разными-именами).
 
@@ -249,7 +249,7 @@ plugins:
 
 ## Проверка managed-опций
 
-Валидация конфигурации и генерация отклоняют неизвестные file/field options и значения неподходящего типа. Булевым опциям вроде <code>java_multiple_files</code> нужен YAML boolean, а не строка в кавычках. Строковым опциям нужны строки. <code>optimize_for</code> принимает <code>SPEED</code>, <code>CODE_SIZE</code> или <code>LITE_RUNTIME</code>; <code>jstype</code> — <code>JS_NORMAL</code>, <code>JS_STRING</code> или <code>JS_NUMBER</code>. Неверное правило не должно незаметно заменяться стандартными managed-настройками.
+Валидация конфигурации и генерация отклоняют неизвестные file/field options и значения неподходящего типа. EasyP поддерживает **19 управляемых `file_option`** (`go_package`, `go_package_prefix`, `java_package`, `java_package_prefix`, `java_package_suffix`, `java_multiple_files`, `java_outer_classname`, `java_string_check_utf8`, `csharp_namespace`, `csharp_namespace_prefix`, `ruby_package`, `ruby_package_suffix`, `php_namespace`, `php_metadata_namespace`, `php_metadata_namespace_suffix`, `objc_class_prefix`, `swift_prefix`, `optimize_for`, `cc_enable_arenas`) и **1 управляемую `field_option`** (`jstype`). Булевым опциям вроде <code>java_multiple_files</code> и <code>cc_enable_arenas</code> нужен YAML boolean, а не строка в кавычках. Строковым опциям нужны строки. <code>optimize_for</code> принимает <code>SPEED</code>, <code>CODE_SIZE</code> или <code>LITE_RUNTIME</code>; <code>jstype</code> — <code>JS_NORMAL</code>, <code>JS_STRING</code> или <code>JS_NUMBER</code>. Неверное правило не должно незаметно заменяться стандартными managed-настройками.
 
 Версию remote-плагина указывайте отдельным полем <code>version</code>, а не после двоеточия в последнем сегменте пути. Порт сервера в имени хоста допустим. Например, <code>remote: localhost:8080/go</code> вместе с <code>version: v1.2.3</code>.
 
