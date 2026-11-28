@@ -5,38 +5,47 @@ description: "Как направить easyp CLI на сервис, как по
 
 ## easyp CLI
 
-Плагин выполняется на сервисе, если в его записи в `generate.plugins` указан
-`remote:` вместо `name:`, `path:` или `command:`:
+Плагин выполняется на сервисе, если в его записи в `plugins:` файла
+`easyp.gen.yaml` указаны `remote:` и `version:` вместо `name:`, `path:` или
+`command:`:
 
 ```yaml
-generate:
-  inputs:
-    - directory:
-        path: .
-        root: proto
-  plugins:
-    - remote: "plugins.example.com/protocolbuffers/go:v1.36.10"
-      out: gen/go
-      opts:
-        paths: source_relative
-    - remote: "plugins.example.com/grpc/go:v1.6.2"
-      out: gen/go
-      opts:
-        paths: source_relative
-        require_unimplemented_servers: false
+# easyp.gen.yaml
+version: v1
+plugins:
+  - remote: plugins.example.com/protocolbuffers/go
+    version: v1.36.10
+    out: gen/go
+    opts:
+      paths: source_relative
+  - remote: plugins.example.com/grpc/go
+    version: v1.6.2
+    out: gen/go
+    opts:
+      paths: source_relative
+      require_unimplemented_servers: false
 ```
 
-### Значение `remote:`
+<Callout type="info">
+В EasyP v0.17 (`easyp.yaml`) удалённые плагины задаются в `generate.plugins` с
+версией прямо в URL:
+`remote: "plugins.example.com/protocolbuffers/go:v1.36.10"`. EasyP v1 требует
+`easyp.gen.yaml` с раздельными полями `remote:` и `version:`.
+</Callout>
 
-`[http://|https://]host[:port]/group/name[:version]`
+### Значения `remote:` и `version:`
+
+`remote:` имеет вид `[http://|https://]host[:port]/group/name`, а `version:` —
+зафиксированный semver-тег `vX.Y.Z` (в EasyP v0.17 `easyp.yaml` они объединены
+как `[http://|https://]host[:port]/group/name[:version]`).
 
 | Часть | Поведение |
 |---|---|
 | схема | Необязательна. `https://` или без схемы → TLS; `http://` → без шифрования. |
 | host | Хост, содержащий `localhost` или `127.0.0.1`, всегда без шифрования, если не указан `https://`. |
-| port | Необязателен. Без него действует порт gRPC-клиента по умолчанию (443 для TLS); ingress из Helm-чарта слушает 443, сервис без обвязки — 23410. |
+| port | Необязателен. Без него easyp CLI подставляет `:443` — даже если указана схема `http://`, поэтому для незашифрованных сервисов порт нужно указывать явно (например, `localhost:23410`). Ingress из Helm-чарта слушает 443, сервис без обвязки — 23410. |
 | group/name | Должны совпадать с зарегистрированным плагином. |
-| version | Необязательна. Без неё — `latest`, то есть самая новая зарегистрированная версия при сравнении номеров как чисел (`v1.36.11` новее `v1.36.9`). |
+| version | Обязательна в EasyP v1 (`version: vX.Y.Z`, отдельно от `remote:`; суффикс `:version` в `remote:` и `latest` отклоняются). Прямые вызовы gRPC/SDK — или конфиги EasyP v0.17 без `:version` — разрешают `latest` в самую новую зарегистрированную версию при сравнении номеров как чисел (`v1.36.11` новее `v1.36.9`). |
 
 `opts` склеиваются в параметр `CodeGeneratorRequest`
 (`paths=source_relative,require_unimplemented_servers=false`) — так же, как для
@@ -45,7 +54,8 @@ generate:
 ### Что CLI умеет и чего не умеет
 
 - Он локально разбирает и разрешает `.proto`-файлы, включая зависимости из
-  `deps`. Отправляется только получившийся `CodeGeneratorRequest`.
+  `protobuf.mod` / `protobuf.lock` (или `deps` в EasyP v0.17). Отправляется
+  только получившийся `CodeGeneratorRequest`.
 - Один gRPC-вызов на плагин, каждый — по новому соединению, с фиксированным
   дедлайном **30 секунд**. Собственный лимит сервиса — 120 с; плагин, которому
   нужно больше 30 с, падает на стороне клиента с `DeadlineExceeded`, хотя сервер
@@ -59,8 +69,8 @@ generate:
   указывающее на `buf.build`, не попадёт в remote plugins Buf: реестр Buf этот API
   не реализует.
 
-`command:` приоритетнее `remote:`; у записи плагина должен быть ровно один
-источник.
+У записи плагина должен быть ровно один источник (`name:`, `path:`, `command:`
+или `remote:`); их смешение отклоняется при проверке `easyp.gen.yaml`.
 
 ## Go SDK
 
@@ -115,7 +125,7 @@ func main() {
 | `WithTransportCredentials(creds)` | — | Свой CA, клиентский сертификат (mTLS). |
 | `WithToken(token)` | — | `authorization: Bearer` в каждом вызове. Нужен для записи и для чтения, если сервис требует аутентификацию. |
 | `WithGenerateCodeTimeout(d)` | 30 с | Дедлайн вызова, если в контексте его нет. Поднимайте к `generation_timeout` сервера. |
-| `WithListPluginsTimeout(d)` | 10 с | На весь постраничный обход. |
+| `WithListPluginsTimeout(d)` | 10 с | Действует **на каждую страницу** (вызов `Plugins`), а не на весь обход. Общий бюджет обхода задаётся дедлайном `ctx` (сработает более ранний). |
 | `WithCreatePluginTimeout(d)` | 120 с | Регистрация проверяет архив в хранилище и читает его, если у объекта нет контрольной суммы. |
 | `WithMaxRetries(n)`, `WithRetryBaseDelay(d)`, `WithRetryMaxDelay(d)` | 3, 100 мс, 5 с | Экспоненциальная задержка. |
 | `WithMaxRecvMsgSize(n)` | 64 МиБ | Совпадает с лимитом вывода сервера. |

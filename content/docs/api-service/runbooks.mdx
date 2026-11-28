@@ -29,15 +29,18 @@ rather than the service, and on Kubernetes the cluster owns that ground.
 The licence stops being valid within `prometheusRule.licenceExpiryWarningDays`.
 
 Nothing breaks at expiry — the token also carries a grace period — but at the end
-of that, the tier drops to community: audit stops, workers cap at 4, plugin
-registration starts refusing past 10. All of it silent.
+of that, the tier drops to Community on the running process: audit stops and
+plugin registration starts refusing past 10 versions immediately, while the
+`worker_pool.workers` (4) and `worker_pool.max_concurrent_generations` (16)
+ceilings take effect on restart (logged at `Warn`). All of it silent for clients.
 
 1. Confirm what the service actually loaded, rather than what you think it has:
-   `kubectl logs deploy/$REL | grep -i licen`, or
+   `kubectl logs statefulset/$REL | grep -i licen`, or
    `docker logs easyp-api-enterprise 2>&1 | grep -i licen`
 2. Check `easyp_license_expiry_timestamp_seconds` against `time()`.
-3. Get a renewed token, put it in the secret as `LICENSE_KEY` (on compose, in
-   `~/easyp/.env`), and restart — `kubectl rollout restart deploy/$REL`, or
+3. Get a renewed token, put it in the secret as `LICENSE_KEY` (or replace the
+   file pointed to by `LICENSE_FILE`; on compose, update `~/easyp/.env`), and
+   restart — `kubectl rollout restart statefulset/$REL`, or
    `docker compose ... up -d --force-recreate service-enterprise`.
    The licence is read at startup.
 
@@ -133,14 +136,14 @@ Consequence: future partitions stop being created. Once the newest existing
 partition is passed, audit rows land in the default partition (see below), and
 if there is no default either, writes fail outright.
 
-1. `kubectl logs deploy/$REL | grep -i partition`, or
+1. `kubectl logs statefulset/$REL | grep -i partition`, or
    `docker logs easyp-api-enterprise 2>&1 | grep -i partition` — the failure is
    logged with the reason.
 2. Most often a permissions problem: the role needs to CREATE and DROP tables in
    the schema, not merely write rows.
 3. Check `easyp_audit_partition_maintenance_last_success_seconds` recovers after
-   the next interval. Do not wait a full 6h to find out — restart the deployment
-   to force a run.
+   the next interval. Do not wait a full 6h to find out — restart the StatefulSet
+   (`kubectl rollout restart statefulset/$REL`) to force a run.
 
 ## EasypAuditDefaultPartitionUsed
 
@@ -225,7 +228,7 @@ The service recovered from a panic. It kept running — that is what the barrier
 for — but a recovered panic is still a bug, and the counter exists so that it is
 not silent.
 
-`kubectl logs deploy/$REL | grep -A30 panic` for the stack, or
+`kubectl logs statefulset/$REL | grep -A30 panic` for the stack, or
 `docker logs easyp-api-enterprise 2>&1 | grep -A30 panic`. The counter has no
 labels; the log line around the stack trace says which unit of work panicked —
 a gRPC handler, a pool worker, or the audit writer.
@@ -240,7 +243,8 @@ Write credentials are being rejected faster than
 
 By default reads are anonymous, so everything here is a mutating call:
 CreatePlugin, UpdatePlugin, DeletePlugin. With
-`config.auth.requireAuthentication` on, reads count too — and every easyp CLI
+`auth.require_authentication: true` (`AUTH_REQUIRE_AUTHENTICATION=true`, set via
+`extraEnv` in Helm) on, reads count too — and every easyp CLI
 user is a failure, since the CLI sends no token. The `reason` label separates
 `no_credentials` (nothing sent) from `unknown_token` (a token that matches no
 digest).

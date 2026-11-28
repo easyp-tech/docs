@@ -5,38 +5,47 @@ description: "Pointing the easyp CLI at the service, using the Go SDK, and calli
 
 ## easyp CLI
 
-A plugin runs on the service when its entry in `generate.plugins` uses `remote:`
-instead of `name:`, `path:` or `command:`:
+A plugin runs on the service when its entry under `plugins:` in
+`easyp.gen.yaml` uses `remote:` and `version:` instead of `name:`, `path:` or
+`command:`:
 
 ```yaml
-generate:
-  inputs:
-    - directory:
-        path: .
-        root: proto
-  plugins:
-    - remote: "plugins.example.com/protocolbuffers/go:v1.36.10"
-      out: gen/go
-      opts:
-        paths: source_relative
-    - remote: "plugins.example.com/grpc/go:v1.6.2"
-      out: gen/go
-      opts:
-        paths: source_relative
-        require_unimplemented_servers: false
+# easyp.gen.yaml
+version: v1
+plugins:
+  - remote: plugins.example.com/protocolbuffers/go
+    version: v1.36.10
+    out: gen/go
+    opts:
+      paths: source_relative
+  - remote: plugins.example.com/grpc/go
+    version: v1.6.2
+    out: gen/go
+    opts:
+      paths: source_relative
+      require_unimplemented_servers: false
 ```
 
-### The `remote:` value
+<Callout type="info">
+On EasyP v0.17 (`easyp.yaml`), remote plugins live under `generate.plugins` and
+carry the version in the URL:
+`remote: "plugins.example.com/protocolbuffers/go:v1.36.10"`. EasyP v1 requires
+`easyp.gen.yaml` with separate `remote:` and `version:` fields.
+</Callout>
 
-`[http://|https://]host[:port]/group/name[:version]`
+### The `remote:` and `version:` values
+
+`remote:` takes `[http://|https://]host[:port]/group/name` and `version:` takes
+a pinned semver tag `vX.Y.Z` (in EasyP v0.17 `easyp.yaml`, both are combined as
+`[http://|https://]host[:port]/group/name[:version]`).
 
 | Part | Behaviour |
 |---|---|
 | scheme | Optional. `https://` or no scheme → TLS; `http://` → plaintext. |
 | host | A host containing `localhost` or `127.0.0.1` is always plaintext unless `https://` is given. |
-| port | Optional. Without it the gRPC client's default applies (443 for TLS); the Helm chart's ingress serves on 443, a bare service listens on 23410. |
+| port | Optional. Without it, the easyp CLI defaults to `:443` — even when `http://` is specified, so include an explicit port for plaintext services (for example `localhost:23410`). The Helm chart's ingress serves on 443; a bare service listens on 23410. |
 | group/name | Must match a registered plugin. |
-| version | Optional. Omitted → `latest`, the highest registered version compared by number (`v1.36.11` over `v1.36.9`). |
+| version | Required in EasyP v1 (`version: vX.Y.Z`, separate from `remote:`; embedding `:version` in `remote:` or using `latest` is rejected). Direct gRPC/SDK callers — or EasyP v0.17 configs omitting `:version` — resolve `latest` to the highest registered version compared by number (`v1.36.11` over `v1.36.9`). |
 
 `opts` are joined into the `CodeGeneratorRequest` parameter
 (`paths=source_relative,require_unimplemented_servers=false`), exactly as for
@@ -45,7 +54,8 @@ local plugins.
 ### What the CLI does and does not support
 
 - It parses and resolves `.proto` files locally, including dependencies from
-  `deps`. Only the resulting `CodeGeneratorRequest` is sent.
+  `protobuf.mod` / `protobuf.lock` (or `deps` in EasyP v0.17). Only the
+  resulting `CodeGeneratorRequest` is sent.
 - One gRPC call per plugin, each on a new connection, with a fixed **30-second**
   deadline. The service's own limit is 120 s; a plugin that needs longer than 30 s
   fails on the client side with `DeadlineExceeded` while the server may still be
@@ -59,8 +69,8 @@ local plugins.
   pointing at `buf.build` does not reach Buf's remote plugins — Buf's registry
   does not implement this API.
 
-`command:` takes precedence over `remote:`; a plugin entry must have exactly one
-source.
+A plugin entry must have exactly one source (`name:`, `path:`, `command:`, or
+`remote:`); combining them is rejected when validating `easyp.gen.yaml`.
 
 ## Go SDK
 
@@ -115,7 +125,7 @@ func main() {
 | `WithTransportCredentials(creds)` | — | Private CA, client certificate (mTLS). |
 | `WithToken(token)` | — | `authorization: Bearer` on every call. Needed for writes, and for reads when the service requires authentication. |
 | `WithGenerateCodeTimeout(d)` | 30 s | Per-call deadline when the context has none. Raise it towards the server's `generation_timeout`. |
-| `WithListPluginsTimeout(d)` | 10 s | Spans the whole paginated walk. |
+| `WithListPluginsTimeout(d)` | 10 s | Applied **per page** (`Plugins` RPC), not across the whole walk. To cap the overall traversal budget, set a deadline on `ctx` (the earlier deadline wins). |
 | `WithCreatePluginTimeout(d)` | 120 s | Registration checks the archive in storage, and reads it when the object carries no checksum. |
 | `WithMaxRetries(n)`, `WithRetryBaseDelay(d)`, `WithRetryMaxDelay(d)` | 3, 100 ms, 5 s | Exponential backoff. |
 | `WithMaxRecvMsgSize(n)` | 64 MiB | Matches the server's output limit. |

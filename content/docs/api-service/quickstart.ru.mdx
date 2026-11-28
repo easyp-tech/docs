@@ -120,20 +120,18 @@ go run ./cmd/easyp-svc plugins publish \
 
 ## 5. Сгенерировать код
 
-В проекте с `.proto`-файлами в `proto/`:
+В проекте с `.proto`-файлами (например, с `roots proto` в `protobuf.mod`)
+создайте `easyp.gen.yaml`:
 
 ```yaml
-# easyp.yaml
-generate:
-  inputs:
-    - directory:
-        path: .
-        root: proto
-  plugins:
-    - remote: "localhost:23410/protocolbuffers/go:v1.36.10"
-      out: gen/go
-      opts:
-        paths: source_relative
+# easyp.gen.yaml
+version: v1
+plugins:
+  - remote: localhost:23410/protocolbuffers/go
+    version: v1.36.10
+    out: gen/go
+    opts:
+      paths: source_relative
 ```
 
 ```bash
@@ -141,9 +139,10 @@ easyp generate
 ```
 
 С `localhost` CLI работает без шифрования, с любым другим хостом — по TLS.
-`latest` — самая новая зарегистрированная версия, но версию в `remote:` всё
-равно фиксируйте: `latest` сдвигается, как только регистрируют более новую, и
-сгенерированный код меняется вместе с ней. Подробнее — в
+EasyP v1 требует явную semver-версию в отдельном поле `version:` в
+`easyp.gen.yaml` и отклоняет `:version` внутри `remote:` и `latest`. В EasyP
+v0.17 тот же плагин указывается в `easyp.yaml` внутри `generate.plugins` как
+`remote: "localhost:23410/protocolbuffers/go:v1.36.10"`. Подробнее — в
 [Подключении клиентов](/ru/docs/api-service/client-usage).
 
 ## Запуск из исходников

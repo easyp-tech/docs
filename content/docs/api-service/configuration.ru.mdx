@@ -125,7 +125,7 @@ easyp-svc config print --cfg config.yml --changed     # только отлич�
 | `audit.max_save_retries` | `AUDIT_MAX_SAVE_RETRIES` | int | `3` | Повторы упавшего пакета, прежде чем он считается потерянным. |
 | `audit.enqueue_timeout` | `AUDIT_ENQUEUE_TIMEOUT` | duration | `1s` | Сколько операция ждёт места в очереди, прежде чем отбросить свою запись. |
 | `audit.flush_timeout` | `AUDIT_FLUSH_TIMEOUT` | duration | `5s` | Предел на одну запись с учётом повторов. |
-| `audit.retention_months` | `AUDIT_RETENTION_MONTHS` | int | `12` | Месячные партиции старше этого удаляются — по-настоящему. |
+| `audit.retention_months` | `AUDIT_RETENTION_MONTHS` | int | `12` | Месячные партиции старше этого удаляются — по-настоящему. `0` отключает удаление (сохраняются все партиции). |
 | `audit.pre_create_months` | `AUDIT_PRE_CREATE_MONTHS` | int | `3` | Партиции, создаваемые наперёд. |
 | `audit.partition_check_interval` | `AUDIT_PARTITION_CHECK_INTERVAL` | duration | `6h` | Период обслуживания партиций. |
 | `audit.partition_op_timeout` | `AUDIT_PARTITION_OP_TIMEOUT` | duration | `30s` | Предел на одно создание/удаление партиции. |

@@ -31,16 +31,19 @@ compose-стек, — и всерьёз работало только одно:
 `prometheusRule.licenceExpiryWarningDays`.
 
 В момент истечения ничего не ломается — токен несёт ещё и грейс-период, — но по
-его окончании тир падает до community: аудит прекращается, воркеры упираются в
-4, регистрация плагинов начинает отказывать после 10. И всё это молча.
+его окончании на работающем процессе тир падает до Community: аудит прекращается
+и регистрация плагинов начинает отказывать после 10 версий сразу, а потолки
+`worker_pool.workers` (4) и `worker_pool.max_concurrent_generations` (16)
+вступают в силу при перезапуске (пишется `Warn` в лог). Для клиентов всё это
+происходит молча.
 
 1. Убедитесь, что сервис действительно загрузил то, что вы думаете:
-   `kubectl logs deploy/$REL | grep -i licen` или
+   `kubectl logs statefulset/$REL | grep -i licen` или
    `docker logs easyp-api-enterprise 2>&1 | grep -i licen`
 2. Сравните `easyp_license_expiry_timestamp_seconds` с `time()`.
-3. Получите обновлённый токен, положите его в секрет как `LICENSE_KEY` (в
-   compose — в `~/easyp/.env`) и перезапустите:
-   `kubectl rollout restart deploy/$REL` либо
+3. Получите обновлённый токен, положите его в секрет как `LICENSE_KEY` (либо
+   обновите файл, на который указывает `LICENSE_FILE`; в compose — `~/easyp/.env`)
+   и перезапустите: `kubectl rollout restart statefulset/$REL` либо
    `docker compose ... up -d --force-recreate service-enterprise`.
    Лицензия читается при старте.
 
@@ -139,14 +142,15 @@ Reason у отказа — `SERVER_OVERLOADED`. Алерт смотрит на
 существующая партиция пройдена, строки аудита попадают в партицию по умолчанию
 (см. ниже), а если и её нет — записи падают вовсе.
 
-1. `kubectl logs deploy/$REL | grep -i partition` либо
+1. `kubectl logs statefulset/$REL | grep -i partition` либо
    `docker logs easyp-api-enterprise 2>&1 | grep -i partition` — отказ
    залогирован с причиной.
 2. Чаще всего это права: роли нужно CREATE и DROP таблиц в схеме, а не только
    запись строк.
 3. Проверьте, что `easyp_audit_partition_maintenance_last_success_seconds`
    восстанавливается после следующего интервала. Не ждите все 6ч, чтобы это
-   выяснить, — перезапустите деплоймент, чтобы форсировать прогон.
+   выяснить, — перезапустите StatefulSet
+   (`kubectl rollout restart statefulset/$REL`), чтобы форсировать прогон.
 
 ## EasypAuditDefaultPartitionUsed
 
@@ -234,7 +238,7 @@ COMMIT;
 перехваченная паника всё равно баг, и счётчик существует, чтобы она не была
 молчаливой.
 
-`kubectl logs deploy/$REL | grep -A30 panic` за стеком либо
+`kubectl logs statefulset/$REL | grep -A30 panic` за стеком либо
 `docker logs easyp-api-enterprise 2>&1 | grep -A30 panic`. У счётчика нет меток;
 какая единица работы запаниковала — gRPC-хендлер, воркер пула или писатель
 аудита, — видно из строки лога рядом со стеком.
@@ -249,7 +253,8 @@ COMMIT;
 
 По умолчанию чтения анонимны, поэтому всё здесь — мутирующие вызовы:
 CreatePlugin, UpdatePlugin, DeletePlugin. С включённым
-`config.auth.requireAuthentication` считаются и чтения — и каждый пользователь
+`auth.require_authentication: true` (`AUTH_REQUIRE_AUTHENTICATION=true`, в Helm
+задаётся через `extraEnv`) считаются и чтения — и каждый пользователь
 easyp CLI даёт отказ, потому что CLI не отправляет токен. Метка `reason` отличает
 `no_credentials` (ничего не прислали) от `unknown_token` (токен не совпал ни с
 одним дайджестом).

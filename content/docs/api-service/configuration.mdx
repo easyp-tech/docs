@@ -125,7 +125,7 @@ Audit rows are written only with an Enterprise licence.
 | `audit.max_save_retries` | `AUDIT_MAX_SAVE_RETRIES` | int | `3` | Retries of a failed batch before it is counted as lost. |
 | `audit.enqueue_timeout` | `AUDIT_ENQUEUE_TIMEOUT` | duration | `1s` | How long an operation waits for queue space before dropping its entry. |
 | `audit.flush_timeout` | `AUDIT_FLUSH_TIMEOUT` | duration | `5s` | Bound on one write, retries included. |
-| `audit.retention_months` | `AUDIT_RETENTION_MONTHS` | int | `12` | Monthly partitions older than this are dropped — a real delete. |
+| `audit.retention_months` | `AUDIT_RETENTION_MONTHS` | int | `12` | Monthly partitions older than this are dropped — a real delete. `0` disables pruning (keeps all partitions). |
 | `audit.pre_create_months` | `AUDIT_PRE_CREATE_MONTHS` | int | `3` | Partitions created ahead. |
 | `audit.partition_check_interval` | `AUDIT_PARTITION_CHECK_INTERVAL` | duration | `6h` | Partition maintenance period. |
 | `audit.partition_op_timeout` | `AUDIT_PARTITION_OP_TIMEOUT` | duration | `30s` | Bound on one partition create/drop. |

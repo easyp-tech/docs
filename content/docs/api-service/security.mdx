@@ -27,8 +27,10 @@ Everything below follows from that.
 - **Memory.** A plugin can allocate until the container or host kills something.
 - **CPU.** Beyond the number of concurrent plugins, nothing.
 - **Filesystem.** Whatever the service user can read and write: the plugin
-  cache (every other plugin's binaries), `/tmp`, any mounted secret files. The
-  working directory is the service's.
+  cache (every other plugin's binaries), `/tmp`, any mounted secret files. Each
+  invocation starts in a fresh temporary working directory under
+  `plugins_dir/.tmp` (deleted after the run), which isolates relative writes
+  between runs but does not restrict access to the rest of the filesystem.
 - **Network.** Whatever the service can reach: PostgreSQL, object storage, the
   cloud metadata endpoint, the internet.
 - **Processes and syscalls.** The service applies no seccomp profile,

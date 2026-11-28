@@ -116,7 +116,7 @@ MCP-эндпоинт есть у обоих, но с разным охватом
 - `buf generate` с `remote:` обращается к инстансу BSR. Сервис EasyP не реализует
   API BSR, поэтому `buf` не может использовать его как remote.
 - `easyp generate` с `remote:` говорит на API EasyP `easyp.generator.v1`.
-  `remote: buf.build/...` в `easyp.yaml` не попадёт в remote plugins Buf.
+  `remote: buf.build/...` в `easyp.gen.yaml` не попадёт в remote plugins Buf.
 - Оба запускают стандартные `protoc`-плагины через `CodeGeneratorRequest`, так
   что одна и та же версия плагина даёт одинаковый результат; имена плагинов в
   основном совпадают (`protocolbuffers/go`, `grpc/go`, `connectrpc/go`, …).

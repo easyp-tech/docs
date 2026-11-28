@@ -12,22 +12,24 @@ description: "Перенос генерации кода с remote plugins Buf �
 
 - Работающий EasyP API Service, доступный с машин разработчиков и из CI, —
   [Установка](/ru/docs/api-service/installation).
-- easyp CLI, настроенный на ваши схемы (`easyp.yaml` с `generate.inputs`).
+- easyp CLI, настроенный на ваш модуль (`protobuf.mod` и `easyp.gen.yaml`; для
+  EasyP v0.17 — `easyp.yaml` с `generate.inputs`).
 - Список всех `remote:`-плагинов из ваших `buf.gen.yaml` с версиями.
 
 ## 1. Сопоставить имена плагинов
 
 Ссылки BSR имеют вид `buf.build/<owner>/<plugin>:<version>`
-([remote plugins](https://buf.build/docs/bsr/remote-plugins/)). Имена EasyP —
-`<group>/<name>:<version>` на вашем хосте. Каталог EasyP повторяет тех же
-владельцев, поэтому путь после хоста обычно совпадает:
+([remote plugins](https://buf.build/docs/bsr/remote-plugins/)). На самом сервисе
+плагины адресуются как `<group>/<name>:<version>`; в EasyP v1 `easyp.gen.yaml`
+хост и путь пишутся в `remote:`, а semver-тег — в `version:`. Каталог EasyP
+повторяет тех же владельцев, поэтому путь после хоста обычно совпадает:
 
-| `remote:` в BSR | `remote:` в EasyP |
+| `remote:` в BSR | `remote:` + `version:` в EasyP v1 |
 |---|---|
-| `buf.build/protocolbuffers/go:v1.36.10` | `plugins.example.com/protocolbuffers/go:v1.36.10` |
-| `buf.build/grpc/go:v1.5.1` | `plugins.example.com/grpc/go:v1.5.1` |
-| `buf.build/connectrpc/go:v1.18.1` | `plugins.example.com/connectrpc/go:v1.18.1` |
-| `buf.build/bufbuild/es:v2.2.0` | `plugins.example.com/bufbuild/es:v2.2.0` |
+| `buf.build/protocolbuffers/go:v1.36.10` | `plugins.example.com/protocolbuffers/go` + `v1.36.10` |
+| `buf.build/grpc/go:v1.5.1` | `plugins.example.com/grpc/go` + `v1.5.1` |
+| `buf.build/connectrpc/go:v1.18.1` | `plugins.example.com/connectrpc/go` + `v1.18.1` |
+| `buf.build/bufbuild/es:v2.2.0` | `plugins.example.com/bufbuild/es` + `v2.2.0` |
 
 Проверьте каждый:
 
@@ -40,9 +42,10 @@ description: "Перенос генерации кода с remote plugins Buf �
 Для плагина, которого нет в каталоге EasyP, нужен собственный рецепт — см.
 [Плагины](/ru/docs/api-service/plugins#adding-a-plugin).
 
-Всегда фиксируйте версии. Незафиксированная ссылка EasyP разрешается в самую
-новую зарегистрированную версию, а она меняется, как только вы публикуете более
-новую.
+Всегда фиксируйте версии. EasyP v1 требует явную semver-версию в `version:`
+файла `easyp.gen.yaml`; в прямых вызовах gRPC/SDK или в конфигах EasyP v0.17
+незафиксированная ссылка разрешается в `latest` (самую новую зарегистрированную
+версию), а она меняется, как только вы публикуете более новую.
 
 ## 2. Собрать и опубликовать
 
@@ -77,30 +80,32 @@ plugins:
 ```
 
 ```yaml
-# easyp.yaml
-generate:
-  inputs:
-    - directory:
-        path: .
-        root: proto
-  plugins:
-    - remote: "plugins.example.com/protocolbuffers/go:v1.36.10"
-      out: gen/go
-      opts:
-        paths: source_relative
-    - remote: "plugins.example.com/grpc/go:v1.5.1"
-      out: gen/go
-      opts:
-        paths: source_relative
-        require_unimplemented_servers: false
+# easyp.gen.yaml
+version: v1
+plugins:
+  - remote: plugins.example.com/protocolbuffers/go
+    version: v1.36.10
+    out: gen/go
+    opts:
+      paths: source_relative
+  - remote: plugins.example.com/grpc/go
+    version: v1.5.1
+    out: gen/go
+    opts:
+      paths: source_relative
+      require_unimplemented_servers: false
 ```
 
-| buf.gen.yaml | easyp.yaml |
+В EasyP v0.17 (`easyp.yaml`) плагины описываются в `generate.plugins` как
+`remote: "plugins.example.com/protocolbuffers/go:v1.36.10"`, а входные каталоги
+— в `generate.inputs`.
+
+| buf.gen.yaml | easyp.gen.yaml |
 |---|---|
-| `plugins[].remote` | `generate.plugins[].remote`, с вашим хостом |
-| `plugins[].opt` (строка или список) | `generate.plugins[].opts` (карта) |
-| `plugins[].out` | `generate.plugins[].out` |
-| `inputs` | `generate.inputs` |
+| `plugins[].remote` (`buf.build/<owner>/<plugin>:<version>`) | `plugins[].remote` (`<host>/<group>/<name>`) + `plugins[].version` (`vX.Y.Z`) |
+| `plugins[].opt` (строка или список) | `plugins[].opts` (карта или список строк) |
+| `plugins[].out` | `plugins[].out` |
+| `inputs` | Корни модуля в `protobuf.mod`, при необходимости суженные через `generate.modules` / `generate.paths` / `generate.packages` |
 | managed mode | `generate.managed` — см. [Генератор](/ru/docs/cli/generator) |
 
 ## 4. CI
@@ -141,7 +146,7 @@ easyp generate && diff -r gen.buf gen
 
 Обратный путь — та же таблица, прочитанная справа налево.
 
-1. Для каждого `remote:` в `easyp.yaml` убедитесь, что плагин есть в каталоге BSR
+1. Для каждого `remote:` в `easyp.gen.yaml` (или `easyp.yaml` в v0.17) убедитесь, что плагин есть в каталоге BSR
    (https://buf.build/plugins) в той же версии. Внутренние плагины, которые вы
    регистрировали в EasyP, придётся превратить в
    [custom plugins](https://buf.build/docs/bsr/remote-plugins/custom-plugins/)

@@ -34,12 +34,14 @@ A rename is handled without breaking anyone: the old configuration key keeps
 working for one release while warning, naming both spellings and the line to
 change, and only then stops.
 
-## v1.3.0 → v1.3.1
+## v1.3.0 → v1.3.2
 
-v1.3.1 was tagged but never published: the release job's image scan stopped it
-before anything left the runner. v1.3.2 carries the same changes plus a
-dependency fix, so upgrade from v1.3.0 straight to v1.3.2. Only the `api/v1.3.1`
-and `sdk/v1.3.1` Go modules exist under that number.
+v1.3.1 was tagged but never published: the release job's image scan stopped it on
+CVE-2026-78661 in `golang.org/x/net` v0.61.0 before anything left the runner.
+v1.3.2 bumps `x/net` to v0.62.0 and ships all of the v1.3.1 changes below, so
+upgrade from v1.3.0 straight to v1.3.2. Only the `api/v1.3.1` and `sdk/v1.3.1`
+Go modules exist under that number (upgrading those modules from `v1.3.1` to
+`v1.3.2` is the `x/net` update only).
 
 ### `latest` resolves to the highest version number
 
@@ -48,8 +50,10 @@ above `v1.36.11`. It now compares versions component by component, a missing
 patch counting as zero. **A registry holding such versions serves a different
 `latest` after the upgrade**: on plugins.easyp.tech `protocolbuffers/go:latest`
 moved from v1.36.9 to v1.36.11 and `bufbuild/es:latest` from v2.9.0 to v2.12.0,
-nine plugins of 80 in all. An unpinned `remote:` generates different code from
-the first run after the upgrade; pin the version to keep the old output.
+nine plugins of 80 in all. An unpinned `remote:` (from direct gRPC/SDK callers or
+EasyP v0.17 `easyp.yaml`; EasyP v1 `easyp.gen.yaml` requires an explicit
+`version:`) generates different code from the first run after the upgrade; pin
+the version to keep the old output.
 
 ### MCP `plugins_list` items carry `createdAt`
 
@@ -114,9 +118,10 @@ version is accepted until the count is below the limit.
 
 The SDK and `easyp-svc` dial a plain `host:port` through `passthrough:///`, so
 the operating system resolves the name when connecting. A host without a port
-gets 443, as before. Prefix `dns:///` to use grpc-go's own resolver. The `easyp`
-CLI gets the same change for remote plugins in its next release; until then
-`easyp generate` still uses grpc-go's resolver.
+gets 443, as before. Prefix `dns:///` to use grpc-go's own resolver. In the
+`easyp` CLI, the `passthrough:///` fix is already merged on `main` and ships in
+`v1.0.0` (it always dials remote plugins through `passthrough:///`, with no
+`dns:///` prefix needed or accepted).
 
 ### The rate limit says how long to wait
 
