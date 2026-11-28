@@ -14,7 +14,7 @@ description: "Пошаговое руководство по миграции к
 | <code>buf.yaml</code> (секция deps) | <code>protobuf.mod</code> | Независимый от инструментов DSL; использует Git URL вместо BSR. |
 | <code>buf.yaml</code> (секция lint) | <code>easyp.yaml</code> (linters) | Использует пресеты и списки правил; каждая секция политики берётся целиком из ближайшего определения. <code>extends</code> явно подключает базу секции из локального файла или существующего закреплённого модуля. |
 | <code>buf.yaml</code> (секция breaking) | <code>easyp.yaml</code> (breaking) | Явное сравнение с git-baseline (например, <code>git:main</code>). |
-| <code>buf.gen.yaml</code> | <code>easyp.gen.yaml</code> | Находится у потребителя и выбирает целые модули. |
+| <code>buf.gen.yaml</code> | <code>easyp.gen.yaml</code> | Находится у потребителя; выбирает модули (строкой или `{ module, paths, packages }`) и опциональные глобальные `paths`/`packages`. |
 | <code>buf.gen.yaml</code> (managed) | <code>easyp.gen.yaml</code> (generate.managed) | Явный managed mode; <code>options.go.package_prefix</code> — отдельная настройка только для Go. |
 | <code>buf.lock</code> | <code>protobuf.lock</code> | Включает SHA коммитов Git и хеши содержимого. |
 | <code>buf dep update</code> | <code>easyp mod tidy</code> | Разрешает объявленные требования через MVS и записывает lock; обновления версий проверяйте отдельно. |
@@ -45,7 +45,7 @@ easyp init --module github.com/acme/my-service
 module github.com/acme/my-service
 
 require (
-    github.com/googleapis/googleapis v1.5.0
+    github.com/googleapis/googleapis 03a91044136a014466d4293eb1fe91f2b02075d2
 )
 ~~~
 
@@ -83,18 +83,19 @@ plugins:
       paths: source_relative
 ~~~
 
-Локальному плагину <code>go</code> нужен <code>protoc-gen-go</code> в окружении сборки. Фиксируйте версию там: локальные плагины отклоняют <code>version</code> в YAML. Удалённым плагинам нужна отдельная фиксированная семантическая версия. <code>generate.packages</code> выбирает точные имена protobuf-пакетов внутри выбранных модулей.
+Локальному плагину <code>go</code> нужен <code>protoc-gen-go</code> в окружении сборки (либо используйте <code>remote: plugins.easyp.tech/protocolbuffers/go</code> с зафиксированным <code>version</code>). Фиксируйте версию локальных плагинов в окружении: локальные плагины отклоняют <code>version</code> в YAML. Для сужения целей генерации без изменения корней импортов используйте <code>generate.paths</code>, <code>generate.packages</code> или объекты (`{ module, paths, packages }`) в <code>generate.modules</code>.
 
 ### Шаг 5: Наведение порядка и проверка
 
-Из корня репозитория разрешите зависимости, проверьте схемы линтером и запустите выбранный проект генерации:
+Из корня репозитория разрешите зависимости, проверьте конфиги и схемы линтером и запустите выбранный проект генерации:
 
 ~~~bash
 easyp mod tidy
+easyp validate-config
 easyp lint
 easyp generate --project ./backend
 ~~~
 
-Проверьте и закоммитьте <code>protobuf.mod</code> и <code>protobuf.lock</code>. Перед <code>tidy</code> или <code>update</code> нужно убрать активные локальные замены: обе команды их отклоняют. В CI проверяйте зафиксированные зависимости через <code>easyp mod download</code> и запускайте <code>easyp breaking --against main</code> с доступной локально базой.
+Проверьте и закоммитьте <code>protobuf.mod</code> и <code>protobuf.lock</code>. Пока в манифесте есть локальный <code>replace</code>, команды <code>mod tidy</code> и <code>mod update</code> работают с локальным эффективным графом и оставляют <code>protobuf.lock</code> неизменным; удалите локальные замены перед созданием публикуемого lock-файла, так как <code>--frozen</code> в CI отклоняет любые <code>replace</code>. В CI проверяйте зафиксированные зависимости через <code>easyp mod download --frozen</code> и запускайте <code>easyp breaking --frozen --against main</code> с доступной локально базой.
 
-В <code>breaking.categories</code> поддерживается только <code>FILE</code>; <code>ignore_unstable</code> доступно. Перед переносом breaking-настроек Buf сверьтесь со [справочником политики](/ru/docs/reference/easyp-yaml), сравните результат генерации и запустите тесты потребителей до отказа от старого workflow.
+Поддерживаются все четыре профиля <code>breaking.categories</code> — <code>FILE</code>, <code>PACKAGE</code>, <code>WIRE_JSON</code> и <code>WIRE</code> (по умолчанию <code>["FILE"]</code>) — а также <code>ignore_unstable</code>. Перед переносом breaking-настроек Buf сверьтесь со [справочником политики](/ru/docs/reference/easyp-yaml), сравните результат генерации и запустите тесты потребителей до отказа от старого workflow.

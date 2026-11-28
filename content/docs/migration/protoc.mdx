@@ -2,7 +2,7 @@
 title: "Moving from protoc to EasyP v1"
 ---
 
-Map the existing source roots, plugins and checks to v1 explicitly. The <code>easyp migrate</code> command accepts EasyP v0 configuration, not arbitrary scripts or another tool's configuration. Keep the original inputs and generated output for comparison.
+Map the existing source roots, plugins and checks to v1 explicitly. EasyP v1 compiles `.proto` files with its built-in pure-Go `easyprotoc` compiler (including built-in `google/protobuf/*.proto` well-known types and Protobuf Editions 2023), so you no longer need to install `protoc` itself. The <code>easyp migrate</code> command accepts EasyP v0 configuration, not arbitrary scripts or another tool's configuration. Keep the original inputs and generated output for comparison.
 
 ## Module and source roots
 
@@ -13,7 +13,7 @@ module github.com/acme/contracts
 roots proto
 ~~~
 
-A file at <code>proto/hello/v1/hello.proto</code> has the import name <code>hello/v1/hello.proto</code>. If the previous invocation selected only part of a root, do not silently broaden it: v1 generates complete selected modules.
+A file at <code>proto/hello/v1/hello.proto</code> has the import name <code>hello/v1/hello.proto</code>. If your previous <code>protoc</code> invocation compiled only a subset of files or subdirectories under a root, preserve that exact scope in <code>easyp.gen.yaml</code> using <code>generate.paths</code>, <code>generate.packages</code>, or module objects (`{ module, paths, packages }`) under <code>generate.modules</code> without changing import roots.
 
 ## Generation
 

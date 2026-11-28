@@ -9,13 +9,13 @@ In large monorepos, forcing all microservices to use the exact same dependency v
 
 ## The Problem with Single-Workspace Resolvers
 
-Tools like Buf v2 perform workspace-wide resolution: every service in a monorepo must settle on a single version for every dependency. If `team-user` needs `common v2.0.0` but `team-order` is not ready to migrate from `common v1.2.0`, the entire workspace build breaks or requires manual coordination.
+Tools like Buf v2 perform workspace-wide resolution: every service in a monorepo must settle on a single version for every dependency. If `team-order` needs `common/v2 v2.0.0` (or a newer minor like `common v1.5.0`) while `team-user` stays on `common v1.2.0`, a single-workspace lock couples both teams together.
 
 ---
 
 ## The EasyP Per-Module Solution
 
-EasyP resolves dependencies independently for each Protobuf module defined by a `protobuf.mod` file.
+EasyP resolves dependencies independently for each Protobuf module defined by a `protobuf.mod` file. Nested modules inside a repository include their subdirectory path in their canonical `module` identity:
 
 ```text
 repo/
@@ -24,14 +24,14 @@ repo/
     │   ├── protobuf.mod     # Requires common v1.2.0
     │   └── protobuf.lock    # Locked to common v1.2.0
     └── order/
-        ├── protobuf.mod     # Requires common v2.0.0
-        └── protobuf.lock    # Locked to common v2.0.0
+        ├── protobuf.mod     # Requires common/v2 v2.0.0
+        └── protobuf.lock    # Locked to common/v2 v2.0.0
 ```
 
 ### Module 1: `proto/user/protobuf.mod`
 
 ```protobuf
-module github.com/acme/user
+module github.com/acme/repo/proto/user
 
 require (
     github.com/acme/common v1.2.0
@@ -41,10 +41,10 @@ require (
 ### Module 2: `proto/order/protobuf.mod`
 
 ```protobuf
-module github.com/acme/order
+module github.com/acme/repo/proto/order
 
 require (
-    github.com/acme/common v2.0.0
+    github.com/acme/common/v2 v2.0.0
 )
 ```
 
@@ -52,6 +52,6 @@ require (
 
 ## Key Benefits
 
-1. **Independent Release Cycles**: Team `order` can upgrade to `common v2.0.0` without waiting for Team `user`.
+1. **Independent Release Cycles**: Team `order` can upgrade to `common/v2 v2.0.0` (or a newer `v1.x` release) without waiting for Team `user`.
 2. **Independent version decisions**: module lockfiles can change independently. Shared configuration or contract changes still require cross-service review.
 3. **Isolated dependency graphs**: each module compiles against its selected version. Generated package namespaces may still collide; configure distinct output/import paths. Incompatible graphs cannot share one descriptor set; use independent exports.

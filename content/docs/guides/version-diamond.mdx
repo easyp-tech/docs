@@ -12,8 +12,8 @@ The **diamond dependency problem** occurs when direct and transitive requirement
 Consider a service module <code>user</code> that relies on two dependencies: <code>common</code> and <code>weather</code>.
 
 - <code>user</code> explicitly requires <code>common v1.2.0</code>.
-- <code>user</code> explicitly requires <code>weather v2.1.0</code>.
-- <code>weather v2.1.0</code> transitively requires <code>common v1.3.0</code>.
+- <code>user</code> explicitly requires <code>weather/v2 v2.1.0</code>.
+- <code>weather/v2 v2.1.0</code> transitively requires <code>common v1.3.0</code>.
 
 ~~~text
                +-------------------+
@@ -23,16 +23,16 @@ Consider a service module <code>user</code> that relies on two dependencies: <co
            +-------------+-------------+
            |                           |
            v                           v
-+---------------------+     +---------------------+
-| github.com/acme/    |     | github.com/acme/    |
-| common v1.2.0       |     | weather v2.1.0      |
-+---------------------+     +----------+----------+
-                                       |
-                                       v
-                            +---------------------+
-                            | github.com/acme/    |
-                            | common v1.3.0       |
-                            +---------------------+
++---------------------+     +-----------------------+
+| github.com/acme/    |     | github.com/acme/      |
+| common v1.2.0       |     | weather/v2 v2.1.0     |
++---------------------+     +-----------+-----------+
+                                        |
+                                        v
+                             +---------------------+
+                             | github.com/acme/    |
+                             | common v1.3.0       |
+                             +---------------------+
 ~~~
 
 ---

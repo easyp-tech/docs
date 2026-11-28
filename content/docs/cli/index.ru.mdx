@@ -1,21 +1,23 @@
 ---
 title: "CLI"
-description: "CLI EasyP: lint, generate, mod, breaking."
+description: "CLI EasyP v1: lint, breaking, generate, mod, get, migrate, validate-config и другие команды."
 ---
 
-CLI EasyP — локальный инструментарий для Protocol Buffers.
+CLI EasyP — локальный инструментарий для работы с Protocol Buffers на базе встроенного pure-Go компилятора `easyprotoc` (без установки `protoc`). Архивы релизов, Homebrew и сборка через Go также включают stdio MCP-сервер `easyp-mcp` для ИИ-клиентов.
 
-| Команда | Назначение |
-|---------|------------|
-| `easyp lint` | Правила API-дизайна |
-| `easyp breaking` | Обнаружение breaking changes |
-| `easyp generate` | Локальные/удалённые плагины |
-| `easyp mod` | Git-зависимости |
-| `easyp init` | Инициализация проекта |
-| `easyp validate-config` | Рекурсивная проверка конфигурации и модульных файлов v1 |
-| `easyp ls-files` | Список локальных proto и достижимых импортов |
-| `easyp schema-gen` | Генерация JSON Schema для v1 |
-| `easyp completion bash\|zsh` | Вывод скрипта автодополнения |
+| Команда | Алиас | Назначение |
+|---------|-------|------------|
+| `easyp lint` | `l` | Проверка правил API-дизайна (44 встроенных правила) |
+| `easyp breaking` | — | Обнаружение breaking changes относительно Git-базы (69 правил в 4 профилях) |
+| `easyp generate` | `g` | Запуск встроенных WASM-, локальных (`name`/`path`/`command`) и удалённых плагинов, экспорт дескрипторов |
+| `easyp mod` | `m` | Управление Git-зависимостями (`download`, `tidy`, `update`, `vendor`) |
+| `easyp get` | — | Добавление прямой Git-зависимости (`<модуль>[@версия\|@тег\|@коммит]`) и разрешение транзитивного графа |
+| `easyp init` | `i` | Инициализация нативных файлов v1: `protobuf.mod`, `easyp.yaml` и `easyp.gen.yaml` |
+| `easyp migrate` | — | Интерактивный мастер или предпросмотр миграции с EasyP v0 на v1 |
+| `easyp validate-config` | `validate` | Рекурсивная проверка конфигов, именованных профилей и модульных/lock-файлов v1 |
+| `easyp ls-files` | `ls` | Список локальных `.proto` и достижимых импортов (`-I` / `--include-imports`, `--format json`) |
+| `easyp schema-gen` | — | Генерация JSON Schema v1 для `easyp.yaml`, `easyp.gen.yaml` и `protobuf.lock` |
+| `easyp completion bash\|zsh` | — | Вывод скрипта автодополнения для bash или zsh |
 
 ## Разделы
 

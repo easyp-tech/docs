@@ -13,11 +13,14 @@ From the directory containing your `protobuf.mod`, run:
 
 ```bash
 easyp get github.com/acme/weather
-# Or select a tag or full Git commit:
+# Select a SemVer tag, non-SemVer Git tag, or full Git commit:
 easyp get github.com/acme/weather@v1.2.3
+easyp get github.com/acme/weather@release-2026-10
+# Supply a checked import root for a dependency without root metadata:
+easyp get --import-root api/proto github.com/acme/legacy-schemas@v1.0.0
 ```
 
-`get` adds the selected module as a direct `require`, writes its transitive dependencies as `// indirect`, and updates `protobuf.lock` with exact commits and content hashes. A module inside a Git repository can be named by its full module path, such as `github.com/acme/contracts/proto/user`. A tag is optional; without one, EasyP locks the repository's current HEAD. Run the command separately in each local module directory that has its own `protobuf.mod`.
+`get` adds the selected module as a direct `require`, writes its transitive dependencies as `// indirect`, and updates `protobuf.lock` with exact commits and content hashes. Named non-SemVer Git tags (`@<tag>`) are resolved to their full commit SHA before writing `protobuf.mod`. A module inside a Git repository can be named by its full module path, such as `github.com/acme/contracts/proto/user`. A tag is optional; without one, EasyP locks the repository's current HEAD. Run the command separately in each local module directory that has its own `protobuf.mod`.
 
 Add the required protobuf `import` to your `.proto` file, then review and commit both `protobuf.mod` and `protobuf.lock`.
 
@@ -39,9 +42,12 @@ Open your module's `protobuf.mod` file and add the required module under the `re
 
 ```protobuf
 // proto/user/protobuf.mod
+module github.com/acme/contracts/proto/user
+
+roots proto
 
 require (
-    github.com/googleapis/googleapis v1.5.0
+    github.com/googleapis/googleapis 03a91044136a014466d4293eb1fe91f2b02075d2
     github.com/acme/weather v1.2.3
 )
 ```
@@ -79,20 +85,27 @@ easyp mod tidy
 The consuming project still declares a Git source with `require`. The dependency repository may use another configuration format:
 
 - EasyP v1 `protobuf.mod`: reads `roots` and `require`.
-- Buf v2 `buf.yaml`: reads `modules[].path` as import roots.
-- Buf v1 `buf.work.yaml`: reads `directories`; a single-module v1 `buf.yaml` uses `.`.
-- Buf v1beta1 `buf.yaml`: reads `build.roots`, defaulting to `.`.
+- Buf v2 `buf.yaml`: reads `modules[].path` together with `modules[].includes` and `modules[].excludes`.
+- Buf v1 `buf.work.yaml`: reads `directories` and nested `buf.yaml` `build.excludes`; a single-module v1 `buf.yaml` uses `.` and `build.excludes`.
+- Buf v1beta1 `buf.yaml`: reads `build.roots` (defaulting to `.`) and `build.excludes`.
 - Older EasyP: reads `direct` dependencies from the old `protobuf.mod` and local `generate.inputs[].directory.root` plus Git inputs from `easyp.yaml`.
 
-For an old EasyP dependency without a version on one of its Git requirements, `mod tidy` resolves the Git repository's HEAD and pins its commit in the v1 lock. No tag is required. The old EasyP `source@<commit>` form is also read transitively. Buf Registry `deps` are not Git sources, so declare an appropriate Git module in the consuming `protobuf.mod` when those imports are needed. Buf `includes`/`excludes` filters are not yet supported for Git dependency import roots and produce an explicit error.
+For an old EasyP dependency without a version on one of its Git requirements, `mod tidy` resolves the Git repository's HEAD and pins its commit in the v1 lock. No tag is required. The old EasyP `source@<commit>` form is also read transitively.
 
-Updated `protobuf.mod`:
+When a Buf-configured Git dependency declares `deps` on BSR, EasyP's built-in `bsr.StaticResolver` maps **5 widely used BSR modules** (`buf.build/googleapis/googleapis`, `buf.build/grpc-ecosystem/grpc-gateway`, `buf.build/mercari/grpc-federation`, `buf.build/envoyproxy/protoc-gen-validate`, and `buf.build/bufbuild/protovalidate`) to pinned Git compatibility snapshots recorded under `modules[].bsr` in `protobuf.lock`. Unknown BSR modules fail explicitly (no Git URL is guessed), and direct BSR entries in the consumer's own `protobuf.mod` are not supported.
+
+Updated `protobuf.mod` (note that native v2+ modules require a `/v2` major-version suffix on their module path):
 
 ```protobuf
+// proto/user/protobuf.mod
+module github.com/acme/contracts/proto/user
+
+roots proto
+
 require (
-    github.com/googleapis/googleapis v1.5.0
+    github.com/googleapis/googleapis 03a91044136a014466d4293eb1fe91f2b02075d2
     github.com/acme/weather v1.2.3
-    github.com/grpc-ecosystem/grpc-gateway v2.19.0 // indirect
+    github.com/grpc-ecosystem/grpc-gateway/v2 v2.19.0 // indirect
 )
 ```
 

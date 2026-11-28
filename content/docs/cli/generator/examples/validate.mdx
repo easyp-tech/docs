@@ -18,9 +18,10 @@ plugins:
     out: ./gen/go
     opts:
       lang: go
+      paths: source_relative
 ```
 
-Install `protoc-gen-go` and `protoc-gen-validate` on `PATH`, then run:
+Setting `paths: source_relative` on `validate` ensures `*.pb.validate.go` files are written alongside `*.pb.go` in the same Go package directory. Install `protoc-gen-go` and `protoc-gen-validate` on `PATH`, then run:
 
 ```bash
 easyp mod tidy

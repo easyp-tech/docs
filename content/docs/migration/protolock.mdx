@@ -1,5 +1,60 @@
 ---
-title: "Protolock"
+title: "Moving from protolock to EasyP v1"
+description: "Replace committed proto.lock snapshots with Git-backed breaking change detection in EasyP v1."
 ---
 
-## Work in progress
+`protolock` detects breaking changes by committing and updating a JSON `proto.lock` snapshot alongside your `.proto` files. EasyP v1 replaces that extra lock snapshot with direct descriptor-backed Git comparisons across **69 breaking rules** in four compatibility profiles (`FILE`, `PACKAGE`, `WIRE_JSON`, and `WIRE`).
+
+## Concept mapping
+
+| `protolock` | EasyP v1 | Notes |
+| --- | --- | --- |
+| `protolock init` / `proto.lock` | Git history (`breaking.baseline`) | Compares against any local branch, tag, or commit SHA — no `proto.lock` file to maintain |
+| `protolock status` | `easyp breaking` | Checks compatibility against `breaking.baseline` or `--against <ref>` |
+| `protolock commit` | Normal `git commit` / merge | Once merged into the baseline branch (e.g. `main`), it becomes the new baseline automatically |
+| `protolock status --uptodate` | CI `easyp breaking --frozen --against "$BASE_REF"` | Fails pull requests on breaking changes while enforcing the committed `protobuf.lock` |
+
+## 1. Configure `protobuf.mod` and `easyp.yaml`
+
+Declare your module root in `protobuf.mod`:
+
+```text
+module github.com/acme/contracts
+roots proto
+```
+
+Configure the breaking baseline and compatibility profile in `easyp.yaml`:
+
+```yaml
+version: v1
+breaking:
+  baseline: git:main
+  categories: [FILE]
+  ignore_unstable: false
+```
+
+- Use `FILE` (the default) for full source and generated-code compatibility, `PACKAGE` to allow moving declarations between files in the same package, `WIRE_JSON` for binary + JSON wire compatibility, or `WIRE` for binary wire compatibility only.
+- Use `breaking.ignore` (paths relative to `easyp.yaml`) to exclude experimental or internal subtrees.
+
+## 2. Verify locally and in CI
+
+Prepare `protobuf.lock` once with `easyp mod tidy`, commit `protobuf.mod`, `protobuf.lock`, and `easyp.yaml`, then run:
+
+```bash
+easyp validate-config
+easyp breaking --against main
+```
+
+In CI, fetch full Git history (`fetch-depth: 0` or `GIT_DEPTH: "0"`) and pass `--frozen` so the pipeline checks compatibility against the target branch or PR base commit without modifying files:
+
+```bash
+easyp validate-config
+easyp mod download --frozen
+easyp breaking --frozen --against origin/main
+```
+
+## 3. Retire `proto.lock`
+
+Run `easyp breaking` alongside `protolock status` for a few pull requests to confirm rule coverage matches your team's compatibility guarantees, then remove `proto.lock` and the `protolock` CI job.
+
+See the [Breaking changes reference](/docs/cli/breaking-changes) and [Breaking checks in CI](/docs/guides/breaking-checks-ci) for full rule profiles and workflow examples.

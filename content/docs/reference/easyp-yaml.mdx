@@ -58,18 +58,22 @@ description: "Complete specification for easyp.yaml, configuring producer-side l
       description: "Relative to the policy file supplying the issues section. Supports *, ?, [], and complete ** segments; a literal directory covers its subtree.",
       type: "string"
     },
+    "issues.exclude-rules[].linters": {
+      description: "Implemented rule or group names to suppress for matching files. Omitted or empty suppresses all lint rules for matching files.",
+      type: "string[]"
+    },
     breaking: {
       description: "Breaking change detection settings for CI verification.",
       type: "object"
     },
     "breaking.baseline": {
-      description: "Locally available Git branch, tag, full commit SHA, or revision prefixed with git:. Explicit --against wins; otherwise this field applies, then master.",
-      type: "string",
-      default: "master"
+      description: "Locally available Git branch, tag, full commit SHA, or revision prefixed with git: (the git: prefix is required in YAML). Explicit --against wins; if both are omitted, easyp breaking defaults to master.",
+      type: "string"
     },
     "breaking.categories": {
-      description: "FILE, PACKAGE, WIRE_JSON, WIRE: distinct compatibility profiles. Omitted/empty preserves legacy checks; multiple profiles apply their union.",
-      type: "string[]"
+      description: "FILE, PACKAGE, WIRE_JSON, WIRE: descriptor-backed compatibility profiles. Multiple profiles apply their union; omitted or empty defaults to [\"FILE\"].",
+      type: "string[]",
+      default: '["FILE"]'
     },
     "breaking.ignore_unstable": {
       description: "Skip packages with a supported unstable version in their final component on both sides of comparison. See exact forms below.",
@@ -119,11 +123,11 @@ breaking:
 
 The <code>linters</code>, <code>linters-settings</code>, <code>issues</code>, and <code>breaking</code> sections each come as a whole from the nearest file defining that section; fields are not partially merged. A child <code>issues: &#123;&#125;</code> clears inherited exclusions. An inherited exclusion path stays relative to the file defining <code>issues</code>, even when the invocation directory or <code>--root</code> is deeper.
 
-Policy discovery searches ancestors within the workspace. If no ancestor policy exists, one unambiguous outermost descendant policy may be selected; multiple independent policies require explicit <code>--cfg</code>. Explicit <code>--cfg</code> takes precedence, and explicit <code>--root</code> supplies the default lookup start.
+Policy discovery searches ancestors within the workspace. If no ancestor policy exists, one unambiguous outermost descendant policy may be selected; multiple independent policies require explicit <code>--config</code> (for example <code>easyp lint --config strict.easyp.yaml</code>). Explicit <code>--config</code> takes precedence, and explicit <code>--root</code> supplies the default lookup start.
 
 ## Rule selection and exclusions
 
-Repeated rule or group names are idempotent, and disabling wins over enabling. Unknown names in enable, disable, and exclusions are errors even if also listed on the opposite side. The reserved <code>PACKAGE_NO_IMPORT_CYCLE</code> rule is unimplemented and cannot be selected.
+Repeated rule or group names are idempotent, and disabling wins over enabling. Unknown names in enable, disable, and exclusions are errors even if also listed on the opposite side. <code>PACKAGE_NO_IMPORT_CYCLE</code> is implemented and included in the <code>MINIMAL</code> group and preset.
 
 <code>issues.exclude-rules[].path</code> uses <code>/</code> separators and is anchored to the directory of the file supplying the effective <code>issues</code> section:
 
@@ -154,7 +158,7 @@ The baseline can name a local branch, a lightweight or annotated tag, a full com
 
 Each selected module uses revision-local roots, manifests, and locks for its current and baseline revisions. The baseline is read from an isolated Git snapshot; the caller's checkout, manifest, and lock are unchanged. Policies come from current configuration and may each select a different baseline. See the [breaking guide](/docs/cli/breaking-changes) for local replacement limits.
 
-Select FILE for file/source compatibility, PACKAGE to allow moves within a package, WIRE_JSON for binary plus JSON, or WIRE for binary. See the [profile matrix](/docs/cli/breaking-changes). Omitted/empty categories preserve legacy checks. Shared policies remain pinned through the consuming manifest/lock.
+Select <code>FILE</code> for file/source compatibility, <code>PACKAGE</code> to allow moves within a package, <code>WIRE_JSON</code> for binary plus JSON, or <code>WIRE</code> for binary compatibility. See the [profile matrix](/docs/cli/breaking-changes). Omitted or empty <code>categories</code> defaults to <code>["FILE"]</code>. Shared policies remain pinned through the consuming manifest/lock.
 
 ## Unstable packages
 

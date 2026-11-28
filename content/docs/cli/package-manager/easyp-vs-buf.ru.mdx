@@ -1,18 +1,18 @@
 ---
 title: "Git-зависимости с конфигом Buf"
-description: "Как пилотная версия EasyP v1 извлекает корни proto из Git-зависимостей на Buf."
+description: "Как EasyP v1 читает корни proto, фильтры includes/excludes и сопоставления BSR из Git-зависимостей на Buf."
 ---
 
-Проект EasyP v1 перечисляет Git-модули в <code>protobuf.mod</code>. Репозиторий зависимости может использовать конфигурацию Buf: EasyP читает её и находит корни исходных <code>.proto</code>. Дублировать эти корни в <code>easyp.gen.yaml</code> потребителя не нужно.
+Проект EasyP v1 перечисляет Git-модули в <code>protobuf.mod</code>. Репозиторий зависимости может использовать конфигурацию Buf: EasyP читает её, извлекает корни исходных <code>.proto</code>, применяет фильтры <code>includes</code>/<code>excludes</code> и разрешает известные BSR-зависимости. Дублировать эти корни в <code>easyp.gen.yaml</code> потребителя не нужно.
 
-| Файл зависимости | Корни, которые использует EasyP |
-|------------------|---------------------------------|
-| <code>buf.work.yaml</code> v1 | <code>directories</code> |
-| <code>buf.yaml</code> v2 | <code>modules[].path</code> |
-| <code>buf.yaml</code> v1 | Корень репозитория |
-| <code>buf.yaml</code> v1beta1 | <code>build.roots</code> или корень репозитория |
+| Файл зависимости | Корни и фильтры, которые использует EasyP |
+|------------------|-------------------------------------------|
+| <code>buf.work.yaml</code> v1 | <code>directories</code> (включая вложенные <code>buf.yaml</code> с <code>excludes</code> и <code>deps</code>) |
+| <code>buf.yaml</code> v2 | <code>modules[].path</code> с фильтрами <code>modules[].includes</code> и <code>modules[].excludes</code> |
+| <code>buf.yaml</code> v1 | Корень репозитория с <code>build.excludes</code> |
+| <code>buf.yaml</code> v1beta1 | <code>build.roots</code> (или корень репозитория) с <code>build.excludes</code> |
 
-Если у зависимости нет конфигурации EasyP или Buf, её корнем считается каталог репозитория. Если есть старые EasyP <code>protobuf.mod</code> или <code>easyp.yaml</code>, EasyP также читает транзитивные требования и объявленные корни.
+Если у зависимости нет конфигурации EasyP или Buf, EasyP ищет однозначные корни по внутренним импортам самой зависимости, учитывает явные подсказки <code>easyp get --import-root</code> либо использует корень репозитория (записывая проверенные fallback-корни в <code>protobuf.lock</code>). При наличии старых EasyP <code>protobuf.mod</code> или <code>easyp.yaml</code> EasyP также читает транзитивные требования и объявленные корни.
 
 При адаптации старого <code>easyp.yaml</code> требования берутся и из <code>deps</code>, и из Git-входов генерации. Точные дубликаты источник/версия удаляются, разные минимумы сохраняются для MVS; некорректные deps вызывают ошибку. Совпадающий нативный <code>protobuf.mod</code> имеет приоритет. Читаются только метаданные, плагины зависимости не запускаются.
 
@@ -29,6 +29,15 @@ easyp mod download
 easyp generate
 ~~~
 
-<code>mod tidy</code> разрешает Git-зависимость и записывает выбранный коммит и хеш содержимого в <code>protobuf.lock</code>. Имена зависимостей Buf Registry не превращаются в Git URL автоматически: подходящий Git-источник надо объявить в манифесте потребителя. Фильтры Buf include/exclude для корней Git-зависимостей пока не поддерживаются и вызывают ошибку.
+## Фильтры Buf `includes`/`excludes` и BSR compatibility snapshots
 
-После <code>mod tidy</code> команда <code>mod vendor</code> может скопировать <code>.proto</code> зафиксированной Git-зависимости в <code>easyp_vendor</code>, используя корни из её конфигурации Buf. Подробнее — в [руководстве менеджера пакетов](/ru/docs/cli/package-manager).
+- **Фильтрация исходников**: Buf v1/v1beta1 <code>build.excludes</code> и v2 <code>modules[].includes</code> / <code>modules[].excludes</code> отбирают файлы без изменения их protobuf import paths. Исключённые файлы недоступны при импорте, генерации, линтинге, проверке breaking changes, проверке коллизий и vendoring.
+- **Известные BSR-зависимости (`bsr.StaticResolver`)**: EasyP читает <code>deps</code> из Buf v1, v1beta1 и v2 и сопоставляет **5 популярных BSR-модулей** с зафиксированными Git-снимками без обращений к BSR:
+  - `buf.build/googleapis/googleapis`
+  - `buf.build/grpc-ecosystem/grpc-gateway`
+  - `buf.build/mercari/grpc-federation`
+  - `buf.build/envoyproxy/protoc-gen-validate`
+  - `buf.build/bufbuild/protovalidate`
+- **Lock-файл и ограничения**: каждая привязка BSR сохраняется в <code>modules[].bsr</code> файла <code>protobuf.lock</code> со значением <code>resolution: compatibility_snapshot</code> (воспроизводится без изменений в режиме <code>--frozen</code>; эквивалентность ревизии BSR и её BSR digest не проверяются). Неизвестные BSR-модули вызывают явную ошибку — EasyP не угадывает Git URL, а прямые BSR-зависимости в собственном <code>protobuf.mod</code> потребителя не поддерживаются.
+
+После <code>mod tidy</code> команда <code>mod vendor</code> копирует разрешённые <code>.proto</code> зафиксированной Git-зависимости в <code>easyp_vendor</code> с учётом корней и фильтров из её конфигурации Buf. Подробнее — в [руководстве менеджера пакетов](/ru/docs/cli/package-manager#зависимости-на-buf-или-старом-easyp).

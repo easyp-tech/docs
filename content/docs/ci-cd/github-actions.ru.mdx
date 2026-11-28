@@ -9,7 +9,7 @@ description: "Проверка lock-файлов v1, линтинг схем, с
 
 Пример предполагает корневые <code>protobuf.mod</code> и закоммиченный <code>protobuf.lock</code>, корневой <code>easyp.yaml</code>, схемы в <code>proto</code> и корневой <code>easyp.gen.yaml</code>, записывающий отслеживаемые файлы в <code>gen</code>.
 
-Workflow использует подготовленный self-hosted Linux runner с пользовательской меткой <code>easyp-v1</code>. Назначайте её после подготовки выбранного бинарника EasyP с поддержкой v1 и необходимых локальных плагинов в <code>PATH</code>. Для hosted runner добавьте принятую в проекте установку фиксированных версий инструментов до шагов EasyP. Пример не предполагает существования конкретного опубликованного артефакта релиза v1.
+Workflow ниже устанавливает закреплённый архив релиза EasyP v1 на стандартном GitHub-hosted runner `ubuntu-latest` (также можно использовать контейнер `ghcr.io/easyp-tech/easyp:v1.0.0`, Homebrew на Linux/macOS или подготовленный self-hosted runner). Передавайте <code>--frozen</code> на шагах CI, чтобы EasyP проверял закоммиченный манифест и lock, отклонял локальные директивы <code>replace</code> и никогда не изменял файлы зависимостей.
 
 Локальные и встроенные плагины не принимают фиксацию через YAML-поле <code>version</code>: их версии определяются установленными исполняемыми файлами и бинарником EasyP. Удалённым плагинам нужна отдельная фиксированная семантическая <code>version</code> в <code>easyp.gen.yaml</code>.
 
@@ -26,28 +26,40 @@ permissions:
 
 jobs:
   verify:
-    runs-on: [self-hosted, linux, x64, easyp-v1]
+    runs-on: ubuntu-latest
+    env:
+      EASYP_VERSION: "1.0.0"
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Verify toolchain
-        run: easyp --version
+      - name: Install EasyP v1
+        run: |
+          ASSET="easyp-${EASYP_VERSION}-linux-amd64.tar.gz"
+          curl -fLO "https://github.com/easyp-tech/easyp/releases/download/v${EASYP_VERSION}/${ASSET}"
+          curl -fLO "https://github.com/easyp-tech/easyp/releases/download/v${EASYP_VERSION}/easyp-${EASYP_VERSION}-checksums.txt"
+          sha256sum --check --ignore-missing "easyp-${EASYP_VERSION}-checksums.txt"
+          tar -xzf "$ASSET"
+          sudo install "easyp-${EASYP_VERSION}-linux-amd64/easyp" /usr/local/bin/easyp
+          easyp --version
+
+      - name: Validate configuration
+        run: easyp validate-config
 
       - name: Verify locked dependencies
-        run: easyp mod download
+        run: easyp mod download --frozen
 
       - name: Lint schemas
-        run: easyp lint --path proto
+        run: easyp lint --frozen --path proto
 
       - name: Check compatibility
         env:
           BASE_REF: ${{ github.event.pull_request.base.sha }}
-        run: easyp breaking --path proto --against "$BASE_REF"
+        run: easyp breaking --frozen --path proto --against "$BASE_REF"
 
       - name: Generate code
-        run: easyp generate --project .
+        run: easyp generate --frozen --project .
 
       - name: Check committed generated files
         run: |
@@ -82,7 +94,7 @@ easyp breaking --path proto --against refs/tags/v1.2.0
 
 Выбирайте нужный предыдущий релиз явно: порядок создания тегов не обязательно задаёт историю совместимости. Каждая ревизия использует свои манифесты модулей, lock-файлы и зависимости, поэтому breaking-проверка может загрузить зависимости, которые не нужны текущему checkout.
 
-<code>FILE</code> — единственная поддерживаемая дополнительная категория. <code>ignore_unstable</code> работает для поддерживаемых суффиксов пакетов. Пути исключений отсчитываются от файла политики с секцией <code>breaking</code>: здесь <code>proto/experimental</code> задан относительно корневой политики. Вложенные секции заменяют секции целиком; <code>extends</code> явно подключает базу секции из локального файла или существующего закреплённого модуля.
+Поддерживаются все четыре профиля на базе дескрипторов: <code>FILE</code>, <code>PACKAGE</code>, <code>WIRE_JSON</code> и <code>WIRE</code> (отсутствующий или пустой <code>categories</code> по умолчанию использует <code>["FILE"]</code>). <code>ignore_unstable</code> работает для поддерживаемых суффиксов пакетов. Пути исключений отсчитываются от файла политики с секцией <code>breaking</code>: здесь <code>proto/experimental</code> задан относительно корневой политики. Вложенные секции заменяют секции целиком; <code>extends</code> явно подключает базу секции из локального файла или существующего закреплённого модуля.
 
 ## Выбор проектов генерации
 
@@ -102,7 +114,7 @@ easyp generate --project ./backend --project ./frontend
 
 По умолчанию хранилище EasyP находится в <code>~/.easyp</code>; его можно перенести через <code>EASYPPATH</code>. Если кешируете его, включайте в ключ кеша ОС, версию инструментов EasyP и хеши нужных lock-файлов. Восстановленный кеш — оптимизация, проверка зависимостей всё равно выполняется.
 
-До шага зависимостей настройте Git-аутентификацию, необходимую приватным источникам. Храните учётные данные в принятом для runner механизме секретов и не выводите их в логи. Локальная замена не устраняет загрузки, если весь граф зависимостей не локальный и не находится в проверенном кеше; удалённым плагинам всё ещё нужна сеть. <code>tidy</code> и <code>update</code> отклоняют активные локальные замены и не являются проверками только для чтения.
+До шага зависимостей настройте Git-аутентификацию, необходимую приватным источникам. Храните учётные данные в принятом для runner механизме секретов и не выводите их в логи. Локальная замена не устраняет загрузки, если весь граф зависимостей не локальный и не находится в проверенном кеше; удалённым плагинам всё ещё нужна сеть. Без <code>--frozen</code> команды <code>mod tidy</code> и <code>mod update</code> работают с локальными заменами, не переписывая <code>protobuf.lock</code>, и относятся к изменяющим командам, а не к read-only проверкам; в CI передавайте <code>--frozen</code>, чтобы отклонять любые директивы <code>replace</code> и изменения графа.
 
 ## Отладка
 

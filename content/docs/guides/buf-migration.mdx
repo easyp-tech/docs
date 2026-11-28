@@ -14,7 +14,7 @@ This guide maps Buf configuration to the EasyP v1 files and commands. Review eac
 | <code>buf.yaml</code> (deps section) | <code>protobuf.mod</code> | Tool-neutral dependency DSL; uses Git URLs instead of proprietary BSR names. |
 | <code>buf.yaml</code> (lint section) | <code>easyp.yaml</code> (linters) | Uses presets and rule lists; each policy section comes whole from its nearest definition. <code>extends</code> explicitly loads a section base from a local file or an existing locked module. |
 | <code>buf.yaml</code> (breaking section) | <code>easyp.yaml</code> (breaking) | Explicit git baseline comparison (e.g. <code>git:main</code>). |
-| <code>buf.gen.yaml</code> | <code>easyp.gen.yaml</code> | Resides at consumer project level and selects complete modules. |
+| <code>buf.gen.yaml</code> | <code>easyp.gen.yaml</code> | Resides at consumer project level; selects modules (string or `{ module, paths, packages }`) plus optional global `paths`/`packages`. |
 | <code>buf.gen.yaml</code> (managed) | <code>easyp.gen.yaml</code> (generate.managed) | Explicit managed mode; <code>options.go.package_prefix</code> is a separate Go-only convenience. |
 | <code>buf.lock</code> | <code>protobuf.lock</code> | Includes Git commit SHAs and content hashes. |
 | <code>buf dep update</code> | <code>easyp mod tidy</code> | Resolves declared requirements with MVS and writes the lock; review version updates separately. |
@@ -45,7 +45,7 @@ Extract module dependencies from <code>buf.yaml</code> into <code>protobuf.mod</
 module github.com/acme/my-service
 
 require (
-    github.com/googleapis/googleapis v1.5.0
+    github.com/googleapis/googleapis 03a91044136a014466d4293eb1fe91f2b02075d2
 )
 ~~~
 
@@ -83,7 +83,7 @@ plugins:
       paths: source_relative
 ~~~
 
-The local <code>go</code> plugin requires <code>protoc-gen-go</code> in the build environment. Fix its version there; local plugins reject a YAML <code>version</code>. Remote plugins require a separate pinned semantic version. <code>generate.packages</code> selects exact protobuf package names within the selected modules.
+The local <code>go</code> plugin requires <code>protoc-gen-go</code> in the build environment (or use <code>remote: plugins.easyp.tech/protocolbuffers/go</code> with a pinned <code>version</code>). Fix local plugin versions in the environment; local plugins reject a YAML <code>version</code>. Use <code>generate.paths</code>, <code>generate.packages</code>, or object entries (`{ module, paths, packages }`) in <code>generate.modules</code> to narrow generation targets without changing import roots.
 
 ### Step 5: Tidy and Verify
 
@@ -91,10 +91,11 @@ From the repository root, resolve dependencies, lint schemas, and generate the s
 
 ~~~bash
 easyp mod tidy
+easyp validate-config
 easyp lint
 easyp generate --project ./backend
 ~~~
 
-Review and commit <code>protobuf.mod</code> and <code>protobuf.lock</code>. Active local replacements must be removed before <code>tidy</code> or <code>update</code>; both commands reject them. In CI, use <code>easyp mod download</code> to verify locked dependencies and run <code>easyp breaking --against main</code> with the baseline available locally.
+Review and commit <code>protobuf.mod</code> and <code>protobuf.lock</code>. While a local <code>replace</code> is present, <code>mod tidy</code> and <code>mod update</code> operate on the local effective graph and leave <code>protobuf.lock</code> untouched; remove local replacements before producing a publishable lock, because <code>--frozen</code> in CI rejects every <code>replace</code>. In CI, use <code>easyp mod download --frozen</code> to verify locked dependencies and run <code>easyp breaking --frozen --against main</code> with the baseline available locally.
 
-Only <code>FILE</code> is supported in <code>breaking.categories</code>; <code>ignore_unstable</code> is available. Check the [policy reference](/docs/reference/easyp-yaml) before translating Buf breaking settings, and compare generated output and consumer tests before retiring the old workflow.
+All four breaking profiles — <code>FILE</code>, <code>PACKAGE</code>, <code>WIRE_JSON</code>, and <code>WIRE</code> (default <code>["FILE"]</code>) — plus <code>ignore_unstable</code> are supported. Check the [policy reference](/docs/reference/easyp-yaml) before translating Buf breaking settings, and compare generated output and consumer tests before retiring the old workflow.

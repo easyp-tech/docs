@@ -27,7 +27,7 @@ plugins:
       paths: source_relative
 ```
 
-Выполните `easyp generate`. Если `protoc-gen-go` или `protoc-gen-go-grpc` доступен в `PATH`, EasyP использует этот бинарник; иначе запускает соответствующий встроенный WASM-плагин. Go import path задаётся опцией `go_package` в `.proto` или managed-опцией `options.go.package_prefix`. Подробности — в [справочнике managed mode](/ru/docs/reference/easyp-gen-yaml).
+Установите `protoc-gen-go` и `protoc-gen-go-grpc` в `PATH` (`go` и `go-grpc` **не** входят в 15 встроенных WASM-плагинов; для запуска без локальной установки используйте `remote: plugins.easyp.tech/protocolbuffers/go` и `remote: plugins.easyp.tech/grpc/go` с зафиксированными полями `version:`), затем выполните `easyp generate`. Go import path задаётся опцией `go_package` в `.proto` или managed-опцией `options.go.package_prefix`. Подробности — в [справочнике managed mode](/ru/docs/reference/easyp-gen-yaml).
 
 Например, `options.go.package_prefix: github.com/acme/contracts/gen/go` отображает protobuf-пакет `common.v1` в `github.com/acme/contracts/gen/go/common/v1`. С `paths: source_relative` файлы попадают в `gen/go/common/v1`, согласуя каталоги с Go-импортами.
 

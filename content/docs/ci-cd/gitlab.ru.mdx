@@ -1,11 +1,14 @@
 ---
 title: "GitLab CI"
+description: "Запуск проверок конфигурации, зависимостей в режиме frozen, линтинга, breaking changes и генерации кода EasyP v1 в GitLab CI."
 ---
 
-Для примера ниже задайте <code>EASYP_CI_IMAGE</code>: закреплённый образ с проверенной сборкой EasyP v1, Git и нужными плагинами. Конфиги и lock должны быть закоммичены. Здесь показан один модуль с generation-конфигом в корне; в монорепозитории команды модулей запускаются для каждого модуля, а генерация выбирается явно.
+Используйте закреплённый образ EasyP v1, например `ghcr.io/easyp-tech/easyp:v1.0.0` (или собственный образ на его базе с нужными локальными бинарниками `protoc-gen-*`; для удалённых и 15 встроенных WASM-плагинов дополнительные бинарники не требуются). Конфиги и `protobuf.lock` должны быть закоммичены. Здесь показан один модуль с generation-конфигом в корне; в монорепозитории команды модулей запускаются для каждого модуля, а проекты генерации выбираются явно через `--project` или `--all`.
 
 ~~~yaml
-image: $EASYP_CI_IMAGE
+image:
+  name: ghcr.io/easyp-tech/easyp:v1.0.0
+  entrypoint: [""]
 
 variables:
   GIT_DEPTH: "0"
@@ -16,13 +19,13 @@ contracts:
   stage: validate
   script:
     - easyp validate-config
-    - easyp mod download
-    - easyp lint
+    - easyp mod download --frozen
+    - easyp lint --frozen
     - git fetch origin +refs/heads/main:refs/remotes/origin/main
-    - easyp breaking --against refs/remotes/origin/main
-    - easyp generate
+    - easyp breaking --frozen --against refs/remotes/origin/main
+    - easyp generate --frozen
     - git diff --exit-code
     - test -z "$(git status --porcelain --untracked-files=normal -- gen)"
 ~~~
 
-Замените <code>main</code> и <code>gen</code> на baseline и каталог результатов проекта. Последняя проверка учитывает новые неотслеживаемые generated-файлы. Не маскируйте ошибку breaking через <code>|| echo</code>. Доступ к приватным Git-источникам настраивается средствами runner; секреты не записываются в YAML-конфиги EasyP.
+Замените `main` и `gen` на baseline и каталог результатов проекта. Флаг `--frozen` проверяет закоммиченный `protobuf.lock` и отклоняет любые локальные директивы `replace` в CI. Последняя проверка обнаруживает новые неотслеживаемые сгенерированные файлы. Не маскируйте ошибку breaking через `|| echo`. Доступ к приватным Git-источникам настраивается средствами runner; секреты не записываются в YAML-конфиги EasyP.

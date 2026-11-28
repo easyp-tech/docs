@@ -1,0 +1,8 @@
+{
+  "title": "Примеры",
+  "pages": [
+    "go",
+    "grpc-gateway",
+    "validate"
+  ]
+}

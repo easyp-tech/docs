@@ -1,18 +1,18 @@
 ---
 title: "Using Buf-configured Git dependencies"
-description: "How the EasyP v1 pilot reads proto roots from Git dependencies that use Buf configuration."
+description: "How EasyP v1 reads proto roots, include/exclude filters, and BSR compatibility mappings from Git dependencies that use Buf configuration."
 ---
 
-An EasyP v1 project lists Git modules in <code>protobuf.mod</code>. A dependency repository can use Buf configuration; EasyP reads that configuration to find its <code>.proto</code> source roots. The consumer does not need to copy those roots into <code>easyp.gen.yaml</code>.
+An EasyP v1 project lists Git modules in <code>protobuf.mod</code>. A dependency repository can use Buf configuration; EasyP reads that configuration to find its <code>.proto</code> source roots, apply include/exclude filters, and resolve known BSR dependencies. The consumer does not need to copy those roots into <code>easyp.gen.yaml</code>.
 
-| Dependency file | Roots used by EasyP |
-|-----------------|---------------------|
-| <code>buf.work.yaml</code> v1 | <code>directories</code> |
-| <code>buf.yaml</code> v2 | <code>modules[].path</code> |
-| <code>buf.yaml</code> v1 | Repository root |
-| <code>buf.yaml</code> v1beta1 | <code>build.roots</code>, or repository root if omitted |
+| Dependency file | Roots & filters used by EasyP |
+|-----------------|-------------------------------|
+| <code>buf.work.yaml</code> v1 | <code>directories</code> (plus each module's nested <code>buf.yaml</code> excludes and <code>deps</code>) |
+| <code>buf.yaml</code> v2 | <code>modules[].path</code> with <code>modules[].includes</code> and <code>modules[].excludes</code> |
+| <code>buf.yaml</code> v1 | Repository root with <code>build.excludes</code> |
+| <code>buf.yaml</code> v1beta1 | <code>build.roots</code> (or repository root if omitted) with <code>build.excludes</code> |
 
-When a dependency has no EasyP or Buf configuration, EasyP uses its repository root. If it has an older EasyP <code>protobuf.mod</code> or <code>easyp.yaml</code>, EasyP also reads its transitive requirements and declared roots.
+When a dependency has no EasyP or Buf configuration, EasyP checks dependency-internal imports for unambiguous roots, honors explicit <code>easyp get --import-root</code> hints, or defaults to its repository root (recording verified fallback roots in <code>protobuf.lock</code>). If it has an older EasyP <code>protobuf.mod</code> or <code>easyp.yaml</code>, EasyP also reads its transitive requirements and declared roots.
 
 When adapting an older <code>easyp.yaml</code>, both <code>deps</code> and generation Git inputs contribute requirements. Exact source/version duplicates are removed; different minimums remain visible to MVS, and malformed deps fail explicitly. A matching native <code>protobuf.mod</code> takes precedence. Only metadata is read; dependency plugins are never executed.
 
@@ -29,6 +29,15 @@ easyp mod download
 easyp generate
 ~~~
 
-<code>mod tidy</code> resolves the Git dependency and records the selected commit and content hash in <code>protobuf.lock</code>. Buf Registry dependency names are not converted into Git URLs automatically; declare a suitable Git source in the consumer manifest. Buf include/exclude filters are not yet supported for Git dependency import roots and produce an error.
+## Buf `includes`/`excludes` and BSR compatibility snapshots
 
-After <code>mod tidy</code>, <code>mod vendor</code> can copy the locked Git dependency's <code>.proto</code> files into <code>easyp_vendor</code> using the roots extracted from its Buf configuration. See the [package manager guide](/docs/cli/package-manager).
+- **Source filtering**: Buf v1/v1beta1 <code>build.excludes</code> and v2 <code>modules[].includes</code> / <code>modules[].excludes</code> filter files without changing their protobuf import paths. Excluded files remain unavailable across imports, generation, linting, breaking checks, collision checks, and vendoring.
+- **Known BSR dependencies (`bsr.StaticResolver`)**: EasyP reads Buf v1, v1beta1, and v2 <code>deps</code> and resolves **5 widely used BSR modules** to pinned Git compatibility snapshots without contacting BSR:
+  - `buf.build/googleapis/googleapis`
+  - `buf.build/grpc-ecosystem/grpc-gateway`
+  - `buf.build/mercari/grpc-federation`
+  - `buf.build/envoyproxy/protoc-gen-validate`
+  - `buf.build/bufbuild/protovalidate`
+- **Lockfile & limits**: Each resolved BSR binding is recorded under <code>modules[].bsr</code> in <code>protobuf.lock</code> with <code>resolution: compatibility_snapshot</code> (replayed verbatim in <code>--frozen</code> mode; BSR revision equivalence and BSR digest are not verified). Unknown BSR modules fail explicitly — EasyP never guesses a Git URL, and direct BSR entries in the consumer's own <code>protobuf.mod</code> are not supported.
+
+After <code>mod tidy</code>, <code>mod vendor</code> copies the locked Git dependency's allowed <code>.proto</code> files into <code>easyp_vendor</code> using the roots and filters extracted from its Buf configuration. See the [package manager guide](/docs/cli/package-manager#dependencies-using-buf-or-older-easyp).
