@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
-import { ArrowRight, Bot, Boxes, Layers, Radio, Tag } from 'lucide-react'
+import { ArrowRight, Bot, Boxes, FileCode2, Layers, Radio, Tag } from 'lucide-react'
 import { isAppLocale, type AppLocale } from '@/lib/i18n'
 import { getRegistry, REGISTRY_HOST } from '@/lib/registry'
 import { pluginsCopy } from '@/lib/plugins-copy'
@@ -136,39 +136,54 @@ export default async function PluginsPage({ params }: Props) {
         </div>
       </section>
 
-      <section className="mx-auto mb-14 grid w-full max-w-7xl grid-cols-1 gap-4 px-6 lg:grid-cols-5">
-        <div className="glass-panel min-w-0 rounded-2xl p-6 lg:col-span-3">
-          <h2 className="mb-1.5 text-lg font-semibold">{t.quickstart.title}</h2>
-          <p className="mb-4 text-sm text-fd-muted-foreground">{t.quickstart.body}</p>
-          <CopyBlock code={snippet} label="Copy easyp.yaml" copiedLabel={t.browser.copied} />
-          <Link
-            href={`${base(lang)}/docs/api-service/client-usage`}
-            className="mt-4 inline-flex items-center gap-1.5 text-sm font-medium text-fd-primary hover:underline"
-          >
-            {t.quickstart.docs}
-            <ArrowRight size={14} />
-          </Link>
-        </div>
-        <div className="glass-panel flex min-w-0 flex-col rounded-2xl p-6 lg:col-span-2">
-          <div className="mb-3 flex h-9 w-9 items-center justify-center rounded-xl bg-fd-primary/10 text-fd-primary">
-            <Bot size={18} />
+      <section className="mx-auto mb-14 flex w-full max-w-7xl flex-col gap-4 px-6">
+        <div className="glass-panel grid min-w-0 gap-6 rounded-2xl p-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] lg:p-8">
+          <div className="flex min-w-0 flex-col">
+            <div className="mb-3 flex h-9 w-9 items-center justify-center rounded-xl bg-fd-primary/10 text-fd-primary">
+              <FileCode2 size={18} />
+            </div>
+            <h2 className="mb-1.5 text-lg font-semibold">{t.quickstart.title}</h2>
+            <p className="text-sm leading-relaxed text-fd-muted-foreground">{t.quickstart.body}</p>
+            <Link
+              href={`${base(lang)}/docs/api-service/client-usage`}
+              className="mt-4 inline-flex items-center gap-1.5 text-sm font-medium text-fd-primary hover:underline lg:mt-auto"
+            >
+              {t.quickstart.docs}
+              <ArrowRight size={14} />
+            </Link>
           </div>
-          <h2 className="mb-1.5 text-lg font-semibold">{t.quickstart.agents}</h2>
-          <p className="mb-4 text-sm text-fd-muted-foreground">{t.quickstart.agentsBody}</p>
-          <CopyBlock code={`https://${REGISTRY_HOST}/mcp`} label="Copy MCP URL" copiedLabel={t.browser.copied} />
-          <p className="mt-4 mb-2 text-sm text-fd-muted-foreground">Claude Code:</p>
-          <CopyBlock
-            code={`claude mcp add --transport http easyp-plugins https://${REGISTRY_HOST}/mcp`}
-            label="Copy command"
-            copiedLabel={t.browser.copied}
-          />
-          <Link
-            href={`${base(lang)}/docs/api-service/mcp`}
-            className="mt-auto inline-flex items-center gap-1.5 pt-4 text-sm font-medium text-fd-primary hover:underline"
-          >
-            MCP
-            <ArrowRight size={14} />
-          </Link>
+          <CopyBlock code={snippet} label="Copy easyp.yaml" copiedLabel={t.browser.copied} />
+        </div>
+
+        <div className="glass-panel grid min-w-0 gap-6 rounded-2xl p-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] lg:p-8">
+          <div className="flex min-w-0 flex-col">
+            <div className="mb-3 flex h-9 w-9 items-center justify-center rounded-xl bg-fd-primary/10 text-fd-primary">
+              <Bot size={18} />
+            </div>
+            <h2 className="mb-1.5 text-lg font-semibold">{t.quickstart.agents}</h2>
+            <p className="text-sm leading-relaxed text-fd-muted-foreground">{t.quickstart.agentsBody}</p>
+            <Link
+              href={`${base(lang)}/docs/api-service/mcp`}
+              className="mt-4 inline-flex items-center gap-1.5 text-sm font-medium text-fd-primary hover:underline lg:mt-auto"
+            >
+              MCP
+              <ArrowRight size={14} />
+            </Link>
+          </div>
+          <div className="flex min-w-0 flex-col gap-4">
+            <div>
+              <p className="mb-2 text-xs font-medium tracking-wide text-fd-muted-foreground uppercase">MCP endpoint</p>
+              <CopyBlock code={`https://${REGISTRY_HOST}/mcp`} label="Copy MCP URL" copiedLabel={t.browser.copied} />
+            </div>
+            <div>
+              <p className="mb-2 text-xs font-medium tracking-wide text-fd-muted-foreground uppercase">Claude Code</p>
+              <CopyBlock
+                code={`claude mcp add --transport http easyp-plugins https://${REGISTRY_HOST}/mcp`}
+                label="Copy command"
+                copiedLabel={t.browser.copied}
+              />
+            </div>
+          </div>
         </div>
       </section>
 

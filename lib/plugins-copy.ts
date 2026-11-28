@@ -17,7 +17,7 @@ const en = {
     title: 'Use it in easyp.yaml',
     body: 'Point a plugin at the registry with remote: — pin the version so the output does not move when a newer one is published.',
     agents: 'For AI agents',
-    agentsBody: 'The same listing over MCP, tool plugins_list:',
+    agentsBody: 'The same listing over MCP, as the plugins_list tool. Connect any agent by URL, or Claude Code with one command.',
     docs: 'Client usage docs',
   },
   browser: {
@@ -62,7 +62,7 @@ const ru: typeof en = {
     title: 'Подключение в easyp.yaml',
     body: 'Укажите плагин через remote: и зафиксируйте версию, чтобы результат не менялся, когда выйдет новая.',
     agents: 'Для AI-агентов',
-    agentsBody: 'Тот же список через MCP, инструмент plugins_list:',
+    agentsBody: 'Тот же список через MCP — инструмент plugins_list. Подключите любого агента по адресу или Claude Code одной командой.',
     docs: 'Документация по подключению',
   },
   browser: {
